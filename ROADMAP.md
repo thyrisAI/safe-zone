@@ -23,17 +23,32 @@ The roadmap is split into phases. Each bullet is a concrete, actionable item.
 
 ## Phase 1 – Core Product Hardening
 
-**Goal:** Ensure the gateway is robust and production‑ready for early adopters.
+**Goal:** Ensure the gateway is robust, testable and production‑ready for security‑sensitive (e.g. banking/PCI) adopters.
 
-- [ ] Add automated tests for:
-  - [ ] PII detection and redaction
-  - [ ] Confidence thresholds and decision logic (allow / mask / block)
-  - [ ] Validators (BUILTIN, REGEX, SCHEMA, AI_PROMPT)
-  - [ ] Templates import behavior (upsert semantics)
-- [ ] Add integration tests for `/detect` and LLM gateway `/v1/chat/completions` end‑to‑end (CI‑friendly, runnable via `go test ./...`)
+- [ ] Define a Phase 1 test strategy (risk‑based, bank/PCI‑ready):
+  - [ ] Define test categories and entry/exit criteria (unit, integration, e2e, non‑functional, security)
+  - [ ] Set minimal coverage expectations for critical flows (PII/PCI, allow/mask/block decisions)
+- [ ] Add unit tests for core detection and decision logic:
+  - [ ] PII detection and redaction (emails, phones, national IDs, card numbers and other PCI‑relevant fields)
+  - [ ] Confidence thresholds and decision logic (allow / mask / block, including rounding and boundary conditions)
+  - [ ] Validators (BUILTIN, REGEX, SCHEMA, AI_PROMPT) including negative and edge cases
+  - [ ] Templates import behavior (upsert semantics, idempotency and validation errors)
+  - [ ] Security event and SIEM model mapping
+- [ ] Add integration tests (API + DB/Redis + AI client boundaries) for:
+  - [ ] `/detect` end‑to‑end with PII / non‑PII / borderline payloads
+  - [ ] LLM gateway `/v1/chat/completions` including streaming and guardrail modes
+  - [ ] Templates import + detection flow using built‑in template packs
+  - [ ] Allowlist/blocklist logic and pattern precedence
+- [ ] Add end‑to‑end regression suites (CI‑friendly, runnable via `go test ./...` or `test-scripts/`):
+  - [ ] Happy‑path flows for typical banking use cases (KYC, customer support chat, transaction memos, internal ops)
+  - [ ] Misuse/abuse scenarios (prompt injection, jailbreak attempts, sensitive data exfiltration)
+  - [ ] Replay known incident patterns as regression tests where applicable
 - [x] Add basic benchmarks (requests per second, latency under load) (covered by `test-scripts` load test helper)
 - [x] Add graceful error handling for external AI failures (timeouts, partial outages)
-- [ ] Document performance characteristics and suggested resource sizing
+- [ ] Add non‑functional tests:
+  - [ ] Load and stress tests for peak traffic and batch scenarios
+  - [ ] Basic resilience tests (timeouts, network failures, Redis/PostgreSQL outages)
+- [ ] Document performance characteristics, suggested resource sizing and the overall test strategy
 - [x] Add an end‑to‑end sanity test suite (`test-scripts/`) that exercises patterns, allowlist/blocklist, validators, templates, admin APIs and the LLM gateway
 
 ---
@@ -89,20 +104,6 @@ The roadmap is split into phases. Each bullet is a concrete, actionable item.
 - [x] Document backup & disaster recovery for PostgreSQL and Redis (see `docs/ARCHITECTURE_SECURITY.md`)
 - [x] Add security event model and SIEM webhook integration for guardrail decisions (`internal/models/security_event.go`, `internal/guardrails/siem.go`, `SIEM_WEBHOOK_URL`)
 - [ ] Document SIEM/webhook integration patterns and example dashboards
-
----
-
-## Phase 5 – Admin UI (Optional but High Impact)
-
-**Goal:** Provide a minimal UI for security and platform teams.
-
-- [ ] Design a simple web UI (can be a separate repo or module):
-  - [ ] View and search patterns, validators, allowlist, blocklist
-  - [ ] Create/update/delete patterns and validators
-  - [ ] Import/export templates from UI
-  - [ ] Simple playground to test `/detect` and gateway interactively
-- [ ] Integrate the UI with authentication (SSO or proxy‑level auth)
-- [ ] Document how to deploy the UI alongside the gateway
 
 ---
 

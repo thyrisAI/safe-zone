@@ -41,8 +41,22 @@ If you are evaluating TSZ for the first time, we recommend the following order:
 3. `docs/QUICK_START.md`
 4. `docs/API_REFERENCE.md`
 
+For a more detailed map of the documentation set, see `docs/README.md`.
+
+---
+
+## Contributing
+
+We welcome community contributions.
+
+- Please read our [Contributing Guide](CONTRIBUTING.md) for details on how to set up a development environment, run tests and propose changes.
+- By participating in this project, you agree to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+- For reporting security issues, **do not** open a public GitHub issue. Instead, follow the process described in our [Security Policy](SECURITY.md).
+
 ---
 
 ## License
 
+This project is licensed under the **Apache License, Version 2.0**. See the [LICENSE](LICENSE) file for the full text.
 
+Unless otherwise noted, all contributions to this repository are also licensed under the Apache License 2.0.

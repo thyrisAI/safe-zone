@@ -10,12 +10,12 @@ The roadmap is split into phases. Each bullet is a concrete, actionable item.
 
 **Goal:** Make the current codebase safe and clear to open‑source.
 
-- [ ] Choose and apply an open‑source license (recommended: Apache 2.0)
-- [ ] Add `LICENSE` file and update all headers/README to reference the new license
-- [ ] Add `CONTRIBUTING.md` (how to run, how to submit issues/PRs, code style)
-- [ ] Add `CODE_OF_CONDUCT.md`
-- [ ] Add `SECURITY.md` with vulnerability disclosure policy
-- [ ] Clean secrets / private references (ensure no internal URLs, tokens, or customer data)
+- [x] Choose and apply an open‑source license (recommended: Apache 2.0)
+- [x] Add `LICENSE` file and update all headers/README to reference the new license
+- [x] Add `CONTRIBUTING.md` (how to run, how to submit issues/PRs, code style)
+- [x] Add `CODE_OF_CONDUCT.md`
+- [x] Add `SECURITY.md` with vulnerability disclosure policy
+- [x] Clean secrets / private references (ensure no internal URLs, tokens, or customer data)
 - [x] Create structured, enterprise‑ready documentation under `docs/`
 - [x] Provide a complete Postman collection with realistic examples (`docs/TSZ_Postman_Collection.json`)
 

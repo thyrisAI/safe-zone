@@ -32,12 +32,15 @@ The documentation set is organized as follows:
 
 - **Postman Collection** – Ready‑to‑use collection for exploring the API  
   `TSZ_Postman_Collection.json`
+
 - **Go Client (tszclient-go)** – Lightweight Go SDK for `/detect` and the LLM gateway  
   `../pkg/tszclient-go/README.md`
 
 You can also view the high‑level marketing/overview document at the repository root:
 
 - `PRODUCT_OVERVIEW.md`
+
+For repository‑level information (license, contributing, security policy), see the root of the repository.
 
 ---
 
@@ -63,3 +66,18 @@ If you are evaluating TSZ in a POC, we recommend starting with:
 2. `ARCHITECTURE_SECURITY.md`
 3. `QUICK_START.md`
 4. `API_REFERENCE.md`
+
+---
+
+## Open Source & Governance
+
+TSZ is released as open source under the **Apache License 2.0**.
+
+At the repository root you will find:
+
+- `LICENSE` – full license text (Apache 2.0)
+- `CONTRIBUTING.md` – how to set up a dev environment, run tests and contribute
+- `CODE_OF_CONDUCT.md` – community standards and expected behavior
+- `SECURITY.md` – vulnerability disclosure and security contact details
+
+Please refer to those documents before contributing or reporting security issues.

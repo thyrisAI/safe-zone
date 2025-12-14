@@ -163,10 +163,6 @@ func (d *Detector) Detect(req models.DetectRequest) models.DetectResponse {
 				continue
 			}
 
-			if p.Name == "TCKN" && !isValidTCKN(value) {
-				continue
-			}
-
 			placeholder := generatePlaceholder(p.Name, req.RID)
 
 			ctx := ConfidenceContext{

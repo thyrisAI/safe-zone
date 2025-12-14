@@ -19,6 +19,7 @@ type Config struct {
 	AIModelName      string
 	Features         FeatureFlags
 	GatewayBlockMode string
+	AppMode          string
 
 	// Streaming / gateway settings
 	// Maximum size of the in-memory buffer used for streaming output guardrails (in bytes).
@@ -47,6 +48,7 @@ func LoadConfig() {
 		PIIMode:          getEnv("PII_MODE", "MASK"),
 		ServerPort:       getEnv("SERVER_PORT", "8080"),
 		GatewayBlockMode: strings.ToUpper(getEnv("GATEWAY_BLOCK_MODE", "BLOCK")),
+		AppMode:          strings.ToUpper(getEnv("APP_MODE", "DEV")),
 		AIModelURL:       getEnv("THYRIS_AI_MODEL_URL", "http://localhost:11434/v1"),
 		AIAPIKey:         getEnv("THYRIS_AI_API_KEY", "ollama"), // Default to 'ollama' for local instances
 		AIModelName:      getEnv("THYRIS_AI_MODEL", "llama3"),

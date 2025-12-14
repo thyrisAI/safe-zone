@@ -12,14 +12,6 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-// isValidTCKN performs a simple check for Turkish ID number validity
-func isValidTCKN(tckn string) bool {
-	if len(tckn) != 11 {
-		return false
-	}
-	return true
-}
-
 // isValidJSON checks if the string is valid JSON
 func isValidJSON(s string) bool {
 	var js interface{}
@@ -31,6 +23,7 @@ func isValidXML(s string) bool {
 	return xml.Unmarshal([]byte(s), new(interface{})) == nil
 }
 
+// isValidSchema validates JSON content against a given JSON Schema
 // isValidSchema validates JSON content against a given JSON Schema
 func isValidSchema(jsonContent string, schemaContent string) (bool, error) {
 	schemaLoader := gojsonschema.NewStringLoader(schemaContent)

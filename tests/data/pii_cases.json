@@ -1,0 +1,38 @@
+[
+  {
+    "name": "EMAIL_SIMPLE",
+    "text": "Contact me at john.doe@example.com",
+    "expect_contains_pii": true,
+    "expected_types": ["EMAIL"]
+  },
+  {
+    "name": "TR_TCKN_LIKE",
+    "text": "My Turkish ID is 10000000146.",
+    "expect_contains_pii": true,
+    "expected_types": ["TCKN"]
+  },
+  {
+    "name": "US_SSN_SIMPLE",
+    "text": "Employee SSN: 123-45-6789.",
+    "expect_contains_pii": true,
+    "expected_types": ["US_SSN"]
+  },
+  {
+    "name": "UK_NINO_SIMPLE",
+    "text": "NINO is AB123456C.",
+    "expect_contains_pii": true,
+    "expected_types": ["UK_NINO"]
+  },
+  {
+    "name": "MIXED_EMAIL_AND_SSN",
+    "text": "You can reach me at jane@example.com and my SSN is 987-65-4321.",
+    "expect_contains_pii": true,
+    "expected_types": ["EMAIL", "US_SSN"]
+  },
+  {
+    "name": "NON_PII_SAFE_TEXT",
+    "text": "This is a harmless sentence without any IDs or emails.",
+    "expect_contains_pii": false,
+    "expected_types": []
+  }
+]

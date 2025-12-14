@@ -210,6 +210,7 @@ func main() {
         log.Fatalf("chat completions failed: %v", err)
     }
 
+    // ChatCompletions returns a `ChatCompletionResponse` map value
     choices, ok := resp["choices"].([]interface{})
     if !ok || len(choices) == 0 {
         log.Println("no choices in response")

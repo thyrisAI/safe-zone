@@ -351,7 +351,7 @@ func logGatewayDetectSummary(stage string, rid string, resp models.DetectRespons
 		breakdownStr = "None"
 	}
 
-	log.Printf("[gateway-detect] stage=%s RID=%s blocked=%v contains_pii=%v total=%d breakdown={%s} message=%q overall_confidence=%s",
+	log.Printf("[gateway-detect] stage=%s RID=%s blocked=%v contains_pii=%v total=%d breakdown={%s} message=%q overall_confidence=%.2f",
 		stage,
 		rid,
 		resp.Blocked,
@@ -359,7 +359,7 @@ func logGatewayDetectSummary(stage string, rid string, resp models.DetectRespons
 		total,
 		breakdownStr,
 		resp.Message,
-		resp.OverallConfidence,
+		float64(resp.OverallConfidence),
 	)
 
 	if len(resp.Detections) > 0 {

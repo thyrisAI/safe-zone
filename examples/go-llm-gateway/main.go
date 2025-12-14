@@ -21,7 +21,7 @@ func main() {
 	}
 
 	resp, err := client.ChatCompletions(ctx, tszclient.ChatCompletionRequest{
-		Model: "gpt-4o",
+		Model: "llama3.1:8b",
 		Messages: []map[string]interface{}{
 			{"role": "user", "content": "Hello via TSZ gateway"},
 		},
@@ -34,6 +34,7 @@ func main() {
 		log.Fatalf("chat completions failed: %v", err)
 	}
 
+	// ChatCompletions returns a map value (ChatCompletionResponse)
 	choices, ok := resp["choices"].([]interface{})
 	if !ok || len(choices) == 0 {
 		log.Println("no choices in response")

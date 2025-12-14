@@ -173,6 +173,9 @@ type ChatCompletionRequest struct {
 // ChatCompletionResponse is kept generic; callers can unmarshal into
 // a strongly-typed struct if they wish, but for most use cases this
 // map-based representation is sufficient.
+//
+// It is returned as a map value (not a pointer) so that call sites can
+// use it directly, e.g. `resp["choices"]`.
 type ChatCompletionResponse map[string]interface{}
 
 // ChatCompletions calls the OpenAI-compatible LLM gateway
@@ -199,7 +202,18 @@ func (c *Client) ChatCompletions(
 		payload[k] = v
 	}
 
-	return postJSON[ChatCompletionResponse](ctx, c.httpClient, c.baseURL, "/v1/chat/completions", payload, headers)
+	resp, err := postJSON[ChatCompletionResponse](ctx, c.httpClient, c.baseURL, "/v1/chat/completions", payload, headers)
+	if err != nil {
+		return nil, err
+	}
+
+	// postJSON returns a pointer, but ChatCompletions exposes a value
+	// type for ergonomic map access at call sites.
+	if resp == nil {
+		return nil, fmt.Errorf("nil response from TSZ gateway")
+	}
+
+	return *resp, nil
 }
 
 // postJSON is a small helper for POSTing JSON and decoding the JSON response

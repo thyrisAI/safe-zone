@@ -19,6 +19,10 @@ on:
           - patch
           - minor
           - major
+      release_notes:
+        description: "Optional release notes (if empty: thyris-sz uses auto-generated notes, SDKs use empty body)"
+        required: false
+        type: string
 
 jobs:
   release:
@@ -58,6 +62,41 @@ jobs:
           chmod +x ci/release_${{ github.event.inputs.product }}.sh
           ci/release_${{ github.event.inputs.product }}.sh --bump ${{ github.event.inputs.bump }}
 
+      # thyris-sz: create release (auto or manual notes depending on input) with a core artifact zip
+      - name: Determine last thyris-sz tag
+        if: ${{ github.event.inputs.product == 'thyris-sz' }}
+        run: |
+          LAST_TAG=$(git tag --list 'thyris-sz-v*' | sort -V | tail -n 1)
+          echo "LAST_TAG=$LAST_TAG" >> $GITHUB_ENV
+
+      - name: Package thyris-sz artifact
+        if: ${{ github.event.inputs.product == 'thyris-sz' }}
+        run: |
+          VERSION=${LAST_TAG#thyris-sz-v}
+          ZIP_NAME="thyris-sz-${VERSION}.zip"
+          echo "Packaging thyris-sz core into $ZIP_NAME"
+          zip -r "$ZIP_NAME" internal .env.example Dockerfile LICENSE docker-compose.yml go.mod go.sum init.sql main.go -x '**/__pycache__/*' '*.pyc' '*.pyo'
+
+      - name: Create GitHub Release for thyris-sz (manual notes)
+        if: ${{ github.event.inputs.product == 'thyris-sz' && github.event.inputs.release_notes != '' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.LAST_TAG }}
+          files: thyris-sz-*.zip
+          body: ${{ github.event.inputs.release_notes }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release for thyris-sz (auto-generated notes)
+        if: ${{ github.event.inputs.product == 'thyris-sz' && github.event.inputs.release_notes == '' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.LAST_TAG }}
+          files: thyris-sz-*.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       # Go SDK: package only SDK + examples as a zip artifact (in addition to source code)
       - name: Package Go SDK artifact (tszclient-go)
         if: ${{ github.event.inputs.product == 'tszclient-go' }}
@@ -69,13 +108,22 @@ jobs:
           echo "Packaging Go SDK from pkg/tszclient-go and examples/go-sdk-demo into $ZIP_NAME"
           zip -r "$ZIP_NAME" pkg/tszclient-go examples/go-sdk-demo -x '**/__pycache__/*' '*.pyc' '*.pyo'
 
-      - name: Create GitHub Release for Go SDK
-        if: ${{ github.event.inputs.product == 'tszclient-go' }}
+      - name: Create GitHub Release for Go SDK (manual notes)
+        if: ${{ github.event.inputs.product == 'tszclient-go' && github.event.inputs.release_notes != '' }}
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.LAST_TAG }}
           files: tszclient-go-*.zip
-          generate_release_notes: true
+          body: ${{ github.event.inputs.release_notes }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release for Go SDK (no notes)
+        if: ${{ github.event.inputs.product == 'tszclient-go' && github.event.inputs.release_notes == '' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.LAST_TAG }}
+          files: tszclient-go-*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -90,12 +138,21 @@ jobs:
           echo "Packaging Python SDK from pkg/tszclient_py and examples/python-sdk-demo into $ZIP_NAME"
           zip -r "$ZIP_NAME" pkg/tszclient_py examples/python-sdk-demo -x '**/__pycache__/*' '*.pyc' '*.pyo'
 
-      - name: Create GitHub Release for Python SDK
-        if: ${{ github.event.inputs.product == 'tszclient-py' }}
+      - name: Create GitHub Release for Python SDK (manual notes)
+        if: ${{ github.event.inputs.product == 'tszclient-py' && github.event.inputs.release_notes != '' }}
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.LAST_TAG }}
           files: tszclient-py-*.zip
-          generate_release_notes: true
+          body: ${{ github.event.inputs.release_notes }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release for Python SDK (no notes)
+        if: ${{ github.event.inputs.product == 'tszclient-py' && github.event.inputs.release_notes == '' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.LAST_TAG }}
+          files: tszclient-py-*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

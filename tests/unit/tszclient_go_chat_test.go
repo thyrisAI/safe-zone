@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	tszclient "thyris-sz/pkg/tszclient-go"
+	tszclient "github.com/thyrisAI/safe-zone/pkg/tszclient-go"
 )
 
 // TestChatCompletions_Success exercises the tszclient-go ChatCompletions helper

@@ -94,10 +94,34 @@ PY
 
 # Run tests (if any)
 echo "[tszclient-py] Running tests (if configured)..."
-# Example: pytest komutun varsa burada çalıştır
-# pytest
+# Add your test command here if you have one, for example: pytest
 
-# Build and publish package
+# Ensure build/twine are available
+# 1) First, check if build and twine modules are importable
+# 2) If missing, try to install them via pip; if pip is not available, exit with a clear message
+
+echo "[tszclient-py] Checking for 'build' and 'twine' modules..."
+if ! python - << 'PY'
+import importlib.util, sys
+missing = []
+for name in ("build", "twine"):
+    if importlib.util.find_spec(name) is None:
+        missing.append(name)
+if missing:
+    sys.exit(1)
+PY
+then
+  echo "[tszclient-py] Python modules 'build' and/or 'twine' are missing. Trying to install via pip..."
+  if python -m pip --version >/dev/null 2>&1; then
+    python -m pip install --upgrade pip
+    python -m pip install build twine
+  else
+    echo "[tszclient-py] 'pip' is not available for this Python interpreter."
+    echo "[tszclient-py] Please install 'build' and 'twine' manually or enable pip (e.g. 'py -m ensurepip --upgrade') before running this script."
+    exit 1
+  fi
+fi
+
 echo "[tszclient-py] Building package..."
 python -m build
 

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 BUMP="patch"
+FORCE="false"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -9,6 +10,10 @@ while [[ $# -gt 0 ]]; do
     --bump)
       BUMP="$2"
       shift 2
+      ;;
+    --force)
+      FORCE="true"
+      shift 1
       ;;
     *)
       echo "Unknown argument: $1" >&2
@@ -22,7 +27,7 @@ if [[ "$BUMP" != "patch" && "$BUMP" != "minor" && "$BUMP" != "major" ]]; then
   exit 1
 fi
 
-echo "[tszclient-go] Release bump type: $BUMP"
+echo "[tszclient-go] Release bump type: $BUMP (force=$FORCE)"
 
 # Find last tszclient-go tag
 LAST_TAG=$(git tag --list 'tszclient-go-v*' | sort -V | tail -n 1 || true)
@@ -35,13 +40,13 @@ else
   echo "[tszclient-go] Last tag: $LAST_TAG (base version: $BASE_VERSION)"
 fi
 
-# Check for changes in Go client code or related tests
-if [[ -n "$LAST_TAG" ]]; then
+# Check for changes in Go client code or related tests, unless forced
+if [[ "$FORCE" != "true" && -n "$LAST_TAG" ]]; then
   if git diff --quiet "$LAST_TAG"..HEAD -- pkg/tszclient-go tests/unit/tszclient_go_chat_test.go; then
-    echo "[tszclient-go] No changes since $LAST_TAG in Go client or its tests, skipping release."
+    echo "[tszclient-go] No changes since $LAST_TAG in Go client or its tests, skipping release. (use --force to override)"
     exit 0
   fi
-else
+elif [[ "$FORCE" != "true" && -z "$LAST_TAG" ]]; then
   echo "[tszclient-go] No previous tag, will release initial version."
 fi
 
@@ -67,9 +72,14 @@ NEW_TAG="tszclient-go-v$NEW_VERSION"
 
 echo "[tszclient-go] New version: $NEW_VERSION (tag: $NEW_TAG)"
 
-# Run tests for the whole module (pure Go, no Python involved)
-echo "[tszclient-go] Running tests..."
-go test ./...
+# Run tests: only tests/ directory, after cleaning test cache
+# Note: internal/guardrails/testing_exports.go uses `//go:build test`, so some tests
+# require the `-tags test` build tag.
+echo "[tszclient-go] Cleaning test cache..."
+go clean -testcache
+
+echo "[tszclient-go] Running tests in ./tests/... with -tags test"
+go test -tags test ./tests/...
 
 # Create and push tag
 echo "[tszclient-go] Creating git tag $NEW_TAG"

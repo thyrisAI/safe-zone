@@ -36,8 +36,8 @@ else
 fi
 
 # Check for changes relevant to thyris-sz
-# Mantık: thyris-sz = client klasörleri dışındaki her şey.
-# Yani sadece client'lar (pkg/tszclient-go, pkg/tszclient_py) değiştiyse thyris-sz release'i tetiklenmesin.
+# Definition: thyris-sz = everything outside the SDK client directories.
+# If only clients (pkg/tszclient-go, pkg/tszclient_py) changed, do not trigger a thyris-sz release.
 if [[ -n "$LAST_TAG" ]]; then
   if git diff --quiet "$LAST_TAG"..HEAD -- . ':(exclude)pkg/tszclient-go' ':(exclude)pkg/tszclient_py'; then
     echo "[thyris-sz] No changes since $LAST_TAG outside client directories, skipping release."
@@ -70,17 +70,17 @@ NEW_TAG="thyris-sz-v$NEW_VERSION"
 echo "[thyris-sz] New version: $NEW_VERSION (tag: $NEW_TAG)"
 
 # Run tests: only tests/ directory, after cleaning test cache
-# Not: internal/guardrails/testing_exports.go dosyası `//go:build test` ile işaretli,
-# bu yüzden bu helper'ların derlenmesi için go test'e `-tags test` vermemiz gerekiyor.
+# Note: internal/guardrails/testing_exports.go uses `//go:build test`, so helpers
+# require the `-tags test` build tag when running tests.
 echo "[thyris-sz] Cleaning test cache..."
 go clean -testcache
 
 echo "[thyris-sz] Running tests in ./tests/... with -tags test"
-go test -tags test ./tests/...
+go test -tags test ./tests/... 
 
-# Build binary (customize as needed)
-echo "[thyris-sz] Building binary..."
-go build -o thyris-sz ./...
+# Build binary (only main module in current directory)
+echo "[thyris-sz] Building binary from current module (.)..."
+go build -o thyris-sz .
 
 # Create and push tag
 echo "[thyris-sz] Creating git tag $NEW_TAG"

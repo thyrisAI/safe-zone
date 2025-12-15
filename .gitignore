@@ -40,3 +40,4 @@ __pycache__/
 venv/
 /build
 /tszclient_py.egg-info
+thyris-sz

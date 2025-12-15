@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tszclient-py"
-version = "0.1.0"
+version = "0.1.6"
 description = "Python client for Thyris Safe Zone (TSZ)"
 readme = "README.md"
 authors = [

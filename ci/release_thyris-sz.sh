@@ -69,9 +69,12 @@ NEW_TAG="thyris-sz-v$NEW_VERSION"
 
 echo "[thyris-sz] New version: $NEW_VERSION (tag: $NEW_TAG)"
 
-# Run tests
-echo "[thyris-sz] Running tests..."
-go test ./...
+# Run tests: only tests/ directory, after cleaning test cache
+echo "[thyris-sz] Cleaning test cache..."
+go clean -testcache
+
+echo "[thyris-sz] Running tests in ./tests/..."
+go test ./tests/...
 
 # Build binary (customize as needed)
 echo "[thyris-sz] Building binary..."

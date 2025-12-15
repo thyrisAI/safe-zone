@@ -6,6 +6,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/xeipuuv/gojsonschema v1.2.0
+	github.com/thyrisAI/safe-zone/pkg/tszclient-go v0.0.0
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/gorm v1.25.12
 )
@@ -25,3 +26,6 @@ require (
 	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 )
+
+// Make the tszclient-go module importable from tests and other packages within this repo.
+replace github.com/thyrisAI/safe-zone/pkg/tszclient-go => ./pkg/tszclient-go

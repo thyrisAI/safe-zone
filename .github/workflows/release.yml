@@ -1,0 +1,99 @@
+name: Product Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      product:
+        description: "Which product to release"
+        required: true
+        type: choice
+        options:
+          - thyris-sz
+          - tszclient-go
+          - tszclient-py
+      bump:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    env:
+      PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # tags and history for diff & versioning
+
+      - name: Setup Go
+        if: ${{ github.event.inputs.product == 'thyris-sz' || github.event.inputs.product == 'tszclient-go' }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Setup Python
+        if: ${{ github.event.inputs.product == 'tszclient-py' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python build deps (for tszclient-py)
+        if: ${{ github.event.inputs.product == 'tszclient-py' }}
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+
+      - name: Run product specific release script
+        run: |
+          chmod +x ci/release_${{ github.event.inputs.product }}.sh
+          ci/release_${{ github.event.inputs.product }}.sh --bump ${{ github.event.inputs.bump }}
+
+      # Go SDK: package only SDK + examples as a zip artifact (in addition to source code)
+      - name: Package Go SDK artifact (tszclient-go)
+        if: ${{ github.event.inputs.product == 'tszclient-go' }}
+        run: |
+          LAST_TAG=$(git tag --list 'tszclient-go-v*' | sort -V | tail -n 1)
+          echo "LAST_TAG=$LAST_TAG" >> $GITHUB_ENV
+          VERSION=${LAST_TAG#tszclient-go-v}
+          ZIP_NAME="tszclient-go-${VERSION}.zip"
+          echo "Packaging Go SDK from pkg/tszclient-go and examples/go-sdk-demo into $ZIP_NAME"
+          zip -r "$ZIP_NAME" pkg/tszclient-go examples/go-sdk-demo -x '**/__pycache__/*' '*.pyc' '*.pyo'
+
+      - name: Create GitHub Release for Go SDK
+        if: ${{ github.event.inputs.product == 'tszclient-go' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.LAST_TAG }}
+          files: tszclient-go-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Python SDK: package only SDK + examples as a zip artifact (in addition to source code)
+      - name: Package Python SDK artifact (tszclient-py)
+        if: ${{ github.event.inputs.product == 'tszclient-py' }}
+        run: |
+          LAST_TAG=$(git tag --list 'tszclient-py-v*' | sort -V | tail -n 1)
+          echo "LAST_TAG=$LAST_TAG" >> $GITHUB_ENV
+          VERSION=${LAST_TAG#tszclient-py-v}
+          ZIP_NAME="tszclient-py-${VERSION}.zip"
+          echo "Packaging Python SDK from pkg/tszclient_py and examples/python-sdk-demo into $ZIP_NAME"
+          zip -r "$ZIP_NAME" pkg/tszclient_py examples/python-sdk-demo -x '**/__pycache__/*' '*.pyc' '*.pyo'
+
+      - name: Create GitHub Release for Python SDK
+        if: ${{ github.event.inputs.product == 'tszclient-py' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.LAST_TAG }}
+          files: tszclient-py-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

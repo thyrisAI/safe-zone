@@ -14,23 +14,30 @@ There is also an official **Python client** (`tszclient_py`, distributed as the
 - `pkg/tszclient_py/`
 - `examples/python-sdk-demo/main.py`
 
-> Note: This package currently lives inside the `thyris-sz` repository. When/if it is published as a separate module, import paths will be adjusted accordingly.
+> Note: `tszclient-go` is published as a Go module with the path
+> `github.com/thyrisAI/safe-zone/pkg/tszclient-go`. This module lives inside
+> the `thyris-sz` monorepo, but can be consumed independently via `go get`.
 
 ---
 
 ## Installation
 
-From within this repository, you can import it as:
+From *inside* this repository (when importing via local module name), you can import it as:
 
 ```go
 import "thyris-sz/pkg/tszclient-go"
 ```
 
-If you want to consume it via the GitHub module path (for example from an
-external project), you can import it as:
+From an **external project**, use the public Go module path:
 
 ```go
 import tszclient "github.com/thyrisAI/safe-zone/pkg/tszclient-go"
+```
+
+Then add it to your `go.mod` via:
+
+```bash
+go get github.com/thyrisAI/safe-zone/pkg/tszclient-go@v0.1.0
 ```
 
 See `examples/go-sdk-demo` in this repository for a complete, runnable
@@ -112,7 +119,7 @@ import (
     "log"
     "time"
 
-    tszclient "thyris-sz/pkg/tszclient-go"
+    tszclient "github.com/thyrisAI/safe-zone/pkg/tszclient-go"
 )
 
 func main() {
@@ -197,7 +204,7 @@ import (
     "fmt"
     "log"
 
-    tszclient "thyris-sz/pkg/tszclient-go"
+    tszclient "github.com/thyrisAI/safe-zone/pkg/tszclient-go"
 )
 
 func main() {
@@ -259,5 +266,3 @@ type APIError struct {
 
 This allows you to inspect the raw JSON error body, including TSZ‑specific
 error codes such as `tsz_content_blocked` or `tsz_output_blocked`.
-
----

@@ -67,7 +67,7 @@ The roadmap is split into phases. Each bullet is a concrete, actionable item.
 
 - [x] Design a simple, stable public API contract (documented in `docs/API_REFERENCE.md`, including `/detect`, LLM gateway and configuration endpoints)
 - [x] Create Go client helper (`tszclient-go`) for gateway and `/detect`
-- [ ] Create Python client (`tsz-client`) with simple `detect()` and gateway helpers
+- [x] Create Python client (`tszclient-py`) with simple `detect()` and gateway helpers
 - [ ] Create Node/TypeScript client
 - [x] Publish Go client usage documentation under `pkg/tszclient-go/README.md`
 - [x] Add `examples/` directory with:

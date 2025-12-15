@@ -8,6 +8,12 @@ It provides:
 - A helper for the **OpenAI-compatible LLM gateway** (`/v1/chat/completions`)
 - Simple configuration via `Config` and a single `Client` type
 
+There is also an official **Python client** (`tszclient_py`, distributed as the
+`tszclient-py` package) for Python services. See:
+
+- `pkg/tszclient_py/`
+- `examples/python-sdk-demo/main.py`
+
 > Note: This package currently lives inside the `thyris-sz` repository. When/if it is published as a separate module, import paths will be adjusted accordingly.
 
 ---

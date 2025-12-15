@@ -36,6 +36,9 @@ The documentation set is organized as follows:
 - **Go Client (tszclient-go)** – Lightweight Go SDK for `/detect` and the LLM gateway  
   `../pkg/tszclient-go/README.md`
 
+- **Python Client (tszclient_py / tszclient-py)** – Lightweight Python helper for `/detect` and the LLM gateway  
+  `../examples/python-sdk-demo/main.py` and `pkg/tszclient_py/`
+
 You can also view the high‑level marketing/overview document at the repository root:
 
 - `PRODUCT_OVERVIEW.md`

@@ -267,7 +267,53 @@ For more details, see:
 
 ---
 
-## 10. Next Steps
+## 10. Using the Python Client (tszclient_py / tszclient-py)
+
+If you are building Python services, you can use the lightweight Python client
+instead of calling the HTTP APIs manually.
+
+### 10.1 Install
+
+Install directly from this GitHub repository (from the `main` branch):
+
+```bash
+pip install "tszclient-py @ git+https://github.com/thyrisAI/safe-zone.git@main"
+```
+
+### 10.2 Example – Call /detect and the LLM gateway from Python
+
+A runnable example is provided at `examples/python-sdk-demo/main.py`. In
+summary, the usage pattern looks like this:
+
+```python
+from tszclient_py import TSZClient, TSZConfig, ChatCompletionRequest
+
+client = TSZClient(TSZConfig(base_url="http://localhost:8080"))
+
+# /detect example
+resp = client.detect_text(
+    "Contact me at john@example.com",
+    rid="RID-QUICKSTART-PY-001",
+    guardrails=["TOXIC_LANGUAGE"],
+)
+print("Redacted:", resp.redacted_text)
+
+# LLM gateway example
+chat_req = ChatCompletionRequest(
+    model="llama3.1:8b",
+    messages=[{"role": "user", "content": "Hello via TSZ gateway (Python)"}],
+)
+llm_resp = client.chat_completions(chat_req)
+print(llm_resp["choices"][0]["message"]["content"])
+```
+
+For a full working demo (including headers, RIDs and guardrails), see:
+
+- `examples/python-sdk-demo/main.py`
+
+---
+
+## 11. Next Steps
 
 From here, you can:
 

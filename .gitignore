@@ -38,3 +38,5 @@ __pycache__/
 .env*/
 .venv/
 venv/
+/build
+/tszclient_py.egg-info

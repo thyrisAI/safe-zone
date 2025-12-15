@@ -15,7 +15,7 @@ Prerequisites:
   model name is used here for the demo call.
 - The Python client is installed, for example:
 
-    pip install "tszclient-py @ git+https://github.com/thyrisAI/safe-zone.git@python-client"
+    pip install "tszclient-py @ git+https://github.com/thyrisAI/safe-zone.git@main"
 
 Run from repo root (after installing the package):
 

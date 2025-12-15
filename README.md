@@ -45,6 +45,24 @@ For a more detailed map of the documentation set, see `docs/README.md`.
 
 ---
 
+## Client Libraries (SDKs)
+
+TSZ provides official client libraries for common stacks:
+
+- **Go client (`tszclient-go`)** – for Go services that want a typed wrapper around `/detect` and the LLM gateway.  
+  See: `pkg/tszclient-go/README.md`.
+
+- **Python client (`tszclient_py` / package `tszclient-py`)** – for Python services that prefer a small `requests`-based helper instead of calling HTTP manually.  
+  Install from GitHub:
+
+  ```bash
+  pip install "tszclient-py @ git+https://github.com/thyrisAI/safe-zone.git@main"
+  ```
+
+  A runnable example lives under `examples/python-sdk-demo`.
+
+---
+
 ## Contributing
 
 We welcome community contributions.

@@ -7,11 +7,10 @@ services:
       dockerfile: Dockerfile
     image: thyris-sz:local
     container_name: thyris_api
-    environment:
-      - SERVER_PORT=8080
-      - DB_DSN=postgres://postgres:postgres@db:5432/thyris?sslmode=disable
-      - REDIS_URL=redis://:thyrisredis@redis:6379/0
-      - APP_MODE=DEV
+    env_file:
+      - .env
+    volumes:
+      - ./.env:/app/.env:ro
     ports:
       - "8080:8080"
     depends_on:

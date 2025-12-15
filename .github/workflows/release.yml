@@ -1,0 +1,59 @@
+name: Product Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      product:
+        description: "Which product to release"
+        required: true
+        type: choice
+        options:
+          - thyris-sz
+          - tszclient-go
+          - tszclient-py
+      bump:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    env:
+      PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # tags and history for diff & versioning
+
+      - name: Setup Go
+        if: ${{ github.event.inputs.product == 'thyris-sz' || github.event.inputs.product == 'tszclient-go' }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Setup Python
+        if: ${{ github.event.inputs.product == 'tszclient-py' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python build deps (for tszclient-py)
+        if: ${{ github.event.inputs.product == 'tszclient-py' }}
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+
+      - name: Run product specific release script
+        run: |
+          chmod +x ci/release_${{ github.event.inputs.product }}.sh
+          ci/release_${{ github.event.inputs.product }}.sh --bump ${{ github.event.inputs.bump }}

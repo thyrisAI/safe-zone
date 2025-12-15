@@ -70,11 +70,13 @@ NEW_TAG="thyris-sz-v$NEW_VERSION"
 echo "[thyris-sz] New version: $NEW_VERSION (tag: $NEW_TAG)"
 
 # Run tests: only tests/ directory, after cleaning test cache
+# Not: internal/guardrails/testing_exports.go dosyası `//go:build test` ile işaretli,
+# bu yüzden bu helper'ların derlenmesi için go test'e `-tags test` vermemiz gerekiyor.
 echo "[thyris-sz] Cleaning test cache..."
 go clean -testcache
 
-echo "[thyris-sz] Running tests in ./tests/..."
-go test ./tests/...
+echo "[thyris-sz] Running tests in ./tests/... with -tags test"
+go test -tags test ./tests/...
 
 # Build binary (customize as needed)
 echo "[thyris-sz] Building binary..."

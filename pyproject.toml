@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tszclient-py"
+version = "0.1.0"
+description = "Python client for Thyris Safe Zone (TSZ)"
+readme = "README.md"
+authors = [
+    { name = "Thyris AI" }
+]
+license = { text = "Apache-2.0" }
+requires-python = ">=3.8"
+dependencies = [
+    "requests>=2.0"
+]
+keywords = ["tsz", "thyris", "safe-zone", "pii", "guardrails", "llm", "gateway"]
+
+[tool.setuptools]
+packages = ["tszclient_py"]
+
+[tool.setuptools.package-dir]
+"tszclient_py" = "pkg/tszclient_py"

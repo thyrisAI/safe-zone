@@ -1,6 +1,7 @@
-"""Python SDK demo – using TSZ Python client from this repo.
+"""Python SDK demo – using the `tszclient_py` Python package.
 
-This example uses the Python client implemented in `pkg/tszclient_py`.
+This example uses the `tszclient_py` Python client, which is installable
+from this GitHub repository via pip.
 
 It demonstrates both:
 
@@ -12,8 +13,11 @@ Prerequisites:
 - The upstream LLM is configured and reachable (see main README/QUICK_START)
 - `THYRIS_AI_MODEL` (or `TSZ_MODEL`) is set in your TSZ environment – the same
   model name is used here for the demo call.
+- The Python client is installed, for example:
 
-Run from repo root:
+    pip install "tszclient-py @ git+https://github.com/thyrisAI/safe-zone.git@python-client"
+
+Run from repo root (after installing the package):
 
     python -m examples.python-sdk-demo.main
 """
@@ -22,20 +26,11 @@ from __future__ import annotations
 
 import os
 
-try:
-    # Preferred: use installed package (e.g. from GitHub via pip)
-    from tszclient_py import (
-        TSZClient,
-        TSZConfig,
-        ChatCompletionRequest,
-    )
-except ImportError:
-    # Fallback for running inside this repository without installing the package
-    from pkg.tszclient_py import (
-        TSZClient,
-        TSZConfig,
-        ChatCompletionRequest,
-    )
+from tszclient_py import (
+    TSZClient,
+    TSZConfig,
+    ChatCompletionRequest,
+)
 
 
 def main() -> None:

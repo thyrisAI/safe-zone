@@ -590,7 +590,7 @@ func runLoadTest(concurrency int, duration time.Duration) {
 
 func callGatewayChatCompletion(prompt, guardrails string) (int, []byte) {
 	payload := map[string]interface{}{
-		"model": "gpt-4o", // forwarded as-is; actual model comes from env in TSZ
+		"model": "llama3.1:8b", // forwarded as-is; actual model comes from env in TSZ
 		"messages": []map[string]string{
 			{"role": "user", "content": prompt},
 		},

@@ -85,13 +85,13 @@ func main() {
 		baseURL = "http://localhost:8080"
 	}
 
-	// Read model from env (priority: THYRIS_AI_MODEL, then TSZ_MODEL, then default "gpt-4o")
+	// Read model from env (priority: THYRIS_AI_MODEL, then TSZ_MODEL, then default "llama3.1:8b")
 	model := os.Getenv("THYRIS_AI_MODEL")
 	if model == "" {
 		model = os.Getenv("TSZ_MODEL")
 	}
 	if model == "" {
-		model = "gpt-4o"
+		model = "llama3.1:8b"
 	}
 
 	piiMode := os.Getenv("PII_MODE")

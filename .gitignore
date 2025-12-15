@@ -29,3 +29,12 @@ go.work
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# Python cache / virtualenv
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.env*/
+.venv/
+venv/

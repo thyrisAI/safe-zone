@@ -51,7 +51,7 @@ func TestGateway_BehaviorUnderDifferentBlockModes(t *testing.T) {
 		t.Run("GATEWAY_BLOCK_MODE="+bm, func(t *testing.T) {
 			model := os.Getenv("THYRIS_AI_MODEL")
 			if model == "" {
-				model = "gpt-4o"
+				model = "llama3.1:8b"
 			}
 
 			payload := map[string]interface{}{

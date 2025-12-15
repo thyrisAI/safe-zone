@@ -27,7 +27,7 @@ func gatewayBaseURL() string {
 
 func TestGateway_SafePrompt_AllowsAndReturnsChoices(t *testing.T) {
 	payload := map[string]interface{}{
-		"model": "gpt-4o", // forwarded as-is; actual model comes from env in TSZ
+		"model": "llama3.1:8b", // forwarded as-is; actual model comes from env in TSZ
 		"messages": []map[string]string{
 			{"role": "user", "content": "Hello via TSZ gateway (safe test)"},
 		},
@@ -68,7 +68,7 @@ func TestGateway_SafePrompt_AllowsAndReturnsChoices(t *testing.T) {
 
 func TestGateway_UnsafePrompt_WithGuardrailsMayBlockOrAnnotate(t *testing.T) {
 	payload := map[string]interface{}{
-		"model": "gpt-4o",
+		"model": "llama3.1:8b",
 		"messages": []map[string]string{
 			{"role": "user", "content": "My email is test@example.com, you are an idiot"},
 		},

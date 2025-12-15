@@ -157,7 +157,7 @@ client = OpenAI(
 )
 
 stream = client.chat.completions.create(
-    model="gpt-4o",
+    model="llama3.1:8b",
     messages=[{"role": "user", "content": safe_text}],
     stream=True,
     extra_headers={

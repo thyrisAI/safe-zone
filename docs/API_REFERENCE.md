@@ -284,7 +284,7 @@ Upstream LLM service is configured via environment variables (see `internal/conf
 ```env
 THYRIS_AI_MODEL_URL=https://api.openai.com/v1
 THYRIS_AI_API_KEY=sk-...your-openai-key...
-THYRIS_AI_MODEL=gpt-4o
+THYRIS_AI_MODEL=llama3.1:8b
 ```
 
 - `THYRIS_AI_MODEL_URL`: Base URL of an OpenAI‑compatible API (OpenAI, Azure OpenAI, Ollama, etc.). TSZ appends `/chat/completions`.
@@ -337,7 +337,7 @@ curl -X POST http://localhost:8080/v1/chat/completions \
   -H "X-TSZ-RID: RID-GW-001" \
   -H "X-TSZ-Guardrails: TOXIC_LANGUAGE" \
   -d '{
-    "model": "gpt-4o",
+    "model": "llama3.1:8b",
     "messages": [
       {"role": "user", "content": "My credit card is 4111 1111 1111 1111, you are an idiot"}
     ],
@@ -371,7 +371,7 @@ curl -N -X POST http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "X-TSZ-RID: RID-GW-STREAM-BASE" \
   -d '{
-    "model": "gpt-4o",
+    "model": "llama3.1:8b",
     "messages": [
       {"role": "user", "content": "Stream a short response about TSZ gateway"}
     ],
@@ -391,7 +391,7 @@ curl -N -X POST http://localhost:8080/v1/chat/completions \
   -H "X-TSZ-Guardrails-Mode: stream-sync" \
   -H "X-TSZ-Guardrails-OnFail: filter" \
   -d '{
-    "model": "gpt-4o",
+    "model": "llama3.1:8b",
     "messages": [
       {"role": "user", "content": "Please stream a short answer that includes an insult and a fake credit card number like 4111 1111 1111 1111."}
     ],
@@ -412,7 +412,7 @@ curl -N -X POST http://localhost:8080/v1/chat/completions \
   -H "X-TSZ-Guardrails-Mode: stream-sync" \
   -H "X-TSZ-Guardrails-OnFail: halt" \
   -d '{
-    "model": "gpt-4o",
+    "model": "llama3.1:8b",
     "messages": [
       {"role": "user", "content": "Stream a response that is clearly toxic and unsafe."}
     ],
@@ -431,7 +431,7 @@ curl -N -X POST http://localhost:8080/v1/chat/completions \
   -H "X-TSZ-Guardrails: TOXIC_LANGUAGE,PII" \
   -H "X-TSZ-Guardrails-Mode: stream-async" \
   -d '{
-    "model": "gpt-4o",
+    "model": "llama3.1:8b",
     "messages": [
       {"role": "user", "content": "Stream a long response that might contain sensitive content."}
     ],
@@ -456,7 +456,7 @@ client = OpenAI(
 
 # Non-streaming example
 resp = client.chat.completions.create(
-    model="gpt-4o",
+    model="llama3.1:8b",
     messages=[{"role": "user", "content": "Hello, this is safe text"}],
 )
 
@@ -464,7 +464,7 @@ print(resp.choices[0].message.content)
 
 # Streaming example with guardrails
 stream = client.chat.completions.create(
-    model="gpt-4o",
+    model="llama3.1:8b",
     messages=[{"role": "user", "content": "Stream something potentially unsafe"}],
     stream=True,
     extra_headers={

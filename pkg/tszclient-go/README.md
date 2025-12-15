@@ -205,7 +205,7 @@ func main() {
     }
 
     resp, err := client.ChatCompletions(ctx, tszclient.ChatCompletionRequest{
-        Model: "gpt-4o",
+        Model: "llama3.1:8b",
         Messages: []map[string]interface{}{
             {"role": "user", "content": "Hello via TSZ gateway"},
         },

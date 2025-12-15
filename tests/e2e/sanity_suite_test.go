@@ -115,7 +115,7 @@ func TestSanity_DetectAndGatewayBasicFlow(t *testing.T) {
 
 	t.Run("gateway-safe", func(t *testing.T) {
 		payload := map[string]interface{}{
-			"model": "gpt-4o",
+			"model": "llama3.1:8b",
 			"messages": []map[string]string{
 				{"role": "user", "content": "Hello from E2E sanity"},
 			},

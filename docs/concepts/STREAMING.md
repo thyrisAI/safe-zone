@@ -152,7 +152,7 @@ POST /v1/chat/completions
 Content-Type: application/json
 
 {
-  "model": "gpt-4o",
+  "model": "llama3.1:8b",
   "messages": [
     {"role": "user", "content": "Stream a short response about TSZ gateway"}
   ],

@@ -110,7 +110,7 @@
             "url": "http://localhost:8080/v1/chat/completions",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"model\": \"gpt-4o\",\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"Hello, this is a safe prompt.\"}\n  ],\n  \"stream\": false\n}"
+              "raw": "{\n  \"model\": \"llama3.1:8b\",\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"Hello, this is a safe prompt.\"}\n  ],\n  \"stream\": false\n}"
             }
           }
         },
@@ -126,7 +126,7 @@
             "url": "http://localhost:8080/v1/chat/completions",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"model\": \"gpt-4o\",\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"My credit card is 4111 1111 1111 1111, you are an idiot\"}\n  ],\n  \"stream\": false\n}"
+              "raw": "{\n  \"model\": \"llama3.1:8b\",\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"My credit card is 4111 1111 1111 1111, you are an idiot\"}\n  ],\n  \"stream\": false\n}"
             }
           }
         },
@@ -141,7 +141,7 @@
             "url": "http://localhost:8080/v1/chat/completions",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"model\": \"gpt-4o\",\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"Stream a short response about TSZ gateway\"}\n  ],\n  \"stream\": true\n}"
+              "raw": "{\n  \"model\": \"llama3.1:8b\",\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"Stream a short response about TSZ gateway\"}\n  ],\n  \"stream\": true\n}"
             }
           }
         },
@@ -159,7 +159,7 @@
             "url": "http://localhost:8080/v1/chat/completions",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"model\": \"gpt-4o\",\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"Please stream a short answer that includes an insult and a fake credit card number like 4111 1111 1111 1111.\"}\n  ],\n  \"stream\": true\n}"
+              "raw": "{\n  \"model\": \"llama3.1:8b\",\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"Please stream a short answer that includes an insult and a fake credit card number like 4111 1111 1111 1111.\"}\n  ],\n  \"stream\": true\n}"
             }
           }
         },
@@ -177,7 +177,7 @@
             "url": "http://localhost:8080/v1/chat/completions",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"model\": \"gpt-4o\",\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"Stream a response that is clearly toxic and unsafe.\"}\n  ],\n  \"stream\": true\n}"
+              "raw": "{\n  \"model\": \"llama3.1:8b\",\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"Stream a response that is clearly toxic and unsafe.\"}\n  ],\n  \"stream\": true\n}"
             }
           }
         },
@@ -194,7 +194,7 @@
             "url": "http://localhost:8080/v1/chat/completions",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"model\": \"gpt-4o\",\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"Stream a long response that might contain sensitive content.\"}\n  ],\n  \"stream\": true\n}"
+              "raw": "{\n  \"model\": \"llama3.1:8b\",\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"Stream a long response that might contain sensitive content.\"}\n  ],\n  \"stream\": true\n}"
             }
           }
         }

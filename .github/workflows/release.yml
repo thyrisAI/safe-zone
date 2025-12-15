@@ -57,3 +57,43 @@ jobs:
         run: |
           chmod +x ci/release_${{ github.event.inputs.product }}.sh
           ci/release_${{ github.event.inputs.product }}.sh --bump ${{ github.event.inputs.bump }}
+
+      # Go SDK: package only SDK + examples as a zip artifact (in addition to source code)
+      - name: Package Go SDK artifact (tszclient-go)
+        if: ${{ github.event.inputs.product == 'tszclient-go' }}
+        run: |
+          LAST_TAG=$(git tag --list 'tszclient-go-v*' | sort -V | tail -n 1)
+          echo "LAST_TAG=$LAST_TAG" >> $GITHUB_ENV
+          VERSION=${LAST_TAG#tszclient-go-v}
+          ZIP_NAME="tszclient-go-${VERSION}.zip"
+          echo "Packaging Go SDK from pkg/tszclient-go and examples/go-sdk-demo into $ZIP_NAME"
+          zip -r "$ZIP_NAME" pkg/tszclient-go examples/go-sdk-demo -x '**/__pycache__/*' '*.pyc' '*.pyo'
+
+      - name: Create GitHub Release for Go SDK
+        if: ${{ github.event.inputs.product == 'tszclient-go' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.LAST_TAG }}
+          files: tszclient-go-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Python SDK: package only SDK + examples as a zip artifact (in addition to source code)
+      - name: Package Python SDK artifact (tszclient-py)
+        if: ${{ github.event.inputs.product == 'tszclient-py' }}
+        run: |
+          LAST_TAG=$(git tag --list 'tszclient-py-v*' | sort -V | tail -n 1)
+          echo "LAST_TAG=$LAST_TAG" >> $GITHUB_ENV
+          VERSION=${LAST_TAG#tszclient-py-v}
+          ZIP_NAME="tszclient-py-${VERSION}.zip"
+          echo "Packaging Python SDK from pkg/tszclient_py and examples/python-sdk-demo into $ZIP_NAME"
+          zip -r "$ZIP_NAME" pkg/tszclient_py examples/python-sdk-demo -x '**/__pycache__/*' '*.pyc' '*.pyo'
+
+      - name: Create GitHub Release for Python SDK
+        if: ${{ github.event.inputs.product == 'tszclient-py' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.LAST_TAG }}
+          files: tszclient-py-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

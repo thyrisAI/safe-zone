@@ -1,6 +1,23 @@
 version: '3.8'
 
 services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: thyris-sz:local
+    container_name: thyris_api
+    env_file:
+      - .env
+    volumes:
+      - ./.env:/app/.env:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    
   db:
     image: postgres:15-alpine
     container_name: thyris_db

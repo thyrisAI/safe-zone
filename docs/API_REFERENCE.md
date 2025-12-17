@@ -279,17 +279,72 @@ TSZ implements the **request and response shape** of the OpenAI `chat/completion
 
 #### 3.2.2 Configuration
 
-Upstream LLM service is configured via environment variables (see `internal/config/config.go`):
+TSZ supports multiple AI providers. The provider is selected via the `AI_PROVIDER` environment variable.
+
+##### OpenAI-Compatible Provider (Default)
 
 ```env
-THYRIS_AI_MODEL_URL=https://api.openai.com/v1
-THYRIS_AI_API_KEY=sk-...your-openai-key...
-THYRIS_AI_MODEL=llama3.1:8b
+AI_PROVIDER=OPENAI_COMPATIBLE
+AI_MODEL_URL=https://api.openai.com/v1
+AI_API_KEY=sk-...your-openai-key...
+AI_MODEL=gpt-4
 ```
 
-- `THYRIS_AI_MODEL_URL`: Base URL of an OpenAI‑compatible API (OpenAI, Azure OpenAI, Ollama, etc.). TSZ appends `/chat/completions`.
-- `THYRIS_AI_API_KEY`: API key for the upstream service (sent as `Authorization: Bearer <key>`).
-- `THYRIS_AI_MODEL`: Default model name used by internal AI validators; the gateway itself forwards the `model` field from the incoming request.
+- `AI_PROVIDER`: Set to `OPENAI_COMPATIBLE` (default) for OpenAI, Azure OpenAI, Ollama, or any OpenAI-compatible endpoint.
+- `AI_MODEL_URL`: Base URL of an OpenAI‑compatible API. TSZ appends `/chat/completions`.
+- `AI_API_KEY`: API key for the upstream service (sent as `Authorization: Bearer <key>`).
+- `AI_MODEL`: Default model name used by internal AI validators; the gateway itself forwards the `model` field from the incoming request.
+
+##### AWS Bedrock Provider
+
+TSZ natively supports AWS Bedrock, allowing you to use models like Anthropic Claude, Amazon Titan, Meta Llama, Mistral, and Cohere directly through the AWS SDK.
+
+```env
+AI_PROVIDER=BEDROCK
+AWS_BEDROCK_REGION=us-east-1
+AWS_BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
+# Optional: Custom endpoint for VPC endpoints
+# AWS_BEDROCK_ENDPOINT_OVERRIDE=https://vpce-xxx.bedrock-runtime.us-east-1.vpce.amazonaws.com
+```
+
+- `AI_PROVIDER`: Set to `BEDROCK` to use AWS Bedrock.
+- `AWS_BEDROCK_REGION`: AWS region where Bedrock is available (required).
+- `AWS_BEDROCK_MODEL_ID`: Bedrock model identifier (e.g., `anthropic.claude-3-sonnet-20240229-v1:0`).
+- `AWS_BEDROCK_ENDPOINT_OVERRIDE`: Optional custom endpoint URL for VPC endpoints or testing.
+
+**AWS Credentials**: Bedrock uses the standard AWS credential chain:
+- Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`)
+- Shared credentials file (`~/.aws/credentials`)
+- IAM role (when running on EC2, ECS, Lambda, etc.)
+
+**Required IAM Permissions**:
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "bedrock:InvokeModel",
+                "bedrock:InvokeModelWithResponseStream"
+            ],
+            "Resource": "arn:aws:bedrock:*::foundation-model/*"
+        }
+    ]
+}
+```
+
+**Supported Bedrock Models**:
+
+| Model Family | Example Model ID | Notes |
+|--------------|------------------|-------|
+| Anthropic Claude | `anthropic.claude-3-sonnet-20240229-v1:0` | Recommended for most use cases |
+| Amazon Titan | `amazon.titan-text-express-v1` | Good for general text generation |
+| Meta Llama | `meta.llama3-8b-instruct-v1:0` | Open-source alternative |
+| Mistral | `mistral.mistral-7b-instruct-v0:2` | Fast inference |
+| Cohere | `cohere.command-text-v14` | Good for summarization |
+
+> **Note**: Bedrock streaming support is planned for a future release. Currently, only non-streaming requests (`stream=false`) are fully supported with Bedrock.
 
 #### 3.2.3 Headers
 

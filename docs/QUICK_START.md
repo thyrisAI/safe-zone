@@ -40,6 +40,20 @@ DB_PASSWORD=thyris_password
 DB_NAME=thyris_db
 REDIS_ADDR=redis:6379
 
+# AI Provider Configuration
+# Options: OPENAI_COMPATIBLE (default) or BEDROCK
+AI_PROVIDER=OPENAI_COMPATIBLE
+
+# OpenAI-Compatible Provider (OpenAI, Azure OpenAI, Ollama, etc.)
+AI_MODEL_URL=http://localhost:11434/v1
+AI_API_KEY=ollama
+AI_MODEL=llama3
+
+# AWS Bedrock Provider (only used when AI_PROVIDER=BEDROCK)
+# AWS_BEDROCK_REGION=us-east-1
+# AWS_BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
+# AWS_BEDROCK_ENDPOINT_OVERRIDE=  # Optional: for VPC endpoints
+
 # Confidence thresholds
 CONFIDENCE_ALLOW_THRESHOLD=0.30
 CONFIDENCE_BLOCK_THRESHOLD=0.85

@@ -14,6 +14,9 @@ TSZ provides real‑time scanning, redaction, and blocking capabilities so that 
 - Allowlist and blocklist management
 - Hot reloading of rules via APIs
 - High‑performance implementation in Go with Redis caching
+- **Native AWS Bedrock integration** – Use Anthropic Claude, Amazon Titan, Meta Llama, Mistral, and Cohere models directly
+- **Multi-provider AI support** – OpenAI-compatible endpoints (OpenAI, Azure OpenAI, Ollama) and AWS Bedrock
+- **OpenAI-compatible LLM gateway** – Drop-in replacement for OpenAI API with built-in guardrails
 
 ---
 

@@ -32,14 +32,39 @@ TSZ is usually deployed **inside your VPC / private network**, behind an API gat
 
 ## 2. Core Components
 
-### 2.1 Detection & Guardrails Engine
+### 2.1 AI Provider Layer
+
+Located under `internal/ai/`, TSZ supports multiple AI providers through a unified interface:
+
+- **Provider Abstraction** (`provider.go`): Defines the `ChatProvider` interface for AI operations
+- **OpenAI-Compatible Provider** (`provider_openai.go`): Supports OpenAI, Azure OpenAI, Ollama, and any OpenAI-compatible endpoint
+- **AWS Bedrock Provider** (`provider_bedrock.go`): Native integration with AWS Bedrock, supporting:
+  - Anthropic Claude models
+  - Amazon Titan models
+  - Meta Llama models
+  - Mistral models
+  - Cohere models
+
+**Provider Selection:**
+- Configured via `AI_PROVIDER` environment variable
+- `OPENAI_COMPATIBLE` (default): Uses HTTP client to connect to OpenAI-compatible endpoints
+- `BEDROCK`: Uses AWS SDK with standard credential chain (environment variables, shared credentials, IAM roles)
+
+**Security Benefits of Bedrock Integration:**
+- Data stays within AWS boundaries
+- Leverages AWS IAM for authentication and authorization
+- Supports VPC endpoints for private connectivity
+- Integrates with AWS KMS for encryption
+- Full AWS CloudTrail audit logging
+
+### 2.2 Detection & Guardrails Engine
 
 Located under `internal/guardrails/`, the engine:
 
 - Parses incoming `DetectRequest` payloads
 - Applies **regex‑based patterns** (configured via `/patterns` or templates)
 - Evaluates **allowlist** and **blocklist** entries
-- Optionally calls **AI scorers / validators** (e.g. `TOXIC_LANGUAGE`)
+- Optionally calls **AI scorers / validators** (e.g. `TOXIC_LANGUAGE`) using the configured provider
 - Computes per‑detection and overall **confidence scores**
 - Decides whether the request should be **allowed, masked or blocked**
 
@@ -50,8 +75,9 @@ Key features:
   - `CONFIDENCE_BLOCK_THRESHOLD` – above this, content is auto‑blocked
 - **Pattern‑level overrides** for enterprise policies (block/allow thresholds by pattern)
 - **Rounding and explainability** (`confidence_explanation`) for auditability
+- **Provider-agnostic AI validation**: Works with any configured AI provider
 
-### 2.2 Data Model
+### 2.3 Data Model
 
 Defined in `internal/models/`, the key types are:
 
@@ -62,7 +88,7 @@ Defined in `internal/models/`, the key types are:
 - **AllowlistItem / BlacklistItem** – explicit allow/deny values
 - **SecurityEvent** – internal model for security/logging use cases
 
-### 2.3 Persistence Layer
+### 2.4 Persistence Layer
 
 Implemented in `internal/database/` and `internal/repository/`:
 
@@ -75,7 +101,7 @@ Implemented in `internal/database/` and `internal/repository/`:
 
 The DB is required for full functionality in production; TSZ is designed to fail fast if DB is unavailable.
 
-### 2.4 Caching Layer
+### 2.5 Caching Layer
 
 Located in `internal/cache/`:
 

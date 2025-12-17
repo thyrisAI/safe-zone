@@ -53,9 +53,27 @@ Deploy protection in seconds instead of weeks.
 - **Template Packs:** Import pre‑packaged rule sets such as "PII Protection Pack", "OWASP Top 10 for LLM", "FINRA/PCI/GDPR‑oriented compliance packs".
 - **Portable Rules:** Export your custom configurations and share them across teams, environments and regions.
 
-### 5. OpenAI-Compatible LLM Gateway with Streaming Guardrails
+### 5. Multi-Provider AI Support
 
-Safely connect your applications to OpenAI-compatible LLMs using TSZ as a **drop‑in gateway**.
+TSZ supports multiple AI providers, giving you flexibility in choosing your LLM backend:
+
+- **OpenAI-Compatible Endpoints:** Works with OpenAI, Azure OpenAI, Ollama, and any OpenAI-compatible API
+- **Native AWS Bedrock Integration:** Direct support for AWS Bedrock models including:
+  - Anthropic Claude (Claude 3 Sonnet, Opus, Haiku)
+  - Amazon Titan
+  - Meta Llama
+  - Mistral
+  - Cohere
+- **Unified Configuration:** Switch between providers with a single environment variable
+- **AWS Integration Benefits:** 
+  - Keep data within AWS boundaries for compliance
+  - Use IAM roles and VPC endpoints
+  - Leverage AWS KMS encryption
+  - Benefit from AWS's security and audit capabilities
+
+### 6. OpenAI-Compatible LLM Gateway with Streaming Guardrails
+
+Safely connect your applications to any supported LLM provider using TSZ as a **drop‑in gateway**.
 
 - **Input Protection:** Runs full `/detect` pipeline on user prompts before they reach the LLM (PII, secrets, toxic content, prompt injection, etc.).
 - **Output Protection (Non‑Streaming):** Validates and, if necessary, redacts non‑streaming assistant responses before returning them to the client.
@@ -64,8 +82,9 @@ Safely connect your applications to OpenAI-compatible LLMs using TSZ as a **drop
   - **`stream-sync` mode:** Applies guardrails on the **live stream**, redacting unsafe content or halting the stream on violations.
   - **`stream-async` mode:** For latency‑sensitive cases, streams raw tokens while validating the full output asynchronously for audit/SIEM.
 - **OpenAI-Compatible:** Works with OpenAI SDKs by simply pointing `base_url` to TSZ; headers like `X-TSZ-Guardrails-Mode` control the streaming behaviour without any SDK changes.
+- **Provider Agnostic:** The same gateway API works whether you're using OpenAI, Bedrock, or any other supported provider.
 
-### 6. Enterprise‑Ready Platform
+### 7. Enterprise‑Ready Platform
 
 - **High Performance:** Built with Go and Redis for low latency and high throughput.
 - **Audit Logging:** Every request is logged with a unique Request ID (RID) for full compliance traceability and SIEM integration.

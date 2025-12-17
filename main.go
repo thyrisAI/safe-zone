@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"thyris-sz/internal/ai"
 	"thyris-sz/internal/cache"
 	"thyris-sz/internal/config"
 	"thyris-sz/internal/database"
@@ -29,8 +30,14 @@ func main() {
 	// Initialize Redis
 	cache.InitRedis()
 
+	// Initialize AI Provider
+	if err := ai.InitProvider(); err != nil {
+		log.Printf("Warning: Failed to initialize AI provider: %v (gateway will use direct HTTP)", err)
+	}
+
 	// Log App Mode
 	log.Printf("App running in [%s] mode", config.AppConfig.AppMode)
+	log.Printf("AI Provider: %s", config.AppConfig.AIProvider)
 
 	detector := guardrails.NewDetector()
 

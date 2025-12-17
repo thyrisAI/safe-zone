@@ -21,6 +21,18 @@ type Config struct {
 	GatewayBlockMode string
 	AppMode          string
 
+	// AI Provider settings
+	// Supported values: "OPENAI_COMPATIBLE" (default), "BEDROCK"
+	AIProvider string
+
+	// AWS Bedrock settings (only used when AIProvider is "BEDROCK")
+	// Region is required when using Bedrock (e.g., "us-east-1", "eu-central-1")
+	BedrockRegion string
+	// EndpointOverride is optional; use for custom endpoints (VPC endpoints, testing)
+	BedrockEndpointOverride string
+	// ModelID is the Bedrock model identifier (e.g., "anthropic.claude-3-sonnet-20240229-v1:0")
+	BedrockModelID string
+
 	// Streaming / gateway settings
 	// Maximum size of the in-memory buffer used for streaming output guardrails (in bytes).
 	// If zero or negative, no explicit limit is enforced.
@@ -49,9 +61,18 @@ func LoadConfig() {
 		ServerPort:       getEnv("SERVER_PORT", "8080"),
 		GatewayBlockMode: strings.ToUpper(getEnv("GATEWAY_BLOCK_MODE", "BLOCK")),
 		AppMode:          strings.ToUpper(getEnv("APP_MODE", "DEV")),
-		AIModelURL:       getEnv("THYRIS_AI_MODEL_URL", "http://localhost:11434/v1"),
-		AIAPIKey:         getEnv("THYRIS_AI_API_KEY", "ollama"), // Default to 'ollama' for local instances
-		AIModelName:      getEnv("THYRIS_AI_MODEL", "llama3"),
+		AIModelURL:       getEnv("AI_MODEL_URL", "http://localhost:11434/v1"),
+		AIAPIKey:         getEnv("AI_API_KEY", "ollama"), // Default to 'ollama' for local instances
+		AIModelName:      getEnv("AI_MODEL", "llama3"),
+
+		// AI Provider: OPENAI_COMPATIBLE (default) or BEDROCK
+		AIProvider: strings.ToUpper(getEnv("AI_PROVIDER", "OPENAI_COMPATIBLE")),
+
+		// AWS Bedrock settings
+		BedrockRegion:           getEnv("AWS_BEDROCK_REGION", ""),
+		BedrockEndpointOverride: getEnv("AWS_BEDROCK_ENDPOINT_OVERRIDE", ""),
+		BedrockModelID:          getEnv("AWS_BEDROCK_MODEL_ID", "anthropic.claude-3-sonnet-20240229-v1:0"),
+
 		Features: FeatureFlags{
 			SemanticAnalysisEnabled: getEnvAsBool("FEATURE_AI_SEMANTIC_ANALYSIS", true),
 			SchemaValidationEnabled: getEnvAsBool("FEATURE_JSON_SCHEMA_VALIDATION", true),

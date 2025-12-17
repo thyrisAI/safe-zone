@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"thyris-sz/internal/ai"
 	"thyris-sz/internal/config"
 	"thyris-sz/internal/guardrails"
 	"thyris-sz/internal/models"
@@ -74,19 +75,38 @@ func NewOpenAIChatGateway(detector *guardrails.Detector) http.HandlerFunc {
 
 		payload["messages"] = sanitizedMessages
 
-		// 4) Build upstream request
-		upstreamReq, err := buildUpstreamChatRequest(payload)
-		if err != nil {
-			writeOpenAIError(w, http.StatusInternalServerError, "Failed to create upstream request", "internal_error")
-			return
-		}
+		// 4) Forward request to upstream (via provider or direct HTTP)
+		var upstreamResp *http.Response
 
-		client := &http.Client{Timeout: 60 * time.Second}
-		upstreamResp, err := client.Do(upstreamReq)
-		if err != nil {
-			log.Printf("[gateway] RID=%s upstream LLM request failed: %v", rid, err)
-			writeOpenAIError(w, http.StatusBadGateway, "Failed to reach upstream LLM service", "upstream_unreachable")
-			return
+		provider := ai.GetProvider()
+		if provider != nil {
+			// Use the configured provider
+			log.Printf("[gateway] RID=%s using provider: %s", rid, provider.Name())
+			forwarder := ai.AsOpenAIForwarder(provider)
+			if forwarder != nil {
+				upstreamResp, err = forwarder.ForwardRequest(r.Context(), payload)
+				if err != nil {
+					log.Printf("[gateway] RID=%s provider forward failed: %v", rid, err)
+					writeOpenAIError(w, http.StatusBadGateway, "Failed to reach upstream LLM service", "upstream_unreachable")
+					return
+				}
+			} else {
+				// Provider doesn't support forwarding, fall back to direct HTTP
+				upstreamResp, err = sendDirectUpstreamRequest(payload)
+				if err != nil {
+					log.Printf("[gateway] RID=%s upstream LLM request failed: %v", rid, err)
+					writeOpenAIError(w, http.StatusBadGateway, "Failed to reach upstream LLM service", "upstream_unreachable")
+					return
+				}
+			}
+		} else {
+			// No provider configured, use direct HTTP
+			upstreamResp, err = sendDirectUpstreamRequest(payload)
+			if err != nil {
+				log.Printf("[gateway] RID=%s upstream LLM request failed: %v", rid, err)
+				writeOpenAIError(w, http.StatusBadGateway, "Failed to reach upstream LLM service", "upstream_unreachable")
+				return
+			}
 		}
 		defer upstreamResp.Body.Close()
 
@@ -221,8 +241,9 @@ func applyInputGuardrails(detector *guardrails.Detector, messages []interface{},
 	return messages, blocked, blockMessage, detectResponses
 }
 
-// buildUpstreamChatRequest constructs the HTTP request to the upstream OpenAI-compatible endpoint.
-func buildUpstreamChatRequest(payload map[string]interface{}) (*http.Request, error) {
+// sendDirectUpstreamRequest sends a direct HTTP request to the upstream OpenAI-compatible endpoint.
+// This is used when no provider is configured or for backward compatibility.
+func sendDirectUpstreamRequest(payload map[string]interface{}) (*http.Response, error) {
 	forwardBody, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -240,7 +261,8 @@ func buildUpstreamChatRequest(payload map[string]interface{}) (*http.Request, er
 		req.Header.Set("Authorization", "Bearer "+config.AppConfig.AIAPIKey)
 	}
 
-	return req, nil
+	client := &http.Client{Timeout: 60 * time.Second}
+	return client.Do(req)
 }
 
 // processNonStreamResponse reads the upstream JSON response and applies output guardrails.

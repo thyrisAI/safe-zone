@@ -35,9 +35,11 @@ func main() {
 		log.Printf("Warning: Failed to initialize AI provider: %v (gateway will use direct HTTP)", err)
 	}
 
-	// Log App Mode
-	log.Printf("App running in [%s] mode", config.AppConfig.AppMode)
-	log.Printf("AI Provider: %s", config.AppConfig.AIProvider)
+	// Log Configuration
+	log.Printf("PII Mode: [%s] | Gateway Block Mode: [%s] | AI Provider: %s",
+		config.AppConfig.PIIMode,
+		config.AppConfig.GatewayBlockMode,
+		config.AppConfig.AIProvider)
 
 	detector := guardrails.NewDetector()
 

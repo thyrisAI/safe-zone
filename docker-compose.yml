@@ -7,10 +7,14 @@ services:
       dockerfile: Dockerfile
     image: thyris-sz:local
     container_name: thyris_api
-    env_file:
-      - .env
-    volumes:
-      - ./.env:/app/.env:ro
+    environment:
+      - DB_DSN=postgres://postgres:postgres@db:5432/thyris?sslmode=disable&TimeZone=Europe/Istanbul
+      - REDIS_URL=redis://:thyrisredis@redis:6379/0
+      - SERVER_PORT=8080
+      - AI_PROVIDER=OPENAI_COMPATIBLE
+      - AI_MODEL_URL=http://host.docker.internal:11434/v1
+      - AI_API_KEY=ollama
+      - AI_MODEL=llama3
     ports:
       - "8080:8080"
     depends_on:

@@ -2,7 +2,10 @@ FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
 
+# Copy go.mod, go.sum and the local module first
 COPY go.mod go.sum ./
+COPY pkg/tszclient-go ./pkg/tszclient-go
+
 RUN go mod download
 
 COPY . .

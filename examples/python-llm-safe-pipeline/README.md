@@ -65,7 +65,7 @@ Set one of the following environment variables to a valid model name:
 ```bash
 export TSZ_MODEL=gemma3:1b
 # or
-export THYRIS_AI_MODEL=gemma3:1b
+export AI_MODEL=gemma3:1b
 ```
 
 ## How to Run

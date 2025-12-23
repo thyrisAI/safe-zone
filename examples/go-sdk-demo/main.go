@@ -203,7 +203,7 @@ func runLLMDemo(ctx context.Context, client *tszclient.Client) error {
 	resp, err := client.ChatCompletions(
 		ctx,
 		tszclient.ChatCompletionRequest{
-			Model: "llama3.1:8b", // Align with THYRIS_AI_MODEL in your .env
+			Model: "llama3.1:8b", // Align with AI_MODEL in your .env
 			Messages: []map[string]interface{}{
 				{"role": "user", "content": "Hello from external Go SDK demo via TSZ gateway"},
 			},

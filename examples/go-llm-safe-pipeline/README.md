@@ -58,7 +58,7 @@ Set one of the following environment variables:
 ```bash
 export TSZ_MODEL=gemma3:1b
 # or
-export THYRIS_AI_MODEL=gemma3:1b
+export AI_MODEL=gemma3:1b
 ```
 
 If using Ollama, list available models with:

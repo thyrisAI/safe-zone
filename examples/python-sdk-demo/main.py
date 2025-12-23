@@ -11,7 +11,7 @@ It demonstrates both:
 Prerequisites:
 - TSZ is running locally and accessible at http://localhost:8080
 - The upstream LLM is configured and reachable (see main README/QUICK_START)
-- `THYRIS_AI_MODEL` (or `TSZ_MODEL`) is set in your TSZ environment – the same
+- `AI_MODEL` (or `TSZ_MODEL`) is set in your TSZ environment – the same
   model name is used here for the demo call.
 - The Python client is installed, for example:
 
@@ -56,10 +56,10 @@ def main() -> None:
     print("\n[LLM] Calling /v1/chat/completions via Python client...")
 
     # Model resolution logic mirrors the Go gateway test helper:
-    #   1) THYRIS_AI_MODEL
+    #   1) AI_MODEL
     #   2) TSZ_MODEL
     #   3) fallback "llama3.1:8b"
-    model = os.getenv("THYRIS_AI_MODEL") or os.getenv("TSZ_MODEL") or "llama3.1:8b"
+    model = os.getenv("AI_MODEL") or os.getenv("TSZ_MODEL") or "llama3.1:8b"
 
     chat_req = ChatCompletionRequest(
         model=model,

@@ -51,13 +51,13 @@ def main():
 
     # 2️⃣ Call TSZ LLM Gateway
     model = (
-        os.getenv("THYRIS_AI_MODEL")
+        os.getenv("AI_MODEL")
         or os.getenv("TSZ_MODEL")
     )
 
     if not model:
         raise RuntimeError(
-            "No LLM model configured. Set TSZ_MODEL or THYRIS_AI_MODEL."
+            "No LLM model configured. Set TSZ_MODEL or AI_MODEL."
         )
 
     chat_req = ChatCompletionRequest(

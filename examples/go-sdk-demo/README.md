@@ -60,7 +60,7 @@ You should see log output similar to:
 
 - TSZ is running locally and accessible at `http://localhost:8080`
   (for example via `docker-compose up` as described in the main README/QUICK_START).
-- The upstream LLM configured in `.env` / `THYRIS_AI_MODEL_URL` / `THYRIS_AI_MODEL`
+- The upstream LLM configured in `.env` / `AI_MODEL_URL` / `AI_MODEL`
   is reachable and supports the chosen model (e.g. `llama3.1:8b`).
 
 ---

@@ -24,6 +24,8 @@ type BedrockConfig struct {
 	EndpointOverride string
 	// ModelID is the Bedrock model identifier (e.g., "anthropic.claude-3-sonnet-20240229-v1:0").
 	ModelID string
+	// Timeout for HTTP requests (default: 60 seconds).
+	Timeout time.Duration
 }
 
 // BedrockProvider implements ChatProvider for AWS Bedrock.
@@ -142,10 +144,11 @@ func (p *BedrockProvider) buildRequestBody(modelID string, req ChatRequest) ([]b
 		return p.buildMistralRequest(req)
 	case "cohere":
 		return p.buildCohereRequest(req)
+	case "openai":
+		return p.buildOpenAIRequest(req)
 	default:
-		// Default to Anthropic format as it's the most common
-		log.Printf("[bedrock] Unknown model family for %s, using Anthropic format", modelID)
-		return p.buildAnthropicRequest(req)
+		// Unknown model family - return error instead of defaulting to any specific format
+		return nil, fmt.Errorf("unsupported model family for model ID: %s. Supported families: anthropic, amazon, meta, mistral, cohere, openai", modelID)
 	}
 }
 
@@ -164,6 +167,8 @@ func detectModelFamily(modelID string) string {
 		return "mistral"
 	case strings.Contains(modelID, "cohere"):
 		return "cohere"
+	case strings.Contains(modelID, "openai") || strings.Contains(modelID, "gpt"):
+		return "openai"
 	default:
 		return "unknown"
 	}
@@ -370,6 +375,43 @@ func (p *BedrockProvider) buildCohereRequest(req ChatRequest) ([]byte, error) {
 	return json.Marshal(body)
 }
 
+// buildOpenAIRequest builds a request body for OpenAI models on Bedrock.
+func (p *BedrockProvider) buildOpenAIRequest(req ChatRequest) ([]byte, error) {
+	// OpenAI models on Bedrock use standard OpenAI format
+	messages := make([]map[string]interface{}, 0, len(req.Messages))
+
+	for _, msg := range req.Messages {
+		messages = append(messages, map[string]interface{}{
+			"role":    msg.Role,
+			"content": msg.Content,
+		})
+	}
+
+	body := map[string]interface{}{
+		"messages":   messages,
+		"max_tokens": 4096,
+	}
+
+	if req.MaxTokens > 0 {
+		body["max_tokens"] = req.MaxTokens
+	}
+	if req.Temperature > 0 {
+		body["temperature"] = req.Temperature
+	}
+	if req.TopP > 0 {
+		body["top_p"] = req.TopP
+	}
+
+	// Merge extra fields (consistent with OpenAI provider)
+	for k, v := range req.Extra {
+		if _, exists := body[k]; !exists {
+			body[k] = v
+		}
+	}
+
+	return json.Marshal(body)
+}
+
 // parseResponse parses the Bedrock response based on the model family.
 func (p *BedrockProvider) parseResponse(modelID string, body []byte) (*ChatResponse, error) {
 	modelFamily := detectModelFamily(modelID)
@@ -388,8 +430,11 @@ func (p *BedrockProvider) parseResponse(modelID string, body []byte) (*ChatRespo
 		content, err = p.parseMistralResponse(body)
 	case "cohere":
 		content, err = p.parseCohereResponse(body)
+	case "openai":
+		content, err = p.parseOpenAIResponse(body)
 	default:
-		content, err = p.parseAnthropicResponse(body)
+		// Unknown model family - return error instead of defaulting to any specific format
+		return nil, fmt.Errorf("unsupported model family for response parsing. Model ID: %s. Supported families: anthropic, amazon, meta, mistral, cohere, openai", modelID)
 	}
 
 	if err != nil {
@@ -503,6 +548,27 @@ func (p *BedrockProvider) parseCohereResponse(body []byte) (string, error) {
 	return resp.Text, nil
 }
 
+// parseOpenAIResponse parses an OpenAI response from Bedrock.
+func (p *BedrockProvider) parseOpenAIResponse(body []byte) (string, error) {
+	var resp struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return "", fmt.Errorf("failed to parse OpenAI response: %w", err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("no choices in OpenAI response")
+	}
+
+	return resp.Choices[0].Message.Content, nil
+}
+
 // ForwardRequest forwards a raw OpenAI-compatible request to Bedrock.
 // This converts the OpenAI format to Bedrock format and back.
 func (p *BedrockProvider) ForwardRequest(ctx context.Context, payload map[string]interface{}) (*http.Response, error) {
@@ -533,6 +599,7 @@ func (p *BedrockProvider) ForwardRequest(ctx context.Context, payload map[string
 	req := ChatRequest{
 		Model:    model,
 		Messages: messages,
+		Extra:    make(map[string]interface{}),
 	}
 
 	if maxTokens, ok := payload["max_tokens"].(float64); ok {
@@ -543,6 +610,16 @@ func (p *BedrockProvider) ForwardRequest(ctx context.Context, payload map[string
 	}
 	if topP, ok := payload["top_p"].(float64); ok {
 		req.TopP = topP
+	}
+
+	// Copy extra fields from payload (consistent with OpenAI provider)
+	for k, v := range payload {
+		switch k {
+		case "model", "messages", "max_tokens", "temperature", "top_p":
+			// Skip standard fields
+		default:
+			req.Extra[k] = v
+		}
 	}
 
 	// Call Chat

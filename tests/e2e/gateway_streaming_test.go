@@ -51,7 +51,7 @@ func streamRequest(t *testing.T, payload map[string]interface{}, headers map[str
 }
 
 func TestGateway_Streaming_NoGuardrails(t *testing.T) {
-	model := os.Getenv("THYRIS_AI_MODEL")
+	model := os.Getenv("AI_MODEL")
 	if model == "" {
 		model = "llama3.1:8b"
 	}
@@ -79,7 +79,7 @@ func TestGateway_Streaming_NoGuardrails(t *testing.T) {
 }
 
 func TestGateway_Streaming_WithGuardrailsFilter(t *testing.T) {
-	model := os.Getenv("THYRIS_AI_MODEL")
+	model := os.Getenv("AI_MODEL")
 	if model == "" {
 		model = "llama3.1:8b"
 	}
@@ -112,7 +112,7 @@ func TestGateway_Streaming_WithGuardrailsFilter(t *testing.T) {
 }
 
 func TestGateway_Streaming_WithGuardrailsHalt(t *testing.T) {
-	model := os.Getenv("THYRIS_AI_MODEL")
+	model := os.Getenv("AI_MODEL")
 	if model == "" {
 		model = "llama3.1:8b"
 	}

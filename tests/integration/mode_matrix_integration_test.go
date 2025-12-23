@@ -49,7 +49,7 @@ func TestGateway_BehaviorUnderDifferentBlockModes(t *testing.T) {
 	for _, bm := range blockModes {
 		bm := bm
 		t.Run("GATEWAY_BLOCK_MODE="+bm, func(t *testing.T) {
-			model := os.Getenv("THYRIS_AI_MODEL")
+			model := os.Getenv("AI_MODEL")
 			if model == "" {
 				model = "llama3.1:8b"
 			}

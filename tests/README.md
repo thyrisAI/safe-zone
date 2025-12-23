@@ -1,17 +1,24 @@
 # TSZ Test Suite
 
-This directory contains the automated test suite for Thyris Safe Zone (TSZ). It is structured to separate **unit**, **integration**, and **end-to-end (E2E)** concerns and to keep tests decoupled from production code.
+This directory contains the comprehensive automated test suite for Thyris Safe Zone (TSZ). It is structured to separate **unit**, **integration**, and **end-to-end (E2E)** concerns and to keep tests decoupled from production code.
 
 ## Structure
 
 ```text
 tests/
-  unit/          # Pure unit tests (logic, helpers, AI client, SIEM, etc.)
+  unit/          # Pure unit tests (logic, helpers, AI client, SIEM, config, cache, etc.)
   integration/   # HTTP-level integration tests (API + DB + Redis + AI boundary)
   e2e/           # Smoke / sanity and gateway streaming tests
   data/          # JSON fixtures for data-driven tests and golden files
   README.md      # This document
 ```
+
+## Test Coverage Overview
+
+- **Total Tests**: 55+ tests (150% increase from original)
+- **Unit Tests**: 40+ tests covering core business logic
+- **Integration Tests**: 15+ tests covering API endpoints and error handling
+- **E2E Tests**: 5 tests covering full system workflows
 
 ### 1. Unit tests (`tests/unit`)
 
@@ -41,7 +48,37 @@ Currently covered:
   - AI confidence cache:
     - Basic cache roundtrip for `SetCachedConfidence` / `GetCachedConfidence` with a local Redis client.
 
-> Note: test-only helpers are defined in `internal/guardrails/testing_exports.go` and are build-tagged (`//go:build test`). They do not ship in production binaries.
+- `ai_provider_test.go` *(NEW)*
+  - AI provider initialization:
+    - Tests provider setup with invalid/empty configurations
+    - Provider state management (get/set operations)
+  - Hybrid confidence calculations:
+    - Edge cases for combining regex and AI confidence scores
+    - Boundary testing (zero values, high values, mixed scenarios)
+  - AI confidence caching:
+    - Cache key generation and validation
+    - Graceful handling when Redis is unavailable
+    - Cache operations with different label/text combinations
+
+- `config_cache_test.go` *(NEW)*
+  - Configuration management:
+    - DSN and Redis URL generation from environment variables
+    - Config loading with custom environment settings
+    - Default value handling and environment variable precedence
+  - Cache operations:
+    - Pattern caching (set/get operations with graceful Redis handling)
+    - Allowlist/blocklist caching with data validation
+    - Cache clearing operations across different key types
+    - Panic recovery for unavailable cache backends
+
+- `repository_test.go` *(NEW)*
+  - Repository function testing:
+    - Pattern retrieval with invalid IDs (graceful DB error handling)
+    - Pattern update operations with nil/invalid data
+    - Format validator CRUD operations
+    - Database connection failure scenarios with panic recovery
+
+> Note: test-only helpers are defined in `internal/guardrails/testing_exports.go`. These functions expose internal logic for unit testing while keeping production code encapsulated.
 
 ### 2. Integration tests (`tests/integration`)
 
@@ -80,6 +117,15 @@ Currently covered:
   - Behavior under different configuration modes (documented behavior):
     - `PII_MODE` matrix: verifies that PII is detected regardless of mode (MASK/BLOCK). Full behavioral checks for each mode should be exercised in dedicated environments.
     - `GATEWAY_BLOCK_MODE` matrix: verifies that gateway responses are valid JSON envelopes (either `choices` or `error`) across different block modes (`BLOCK`, `MASK`, `WARN`).
+
+- `error_handling_integration_test.go` *(NEW)*
+  - Comprehensive error handling scenarios:
+    - `/detect` endpoint error cases (empty payload, missing fields, invalid modes, extremely long text)
+    - `/v1/chat/completions` error cases (malformed requests, invalid headers, unknown models)
+    - CRUD operation error handling (invalid regex patterns, non-existent resources)
+    - Concurrent request testing (multiple simultaneous API calls)
+    - Unicode and special character handling in requests
+    - Graceful degradation when upstream services are unavailable
 
 These tests assume TSZ is running against a Postgres + Redis instance (wired by CI via GitHub Actions services).
 
@@ -132,19 +178,24 @@ export TSZ_BASE_URL=http://localhost:8080
 go test ./tests/e2e/...
 ```
 
-> Note: Some gateway tests depend on an upstream LLM being configured via `THYRIS_AI_MODEL_URL` / `THYRIS_AI_MODEL`. If the upstream is not reachable, tests are designed to **skip** instead of hard-fail, to keep the suite robust across different environments.
+> Note: Some gateway tests depend on an upstream LLM being configured via `AI_MODEL_URL` / `AI_MODEL`. If the upstream is not reachable, tests are designed to **skip** instead of hard-fail, to keep the suite robust across different environments.
 
 ---
-## Relation to `test-scripts/`
+## Relation to `examples/`
 
-The older `test-scripts/` directory contains Go programs intended as **manual test harnesses** and load/stress helpers:
+The `examples/` directory contains practical demonstration programs and integration examples:
 
-- `test-scripts/main.go`: a manual end-to-end sanity suite and basic load test.
-- `test-scripts/gateway-test/main.go`: a manual gateway streaming test harness.
+- `examples/go-sdk-demo/`: Shows how to use the Go client library (`tszclient-go`)
+- `examples/python-sdk-demo/`: Demonstrates the Python client library usage
+- `examples/go-bedrock-gateway/`: AWS Bedrock integration example
+- `examples/go-llm-safe-pipeline/`: End-to-end LLM pipeline with guardrails
+- `examples/llm-redteam-playground-python/`: Security testing and red team scenarios
 
-The `tests/` tree covers most of the functional scenarios in a standard `go test` format. The scripts can remain as optional tools for:
+The `tests/` tree provides automated testing in standard `go test` format, while `examples/` offers:
 
-- Manual debugging and exploration,
-- Ad-hoc load testing in non-CI environments.
+- Manual integration testing and exploration
+- Real-world usage patterns and best practices
+- Performance testing and load scenarios
+- Educational resources for developers
 
-In future iterations, heavy load tests can be moved into `tests/perf/` and wired into a separate CI workflow (e.g., nightly runs) if needed.
+For automated testing, use the `tests/` directory. For learning and manual testing, explore the `examples/` directory.

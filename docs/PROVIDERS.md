@@ -233,7 +233,8 @@ TSZ needs IAM permissions to invoke Bedrock models. You can configure this in se
                 "arn:aws:bedrock:*::foundation-model/amazon.titan-*",
                 "arn:aws:bedrock:*::foundation-model/meta.llama*",
                 "arn:aws:bedrock:*::foundation-model/mistral.*",
-                "arn:aws:bedrock:*::foundation-model/cohere.*"
+                "arn:aws:bedrock:*::foundation-model/cohere.*",
+                "arn:aws:bedrock:*::foundation-model/openai.*"
             ]
         }
     ]
@@ -330,6 +331,7 @@ TSZ's Bedrock provider supports the following model families:
 - **Meta Llama** - Llama 3 (8B, 70B)
 - **Mistral** - Mistral 7B, Mixtral 8x7B
 - **Cohere** - Command, Command Light
+- **OpenAI** - GPT-OSS 20B, GPT-OSS 120B (via Bedrock)
 
 For the latest model IDs and availability, refer to the [AWS Bedrock Model IDs documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html).
 

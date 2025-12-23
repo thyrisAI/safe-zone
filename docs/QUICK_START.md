@@ -17,11 +17,9 @@ TSZ is designed to run as a containerized microservice in your environment (Dock
 ## 2. Clone the Repository
 
 ```bash
-git clone https://github.com/thyris-ai/tdz.git
-cd tdz
+git clone https://github.com/thyrisAI/safe-zone.git
+cd safe-zone
 ```
-
-> Note: The project may be referred to as TDZ (Thyris Data Zero) internally; the runtime product name is **TSZ (Thyris Safe Zone)**.
 
 ---
 
@@ -47,7 +45,7 @@ AI_PROVIDER=OPENAI_COMPATIBLE
 # OpenAI-Compatible Provider (OpenAI, Azure OpenAI, Ollama, etc.)
 AI_MODEL_URL=http://localhost:11434/v1
 AI_API_KEY=ollama
-AI_MODEL=llama3
+AI_MODEL=llama3.1:8b
 
 # AWS Bedrock Provider (only used when AI_PROVIDER=BEDROCK)
 # AWS_BEDROCK_REGION=us-east-1
@@ -243,7 +241,7 @@ of calling the HTTP APIs manually.
 Inside this repository:
 
 ```go
-import tszclient "thyris-sz/pkg/tszclient-go"
+import tszclient "github.com/thyrisAI/safe-zone/pkg/tszclient-go"
 
 client, err := tszclient.New(tszclient.Config{
     BaseURL: "http://localhost:8080", // TSZ gateway URL

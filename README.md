@@ -66,6 +66,27 @@ TSZ provides official client libraries for common stacks:
 
 ---
 
+## Testing
+
+TSZ includes a comprehensive test suite with 55+ tests covering unit, integration, and end-to-end scenarios:
+
+```bash
+# Run all tests
+go test ./tests/... -v
+
+# Run specific test suites
+go test ./tests/unit/...        # Unit tests (no dependencies)
+go test ./tests/integration/... # Integration tests (requires TSZ + DB + Redis)
+go test ./tests/e2e/...         # End-to-end tests (full system)
+```
+
+**Test Coverage:**
+- **Unit Tests (40+)**: Core business logic, AI providers, configuration, caching
+- **Integration Tests (15+)**: API endpoints, error handling, concurrent requests
+- **E2E Tests (5)**: Full system workflows, streaming, health checks
+
+For detailed information about the test suite, see `tests/README.md`.
+
 ## Contributing
 
 We welcome community contributions.

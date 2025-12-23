@@ -14,7 +14,7 @@ services:
       - AI_PROVIDER=OPENAI_COMPATIBLE
       - AI_MODEL_URL=http://host.docker.internal:11434/v1
       - AI_API_KEY=ollama
-      - AI_MODEL=llama3
+      - AI_MODEL=llama3.1:8b
     ports:
       - "8080:8080"
     depends_on:

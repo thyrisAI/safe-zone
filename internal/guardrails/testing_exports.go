@@ -1,6 +1,3 @@
-//go:build test
-// +build test
-
 package guardrails
 
 import "thyris-sz/internal/models"

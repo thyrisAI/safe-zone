@@ -90,8 +90,13 @@ func main() {
 }
 
 func simpleChat(tszURL string) {
+	modelID := os.Getenv("AWS_BEDROCK_MODEL_ID")
+	if modelID == "" {
+		modelID = "anthropic.claude-3-sonnet-20240229-v1:0" // Default fallback
+	}
+
 	req := ChatRequest{
-		Model: "anthropic.claude-3-sonnet-20240229-v1:0",
+		Model: modelID,
 		Messages: []ChatMessage{
 			{Role: "user", Content: "What is the capital of France? Answer in one sentence."},
 		},
@@ -110,9 +115,14 @@ func simpleChat(tszURL string) {
 }
 
 func chatWithPII(tszURL string) {
+	modelID := os.Getenv("AWS_BEDROCK_MODEL_ID")
+	if modelID == "" {
+		modelID = "anthropic.claude-3-sonnet-20240229-v1:0" // Default fallback
+	}
+
 	// This message contains PII that should be detected and masked
 	req := ChatRequest{
-		Model: "anthropic.claude-3-sonnet-20240229-v1:0",
+		Model: modelID,
 		Messages: []ChatMessage{
 			{
 				Role:    "user",
@@ -139,8 +149,13 @@ func chatWithPII(tszURL string) {
 }
 
 func chatWithGuardrails(tszURL string) {
+	modelID := os.Getenv("AWS_BEDROCK_MODEL_ID")
+	if modelID == "" {
+		modelID = "anthropic.claude-3-sonnet-20240229-v1:0" // Default fallback
+	}
+
 	req := ChatRequest{
-		Model: "anthropic.claude-3-sonnet-20240229-v1:0",
+		Model: modelID,
 		Messages: []ChatMessage{
 			{Role: "system", Content: "You are a helpful assistant."},
 			{Role: "user", Content: "Tell me a short joke."},

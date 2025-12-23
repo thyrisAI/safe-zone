@@ -32,7 +32,8 @@ Your AWS credentials need the following IAM permissions:
                 "arn:aws:bedrock:*::foundation-model/amazon.titan-*",
                 "arn:aws:bedrock:*::foundation-model/meta.llama*",
                 "arn:aws:bedrock:*::foundation-model/mistral.*",
-                "arn:aws:bedrock:*::foundation-model/cohere.*"
+                "arn:aws:bedrock:*::foundation-model/cohere.*",
+                "arn:aws:bedrock:*::foundation-model/openai.*"
             ]
         }
     ]
@@ -70,6 +71,7 @@ Safe Zone supports the following Bedrock model families:
 | Meta Llama | `meta.llama3-8b-instruct-v1:0` | Open-source alternative |
 | Mistral | `mistral.mistral-7b-instruct-v0:2` | Fast inference |
 | Cohere | `cohere.command-text-v14` | Good for summarization |
+| OpenAI | `openai.gpt-4o-mini-2024-07-18-v1:0` | GPT models via Bedrock |
 
 ## Running the Example
 

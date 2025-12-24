@@ -8,7 +8,7 @@
 // Prerequisites:
 // - AWS credentials configured (via environment, shared credentials, or IAM role)
 // - Access to AWS Bedrock in your region
-// - Safe Zone server running with THYRIS_AI_PROVIDER=BEDROCK
+// - Safe Zone server running with AI_PROVIDER=BEDROCK
 //
 // Usage:
 //

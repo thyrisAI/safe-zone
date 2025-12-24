@@ -347,7 +347,7 @@ For the latest model IDs and availability, refer to the [AWS Bedrock Model IDs d
 
 #### Limitations
 
-- Streaming is not yet supported (non-streaming only)
+- Streaming is not yet supported (non-streaming only). If a client sends `stream=true` while `AI_PROVIDER=BEDROCK`, TSZ returns an OpenAI-compatible `400` error with code `streaming_not_supported`.
 - Requires AWS credentials and permissions
 - Model availability varies by region
 - Some models require explicit enablement in AWS console

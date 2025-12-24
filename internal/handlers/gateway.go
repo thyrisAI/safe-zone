@@ -75,6 +75,17 @@ func NewOpenAIChatGateway(detector *guardrails.Detector) http.HandlerFunc {
 
 		payload["messages"] = sanitizedMessages
 
+		// Provider streaming compatibility check
+		// If the client requests streaming but the configured provider does not support it,
+		// return a clear error rather than proxying a non-streaming response over SSE.
+		if stream {
+			provider := ai.GetProvider()
+			if provider != nil && !provider.SupportsStreaming() {
+				writeOpenAIError(w, http.StatusBadRequest, "Streaming is currently not supported for this provider integration.", "streaming_not_supported")
+				return
+			}
+		}
+
 		// 4) Forward request to upstream (via provider or direct HTTP)
 		var upstreamResp *http.Response
 

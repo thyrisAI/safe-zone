@@ -252,7 +252,7 @@ TSZ can also act as an **OpenAI-compatible gateway** for chat models. This allow
 POST /v1/chat/completions
 ```
 
-TSZ implements the **request and response shape** of the OpenAI `chat/completions` endpoint for both non‑streaming (`stream=false`) and streaming (`stream=true`) calls.
+TSZ implements the **request and response shape** of the OpenAI `chat/completions` endpoint for both non‑streaming (`stream=false`) and streaming (`stream=true`) calls. Streaming support depends on the selected provider; for example, `AI_PROVIDER=BEDROCK` currently supports **non-streaming only**.
 
 #### 3.2.1 High-Level Behaviour
 
@@ -344,7 +344,7 @@ AWS_BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
 | Mistral | `mistral.mistral-7b-instruct-v0:2` | Fast inference |
 | Cohere | `cohere.command-text-v14` | Good for summarization |
 
-> **Note**: Bedrock streaming support is planned for a future release. Currently, only non-streaming requests (`stream=false`) are fully supported with Bedrock.
+> **Note**: Bedrock streaming support is planned for a future release. Currently, only non-streaming requests (`stream=false`) are supported with Bedrock. If a client sends `stream=true` while `AI_PROVIDER=BEDROCK`, TSZ returns an OpenAI-compatible `400` error with code `streaming_not_supported`.
 
 #### 3.2.3 Headers
 

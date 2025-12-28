@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -240,8 +241,25 @@ func (p *OpenAIProvider) ForwardRequest(ctx context.Context, payload map[string]
 		req.Header.Set("Authorization", "Bearer "+p.config.APIKey)
 	}
 
-	// Use a client without timeout for streaming
-	client := &http.Client{}
+	// Use a client with ResponseHeaderTimeout to prevent hanging on initial connection,
+	// but allow long-running body reading for streaming.
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		ResponseHeaderTimeout: 60 * time.Second,
+	}
+
+	client := &http.Client{
+		Transport: transport,
+	}
 	return client.Do(req)
 }
 

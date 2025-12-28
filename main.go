@@ -71,6 +71,28 @@ func main() {
 			return
 		}
 
+		// Validation
+		if req.Text == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Text field is required"})
+			return
+		}
+
+		if req.Mode != "" {
+			validModes := map[string]bool{
+				"MASK":   true,
+				"BLOCK":  true,
+				"DETECT": true,
+			}
+			if !validModes[req.Mode] {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Invalid mode"})
+				return
+			}
+		}
+
 		startTime := time.Now()
 		result := detector.Detect(req)
 

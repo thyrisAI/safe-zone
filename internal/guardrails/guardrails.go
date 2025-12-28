@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"thyris-sz/internal/ai"
 	"thyris-sz/internal/models"
 	"thyris-sz/internal/repository"
@@ -15,12 +16,31 @@ import (
 // Detector handles PII detection and redaction
 type Detector struct{}
 
+var regexCache sync.Map
+
+// getCachedRegex retrieves a compiled regex from cache or compiles it
+func getCachedRegex(pattern string) (*regexp.Regexp, error) {
+	if v, ok := regexCache.Load(pattern); ok {
+		return v.(*regexp.Regexp), nil
+	}
+	r, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+	regexCache.Store(pattern, r)
+	return r, nil
+}
+
 // resolveAction maps confidence score to action
 func resolveAction(score float64, allowThreshold float64, blockThreshold float64) string {
+	// Safety check for invalid thresholds
+	if allowThreshold > blockThreshold {
+		return "MASK"
+	}
 	if score >= blockThreshold {
 		return "BLOCK"
 	}
-	if score <= allowThreshold {
+	if score < allowThreshold {
 		return "ALLOW"
 	}
 	return "MASK"
@@ -149,7 +169,7 @@ func (d *Detector) Detect(req models.DetectRequest) models.DetectResponse {
 
 	// 2. Find all candidates (Patterns)
 	for _, p := range dbPatterns {
-		regex, err := regexp.Compile(p.Regex)
+		regex, err := getCachedRegex(p.Regex)
 		if err != nil {
 			log.Printf("Invalid regex for pattern %s: %v", p.Name, err)
 			continue
@@ -252,9 +272,12 @@ func (d *Detector) Detect(req models.DetectRequest) models.DetectResponse {
 		breakdown[d.Type]++
 	}
 
-	mode := os.Getenv("PII_MODE")
+	mode := req.Mode
 	if mode == "" {
-		mode = "MASK"
+		mode = os.Getenv("PII_MODE")
+		if mode == "" {
+			mode = "MASK"
+		}
 	}
 
 	containsPII := len(detections) > 0

@@ -5,6 +5,7 @@ import "gorm.io/gorm"
 // DetectRequest represents the incoming request payload for PII detection
 type DetectRequest struct {
 	Text           string   `json:"text"`
+	Mode           string   `json:"mode,omitempty"`
 	RID            string   `json:"rid,omitempty"`
 	ExpectedFormat string   `json:"expected_format,omitempty"`
 	Guardrails     []string `json:"guardrails,omitempty"`

@@ -16,9 +16,21 @@ func ReloadCache(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Admin auth via API key (consistent with UpdatePatternPolicy)
+	adminKey := os.Getenv("ADMIN_API_KEY")
+	if adminKey == "" || r.Header.Get("X-ADMIN-KEY") != adminKey {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	// Clear caches
 	cache.ClearCache(cache.KeyPatterns)
 	cache.ClearCache(cache.KeyAllowlist)
+	cache.ClearCache(cache.KeyBlocklist)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"ok","message":"All caches cleared"}`))
 }
 
 // UpdatePatternPolicy allows admin to update pattern-level thresholds

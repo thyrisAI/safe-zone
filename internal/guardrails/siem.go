@@ -3,6 +3,7 @@ package guardrails
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -29,7 +30,11 @@ func publishSecurityEvent(event models.SecurityEvent) {
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{Timeout: 2 * time.Second}
-	if _, err := client.Do(req); err != nil {
+	resp, err := client.Do(req)
+	if err != nil {
 		log.Printf("SIEM delivery failed: %v", err)
+		return
 	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
 }

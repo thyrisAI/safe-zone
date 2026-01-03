@@ -22,12 +22,14 @@ import (
 // If nil, a default client with 60s timeout will be used.
 type Config struct {
 	BaseURL    string
+	APIKey     string // Optional Admin API Key
 	HTTPClient *http.Client
 }
 
 // Client is a lightweight TSZ API client.
 type Client struct {
 	baseURL    *url.URL
+	apiKey     string
 	httpClient *http.Client
 }
 
@@ -49,6 +51,7 @@ func New(cfg Config) (*Client, error) {
 
 	return &Client{
 		baseURL:    u,
+		apiKey:     cfg.APIKey,
 		httpClient: hc,
 	}, nil
 }
@@ -107,7 +110,7 @@ func (e *APIError) Error() string {
 
 // Detect calls the /detect endpoint of TSZ.
 func (c *Client) Detect(ctx context.Context, req DetectRequest) (*DetectResponse, error) {
-	return postJSON[DetectResponse](ctx, c.httpClient, c.baseURL, "/detect", req, nil)
+	return postJSON[DetectResponse](ctx, c, "/detect", req, nil)
 }
 
 // DetectOption configures a DetectRequest for helper methods such as DetectText.
@@ -199,7 +202,7 @@ func (c *Client) ChatCompletions(
 		payload[k] = v
 	}
 
-	resp, err := postJSON[ChatCompletionResponse](ctx, c.httpClient, c.baseURL, "/v1/chat/completions", payload, headers)
+	resp, err := postJSON[ChatCompletionResponse](ctx, c, "/v1/chat/completions", payload, headers)
 	if err != nil {
 		return nil, err
 	}
@@ -210,13 +213,12 @@ func (c *Client) ChatCompletions(
 // into a target type.
 func postJSON[T any](
 	ctx context.Context,
-	client *http.Client,
-	base *url.URL,
+	c *Client,
 	path string,
 	body interface{},
 	headers map[string]string,
 ) (*T, error) {
-	u := *base
+	u := *c.baseURL
 	u.Path = strings.TrimRight(u.Path, "/") + path
 
 	b, err := json.Marshal(body)
@@ -230,11 +232,14 @@ func postJSON[T any](
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		req.Header.Set("X-ADMIN-KEY", c.apiKey)
+	}
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("http request failed: %w", err)
 	}
@@ -255,4 +260,78 @@ func postJSON[T any](
 	}
 
 	return &out, nil
+}
+
+// getJSON is a helper for GET requests decoding JSON.
+func getJSON[T any](
+	ctx context.Context,
+	c *Client,
+	path string,
+) (*T, error) {
+	u := *c.baseURL
+	u.Path = strings.TrimRight(u.Path, "/") + path
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		req.Header.Set("X-ADMIN-KEY", c.apiKey)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, &APIError{StatusCode: resp.StatusCode, Body: respBody}
+	}
+
+	var out T
+	if err := json.Unmarshal(respBody, &out); err != nil {
+		return nil, fmt.Errorf("failed to decode response body: %w", err)
+	}
+
+	return &out, nil
+}
+
+// deleteRequest is a helper for DELETE requests.
+func deleteRequest(
+	ctx context.Context,
+	c *Client,
+	path string,
+) error {
+	u := *c.baseURL
+	u.Path = strings.TrimRight(u.Path, "/") + path
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, u.String(), nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if c.apiKey != "" {
+		req.Header.Set("X-ADMIN-KEY", c.apiKey)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("http request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return &APIError{StatusCode: resp.StatusCode, Body: body}
+	}
+
+	return nil
 }

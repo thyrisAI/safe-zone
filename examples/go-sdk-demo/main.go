@@ -1,25 +1,21 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"time"
 
 	tszclient "github.com/thyrisAI/safe-zone/pkg/tszclient-go"
 )
 
-// This example uses the Go client (pkg/tszclient-go) together with
-// plain HTTP helpers to demonstrate several TSZ capabilities:
+// This example uses the Go client (pkg/tszclient-go) to demonstrate
+// several TSZ capabilities:
 //
 //  1. Core /detect API (PII detection & guardrails)
-//  2. Allowlist management (/allowlist)
-//  3. Blocklist (blacklist) management (/blacklist)
-//  4. Listing validators and patterns (/validators, /patterns)
+//  2. Allowlist management (using SDK methods)
+//  3. Blocklist management (using SDK methods)
+//  4. Listing validators and patterns
 //  5. OpenAI-compatible LLM gateway (/v1/chat/completions)
 //
 // It is structured as if it were an external project that depends on
@@ -42,6 +38,7 @@ func main() {
 
 	client, err := tszclient.New(tszclient.Config{
 		BaseURL: tszBaseURL,
+		APIKey:  "admin-key", // Change if your server has a different key
 	})
 	if err != nil {
 		log.Fatalf("failed to create tsz client: %v", err)
@@ -63,7 +60,7 @@ func main() {
 	}
 
 	log.Println("\n=== 4) Validators & patterns overview ===")
-	if err := runValidatorsAndPatternsDemo(ctx); err != nil {
+	if err := runValidatorsAndPatternsDemo(ctx, client); err != nil {
 		log.Printf("validators/patterns demo failed: %v", err)
 	}
 
@@ -98,17 +95,15 @@ func runDetectDemo(ctx context.Context, client *tszclient.Client) error {
 // runAllowlistDemo creates an allowlist item, then calls /detect to
 // show how a trusted value can be ignored by detection.
 func runAllowlistDemo(ctx context.Context, client *tszclient.Client) error {
-	httpClient := &http.Client{Timeout: 10 * time.Second}
-
 	// 1) Create an allowlist item for a specific email.
 	allowValue := "support@company.com"
-	payload := map[string]any{
-		"value":       allowValue,
-		"description": "Support mailbox allowlisted from Go SDK demo",
+	item := tszclient.AllowlistItem{
+		Value:       allowValue,
+		Description: "Support mailbox allowlisted from Go SDK demo",
 	}
 
-	var created map[string]any
-	if err := postJSON(ctx, httpClient, tszBaseURL+"/allowlist", payload, &created); err != nil {
+	created, err := client.CreateAllowlistItem(ctx, item)
+	if err != nil {
 		return fmt.Errorf("failed to create allowlist item: %w", err)
 	}
 	log.Printf("[ALLOWLIST] created item: %+v", created)
@@ -134,16 +129,14 @@ func runAllowlistDemo(ctx context.Context, client *tszclient.Client) error {
 // runBlocklistDemo creates a blocklist (blacklist) item and then shows
 // how a forbidden value can cause a request to be blocked.
 func runBlocklistDemo(ctx context.Context, client *tszclient.Client) error {
-	httpClient := &http.Client{Timeout: 10 * time.Second}
-
 	blockValue := "internal_secret_token"
-	payload := map[string]any{
-		"value":       blockValue,
-		"description": "Demo blocklist token from Go SDK demo",
+	item := tszclient.BlacklistItem{
+		Value:       blockValue,
+		Description: "Demo blocklist token from Go SDK demo",
 	}
 
-	var created map[string]any
-	if err := postJSON(ctx, httpClient, tszBaseURL+"/blacklist", payload, &created); err != nil {
+	created, err := client.CreateBlocklistItem(ctx, item)
+	if err != nil {
 		return fmt.Errorf("failed to create blocklist item: %w", err)
 	}
 	log.Printf("[BLOCKLIST] created item: %+v", created)
@@ -169,12 +162,10 @@ func runBlocklistDemo(ctx context.Context, client *tszclient.Client) error {
 
 // runValidatorsAndPatternsDemo lists a few validators and patterns to
 // show how additional guardrails can be configured.
-func runValidatorsAndPatternsDemo(ctx context.Context) error {
-	httpClient := &http.Client{Timeout: 10 * time.Second}
-
+func runValidatorsAndPatternsDemo(ctx context.Context, client *tszclient.Client) error {
 	// List validators
-	var validators []map[string]any
-	if err := getJSON(ctx, httpClient, tszBaseURL+"/validators", &validators); err != nil {
+	validators, err := client.ListValidators(ctx)
+	if err != nil {
 		return fmt.Errorf("failed to list validators: %w", err)
 	}
 	if len(validators) == 0 {
@@ -184,8 +175,8 @@ func runValidatorsAndPatternsDemo(ctx context.Context) error {
 	}
 
 	// List patterns
-	var patterns []map[string]any
-	if err := getJSON(ctx, httpClient, tszBaseURL+"/patterns", &patterns); err != nil {
+	patterns, err := client.ListPatterns(ctx)
+	if err != nil {
 		return fmt.Errorf("failed to list patterns: %w", err)
 	}
 	if len(patterns) == 0 {
@@ -230,68 +221,6 @@ func runLLMDemo(ctx context.Context, client *tszclient.Client) error {
 
 	fmt.Println("[CHAT] LLM response via TSZ:")
 	fmt.Println(content)
-
-	return nil
-}
-
-// postJSON is a small helper for posting JSON payloads and decoding
-// the JSON response into `out`.
-func postJSON(ctx context.Context, client *http.Client, url string, body any, out any) error {
-	b, err := json.Marshal(body)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request body: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("http request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	if out == nil {
-		return nil
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return fmt.Errorf("failed to decode response body: %w", err)
-	}
-
-	return nil
-}
-
-// getJSON is a small helper for GET requests that decode JSON into `out`.
-func getJSON(ctx context.Context, client *http.Client, url string, out any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("http request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return fmt.Errorf("failed to decode response body: %w", err)
-	}
 
 	return nil
 }

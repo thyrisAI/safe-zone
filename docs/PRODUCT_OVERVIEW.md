@@ -91,6 +91,14 @@ Safely connect your applications to any supported LLM provider using TSZ as a **
 - **Flexible Deployment:** Runs as a Docker container in your VPC, on‑prem or in any cloud.
 - **Data Residency & Sovereignty:** All processing happens inside your perimeter; only redacted content needs to leave.
 
+### 8. CLI Tool
+
+Manage your Safe Zone instance directly from the command line.
+
+- **Scan Files:** Run local scans on files or text strings.
+- **Admin Management:** Create patterns, update lists, and configure guardrails without using curl or Postman.
+- **Automation:** Easily integrate into CI/CD pipelines.
+
 ---
 
 ## Technical Architecture (High Level)

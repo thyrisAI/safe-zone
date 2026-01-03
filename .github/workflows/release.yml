@@ -11,6 +11,7 @@ on:
           - thyris-sz
           - tszclient-go
           - tszclient-py
+          - tsz-cli
       bump:
         description: "Version bump type"
         required: true
@@ -40,7 +41,7 @@ jobs:
           fetch-depth: 0  # tags and history for diff & versioning
 
       - name: Setup Go
-        if: ${{ github.event.inputs.product == 'thyris-sz' || github.event.inputs.product == 'tszclient-go' }}
+        if: ${{ github.event.inputs.product == 'thyris-sz' || github.event.inputs.product == 'tszclient-go' || github.event.inputs.product == 'tsz-cli' }}
         uses: actions/setup-go@v5
         with:
           go-version: '1.23'
@@ -154,5 +155,68 @@ jobs:
         with:
           tag_name: ${{ env.LAST_TAG }}
           files: tszclient-py-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # TSZ CLI: package source + build binaries for release
+      - name: Build and Package TSZ CLI
+        if: ${{ github.event.inputs.product == 'tsz-cli' }}
+        run: |
+          LAST_TAG=$(git tag --list 'tsz-cli-v*' | sort -V | tail -n 1)
+          echo "LAST_TAG=$LAST_TAG" >> $GITHUB_ENV
+          VERSION=${LAST_TAG#tsz-cli-v}
+          
+          # 1. Source Archive
+          ZIP_NAME="tsz-cli-${VERSION}-src.zip"
+          echo "Packaging CLI source into $ZIP_NAME"
+          zip -r "$ZIP_NAME" pkg/tsz-cli -x '**/__pycache__/*' '*.pyc' '*.pyo'
+          
+          # 2. Build Binaries
+          cd pkg/tsz-cli
+          
+          # Windows
+          echo "Building for Windows..."
+          GOOS=windows GOARCH=amd64 go build -o ../../tsz-cli-windows-amd64.exe
+          
+          # Linux
+          echo "Building for Linux..."
+          GOOS=linux GOARCH=amd64 go build -o ../../tsz-cli-linux-amd64
+          
+          # macOS (Intel)
+          echo "Building for macOS (Intel)..."
+          GOOS=darwin GOARCH=amd64 go build -o ../../tsz-cli-darwin-amd64
+          
+          # macOS (Apple Silicon)
+          echo "Building for macOS (ARM64)..."
+          GOOS=darwin GOARCH=arm64 go build -o ../../tsz-cli-darwin-arm64
+          
+          cd ../..
+          
+      - name: Create GitHub Release for TSZ CLI (manual notes)
+        if: ${{ github.event.inputs.product == 'tsz-cli' && github.event.inputs.release_notes != '' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.LAST_TAG }}
+          files: |
+            tsz-cli-*-src.zip
+            tsz-cli-windows-amd64.exe
+            tsz-cli-linux-amd64
+            tsz-cli-darwin-amd64
+            tsz-cli-darwin-arm64
+          body: ${{ github.event.inputs.release_notes }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release for TSZ CLI (no notes)
+        if: ${{ github.event.inputs.product == 'tsz-cli' && github.event.inputs.release_notes == '' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.LAST_TAG }}
+          files: |
+            tsz-cli-*-src.zip
+            tsz-cli-windows-amd64.exe
+            tsz-cli-linux-amd64
+            tsz-cli-darwin-amd64
+            tsz-cli-darwin-arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

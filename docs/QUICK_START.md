@@ -325,7 +325,38 @@ For a full working demo (including headers, RIDs and guardrails), see:
 
 ---
 
-## 11. Next Steps
+## 11. Using the CLI Tool (tsz)
+
+You can use the `tsz` command-line tool to interact with the API without writing code.
+
+### 11.1 Build/Install
+
+```bash
+cd pkg/tsz-cli
+go build -o tsz
+# On Windows: tsz.exe
+```
+
+### 11.2 Run a Scan
+
+```bash
+./tsz scan --text "My email is user@example.com"
+```
+
+Output:
+
+```json
+{
+  "redacted_text": "My email is [EMAIL]",
+  "detections": [...]
+}
+```
+
+For more commands (managing patterns, lists, templates), see `pkg/tsz-cli/README.md`.
+
+---
+
+## 12. Next Steps
 
 From here, you can:
 

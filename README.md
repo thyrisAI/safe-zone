@@ -17,6 +17,7 @@ TSZ provides real‑time scanning, redaction, and blocking capabilities so that 
 - **Native AWS Bedrock integration** – Use Anthropic Claude, Amazon Titan, Meta Llama, Mistral, and Cohere models directly
 - **Multi-provider AI support** – OpenAI-compatible endpoints (OpenAI, Azure OpenAI, Ollama) and AWS Bedrock
 - **OpenAI-compatible LLM gateway** – Drop-in replacement for OpenAI API with built-in guardrails
+- **CLI Tool** – Full management and scanning from the command line (`pkg/tsz-cli`)
 
 ---
 
@@ -55,7 +56,10 @@ TSZ provides official client libraries for common stacks:
 - **Go client (`tszclient-go`)** – for Go services that want a typed wrapper around `/detect` and the LLM gateway.  
   See: `pkg/tszclient-go/README.md`.
 
-- **Python client (`tszclient_py` / package `tszclient-py`)** – for Python services that prefer a small `requests`-based helper instead of calling HTTP manually.  
+- **CLI (`tsz`)** – Command-line interface for scanning and administration.  
+  See: `pkg/tsz-cli/README.md`.
+
+- **Python client (`tszclient_py` / package `tszclient-py`)** – for Python services that prefer a small `requests`-based helper instead of calling HTTP manually.
   Install from GitHub:
 
   ```bash

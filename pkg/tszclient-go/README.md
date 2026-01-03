@@ -54,11 +54,13 @@ example that:
 ```go
 type Config struct {
     BaseURL    string
+    APIKey     string // Optional Admin API Key (for management operations)
     HTTPClient *http.Client
 }
 
 client, err := tszclient.New(tszclient.Config{
-    BaseURL: "http://localhost:8080", // TSZ gateway URL
+    BaseURL: "http://localhost:8080",
+    APIKey:  "your-admin-key", // Required only for pattern/allowlist management
 })
 if err != nil {
     log.Fatalf("failed to create tsz client: %v", err)
@@ -250,6 +252,54 @@ In this call:
 - TSZ first scans the user message with `/detect` (PII + guardrails) and masks or blocks according to your policies.
 - If the input is safe, TSZ forwards only the redacted prompt to the upstream LLM.
 - When the LLM responds, TSZ applies the same guardrail set on the assistant output before returning it to the client.
+
+---
+
+## Management API
+
+The client supports all management operations for Patterns, Allowlists, Blocklists, and Validators.
+
+### Managing Patterns
+
+```go
+// List patterns
+patterns, err := client.ListPatterns(ctx)
+
+// Create a new pattern
+p := tszclient.Pattern{
+    Name:     "CUSTOM_ID",
+    Regex:    "ID-\\d{5}",
+    IsActive: true,
+    Category: "PII",
+}
+newPattern, err := client.CreatePattern(ctx, p)
+
+// Delete a pattern
+err := client.DeletePattern(ctx, newPattern.ID)
+```
+
+### Managing Lists
+
+```go
+// Allowlist
+client.CreateAllowlistItem(ctx, tszclient.AllowlistItem{Value: "admin@example.com"})
+items, _ := client.ListAllowlist(ctx)
+
+// Blocklist
+client.CreateBlocklistItem(ctx, tszclient.BlacklistItem{Value: "forbidden_term"})
+```
+
+### Importing Templates
+
+You can import full guardrail templates (JSON packs) directly:
+
+```go
+template := tszclient.TemplateDefinition{
+    Name: "My Policy Pack",
+    Patterns: []tszclient.Pattern{...},
+}
+err := client.ImportTemplate(ctx, template)
+```
 
 ---
 

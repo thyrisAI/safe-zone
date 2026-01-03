@@ -1,21 +1,12 @@
 package e2e
 
 import (
-	"bytes"
-	"encoding/json"
-	"net/http"
+	"context"
 	"os"
-	"strings"
 	"testing"
+
+	tszclient "github.com/thyrisAI/safe-zone/pkg/tszclient-go"
 )
-
-type healthResponse struct {
-	Status string `json:"status"`
-}
-
-type detectResponse struct {
-	ContainsPII bool `json:"contains_pii"`
-}
 
 func baseURL() string {
 	if v := os.Getenv("TSZ_BASE_URL"); v != "" {
@@ -24,122 +15,108 @@ func baseURL() string {
 	return "http://localhost:8080"
 }
 
-func TestSanity_HealthAndReady(t *testing.T) {
-	t.Run("healthz", func(t *testing.T) {
-		resp, err := http.Get(baseURL() + "/healthz")
-		if err != nil {
-			t.Fatalf("GET /healthz failed: %v", err)
-		}
-		defer resp.Body.Close()
+func getClient(t *testing.T) *tszclient.Client {
+	client, err := tszclient.New(tszclient.Config{
+		BaseURL: baseURL(),
+		APIKey:  "test-admin-key",
+	})
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+	return client
+}
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected 200 from /healthz, got %d", resp.StatusCode)
+func TestSanity_HealthAndReady(t *testing.T) {
+	client := getClient(t)
+	ctx := context.Background()
+
+	t.Run("healthz", func(t *testing.T) {
+		up, err := client.Health(ctx)
+		if err != nil {
+			t.Fatalf("Health check failed: %v", err)
+		}
+		if !up {
+			t.Fatal("Service is not UP")
 		}
 	})
 
 	t.Run("ready", func(t *testing.T) {
-		resp, err := http.Get(baseURL() + "/ready")
+		ready, err := client.Ready(ctx)
 		if err != nil {
-			t.Fatalf("GET /ready failed: %v", err)
+			t.Fatalf("Readiness check failed: %v", err)
 		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected 200 from /ready, got %d", resp.StatusCode)
+		if !ready {
+			t.Fatal("Service is not READY")
 		}
 	})
 }
 
 func TestSanity_PatternsAllowlistValidatorsRoundtrip(t *testing.T) {
-	// This is a thin wrapper that relies on existing REST handlers;
-	// it is intentionally high-level and focuses on "does the round-trip work".
+	client := getClient(t)
+	ctx := context.Background()
 
 	// 1) List patterns
-	resp, err := http.Get(baseURL() + "/patterns")
+	patterns, err := client.ListPatterns(ctx)
 	if err != nil {
-		t.Fatalf("GET /patterns failed: %v", err)
+		t.Fatalf("ListPatterns failed: %v", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 from /patterns, got %d", resp.StatusCode)
+	// We expect at least default patterns (e.g. EMAIL)
+	if len(patterns) == 0 {
+		t.Log("Warning: No patterns found (DB might be empty)")
 	}
 
 	// 2) List validators
-	resp2, err := http.Get(baseURL() + "/validators")
+	validators, err := client.ListValidators(ctx)
 	if err != nil {
-		t.Fatalf("GET /validators failed: %v", err)
+		t.Fatalf("ListValidators failed: %v", err)
 	}
-	defer resp2.Body.Close()
-
-	if resp2.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 from /validators, got %d", resp2.StatusCode)
-	}
+	_ = validators // ignored
 
 	// 3) List allowlist
-	resp3, err := http.Get(baseURL() + "/allowlist")
+	allowlist, err := client.ListAllowlist(ctx)
 	if err != nil {
-		t.Fatalf("GET /allowlist failed: %v", err)
+		t.Fatalf("ListAllowlist failed: %v", err)
 	}
-	defer resp3.Body.Close()
-
-	if resp3.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 from /allowlist, got %d", resp3.StatusCode)
-	}
+	_ = allowlist // ignored
 }
 
 func TestSanity_DetectAndGatewayBasicFlow(t *testing.T) {
+	client := getClient(t)
+	ctx := context.Background()
+
 	t.Run("detect-email", func(t *testing.T) {
-		url := baseURL() + "/detect"
-		body := `{"text": "My email is test@example.com", "rid": "e2e-sanity-detect"}`
-
-		resp, err := http.Post(url, "application/json", strings.NewReader(body))
+		resp, err := client.DetectText(
+			ctx,
+			"My email is test@example.com",
+			tszclient.WithRID("e2e-sanity-detect"),
+		)
 		if err != nil {
-			t.Fatalf("POST /detect failed: %v", err)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected 200 from /detect, got %d", resp.StatusCode)
+			t.Fatalf("DetectText failed: %v", err)
 		}
 
-		var dr detectResponse
-		if err := json.NewDecoder(resp.Body).Decode(&dr); err != nil {
-			t.Fatalf("failed to decode /detect response: %v", err)
-		}
-
-		if !dr.ContainsPII {
-			t.Fatalf("expected ContainsPII=true for email payload")
+		if !resp.ContainsPII {
+			t.Fatal("expected ContainsPII=true for email payload")
 		}
 	})
 
 	t.Run("gateway-safe", func(t *testing.T) {
-		payload := map[string]interface{}{
-			"model": "llama3.1:8b",
-			"messages": []map[string]string{
+		req := tszclient.ChatCompletionRequest{
+			Model: "llama3.1:8b",
+			Messages: []map[string]interface{}{
 				{"role": "user", "content": "Hello from E2E sanity"},
 			},
-			"stream": false,
+			Stream: false,
 		}
 
-		body, _ := json.Marshal(payload)
-		req, err := http.NewRequest(http.MethodPost, baseURL()+"/v1/chat/completions", bytes.NewReader(body))
+		// Use empty headers map if none needed
+		resp, err := client.ChatCompletions(ctx, req, map[string]string{"X-TSZ-RID": "E2E-SANITY-GW"})
 		if err != nil {
-			t.Fatalf("failed to create request: %v", err)
+			t.Fatalf("ChatCompletions failed: %v", err)
 		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-TSZ-RID", "E2E-SANITY-GW")
 
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatalf("gateway request failed: %v", err)
-		}
-		defer resp.Body.Close()
-
-		// Upstream may not be configured; we only assert that gateway responds with a JSON payload.
-		var gwResp map[string]interface{}
-		if err := json.NewDecoder(resp.Body).Decode(&gwResp); err != nil {
-			t.Fatalf("failed to decode gateway response: %v", err)
+		// Ensure we got a response map
+		if resp == nil {
+			t.Fatal("ChatCompletions returned nil response")
 		}
 	})
 }

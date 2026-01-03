@@ -108,6 +108,38 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("tsz api error: status=%d body=%s", e.StatusCode, string(e.Body))
 }
 
+// Health checks if the service is up.
+func (c *Client) Health(ctx context.Context) (bool, error) {
+	u := *c.baseURL
+	u.Path = strings.TrimRight(u.Path, "/") + "/healthz"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return false, err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK, nil
+}
+
+// Ready checks if the service is ready (DB/Redis connected).
+func (c *Client) Ready(ctx context.Context) (bool, error) {
+	u := *c.baseURL
+	u.Path = strings.TrimRight(u.Path, "/") + "/ready"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return false, err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK, nil
+}
+
 // Detect calls the /detect endpoint of TSZ.
 func (c *Client) Detect(ctx context.Context, req DetectRequest) (*DetectResponse, error) {
 	return postJSON[DetectResponse](ctx, c, "/detect", req, nil)

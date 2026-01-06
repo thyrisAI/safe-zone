@@ -126,7 +126,7 @@ Prompt Injection (Policy-Based Block)
 
 Data Exfiltration (Detection-Based Block)
 
-``bash
+```bash
 [ATTACK] Data exfiltration attempt
 [STATUS] BLOCKED
 [BLOCK_SOURCE] DETECTION

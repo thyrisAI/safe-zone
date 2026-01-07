@@ -1,0 +1,28 @@
+[
+  {
+    "timestamp": "2026-01-07T11:37:14.505372Z",
+    "request_id": "RID-AUDIT-90cace04",
+    "attack_name": "PII exfiltration",
+    "status": "BLOCKED",
+    "block_source": "DETECTION",
+    "reasons": [
+      "EMAIL"
+    ],
+    "confidence": "0.90",
+    "tsz_version": "safe-zone",
+    "event_type": "llm_security_decision"
+  },
+  {
+    "timestamp": "2026-01-07T11:37:14.510601Z",
+    "request_id": "RID-AUDIT-0ffc85f8",
+    "attack_name": "Prompt injection",
+    "status": "BLOCKED",
+    "block_source": "DETECTION",
+    "reasons": [
+      "PROMPT_INJECTION_SIMPLE"
+    ],
+    "confidence": "0.91",
+    "tsz_version": "safe-zone",
+    "event_type": "llm_security_decision"
+  }
+]

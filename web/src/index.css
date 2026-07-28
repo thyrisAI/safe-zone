@@ -1,0 +1,220 @@
+/* ============================================
+   DESIGN TOKENS
+   Figma tasarımındaki "Swiss functional aesthetic"
+   temel değerleri. Her yeni bileşen bu değişkenleri
+   kullanmalı, renk/spacing'i doğrudan yazmamalı.
+   ============================================ */
+   :root {
+    /* Renkler - nötr palet */
+    --color-bg: #ffffff;
+    --color-bg-subtle: #f8f9fa;
+    --color-border: #e5e7eb;
+    --color-text: #111827;
+    --color-text-muted: #6b7280;
+  
+    /* Tek accent renk (mavi-600) */
+    --color-accent: #2563eb;
+    --color-accent-bg: #eff6ff;
+  
+    /* Semantic durumlar (güvenlik odaklı: allowed/blocked/warning) */
+    --color-success: #16a34a;
+    --color-success-bg: #f0fdf4;
+    --color-danger: #dc2626;
+    --color-danger-bg: #fef2f2;
+    --color-warning: #d97706;
+    --color-warning-bg: #fffbeb;
+    --color-neutral: #6b7280;
+    --color-neutral-bg: #f3f4f6;
+  
+    /* Tipografi */
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  
+    /* Spacing (8px grid) */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 16px;
+    --space-4: 24px;
+    --space-5: 32px;
+  
+    /* Diğer */
+    --radius: 8px;
+    --sidebar-width: 220px;
+    --sidebar-width-collapsed: 56px;
+  }
+  
+  /* ============================================
+     GLOBAL RESET / BASE
+     ============================================ */
+  * {
+    box-sizing: border-box;
+  }
+  
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--color-text);
+    background: var(--color-bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  
+  h1, h2, h3, p {
+    margin: 0;
+  }
+  
+  a {
+    color: var(--color-accent);
+  }
+  
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  /* ============================================
+   SAYFA BAŞLIKLARI (her page bileşeninde ortak)
+   ============================================ */
+.page-header {
+  margin-bottom: var(--space-4);
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: var(--space-1);
+}
+
+.page-subtitle {
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+/* ============================================
+   TABLOLAR (Patterns, Guardrails, Events ortak)
+   ============================================ */
+.data-table {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.data-table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-subtle);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.data-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table td:first-child {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+/* ============================================
+   INFO/EMPTY MESAJLARI (Overview, Events, Configuration'daki
+   "henüz veri yok" metinleri için)
+   ============================================ */
+.info-message {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  padding: var(--space-3);
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius);
+}
+
+/* ============================================
+   RESPONSIVE TABLO -> KART DÖNÜŞÜMÜ (768px altı)
+   ============================================ */
+   @media (max-width: 768px) {
+    .data-table {
+      border: none;
+      border-radius: 0;
+    }
+  
+    .data-table thead {
+      display: none;
+    }
+  
+    .data-table,
+    .data-table tbody,
+    .data-table tr {
+      display: block;
+      width: 100%;
+    }
+  
+    .data-table tr {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      margin-bottom: var(--space-3);
+      padding: var(--space-4);
+      background: var(--color-bg);
+    }
+  
+    .data-table td {
+      display: block;
+      padding: 0;
+      border: none;
+      text-align: left;
+    }
+  
+    /* Kart başlığı: Name alanı, büyük ve net, altında ayırıcı çizgi */
+    .data-table td:first-child {
+      font-size: 16px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      padding-bottom: var(--space-3);
+      margin-bottom: var(--space-3);
+      border-bottom: 1px solid var(--color-border);
+    }
+  
+    /* Her alan (Category, Description, Status vb.) kendi bloğu,
+       aralarında bariz boşluk var -- göz kolayca ayırt edebilsin diye */
+    .data-table td:not(:first-child) {
+      margin-bottom: var(--space-3);
+    }
+  
+    .data-table td:not(:first-child):last-child {
+      margin-bottom: 0;
+    }
+  
+    /* Etiket: küçük, gri, biraz aralıklı -- değerden net ayrılsın */
+    .data-table td:not(:first-child)::before {
+      content: attr(data-label);
+      display: block;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-text-muted);
+      margin-bottom: 4px;
+    }
+  
+    /* Değer: normal metin boyutunda, koyu renk -- göz hemen buraya odaklansın */
+    .data-table td:not(:first-child) {
+      font-size: 14px;
+      color: var(--color-text);
+      line-height: 1.5;
+    }
+
+    .data-table tr:last-child td:first-child {
+      border-bottom: 1px solid var(--color-border);
+    }
+  }
+
+  

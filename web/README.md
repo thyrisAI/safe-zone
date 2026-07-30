@@ -1,32 +1,76 @@
-# React + TypeScript + Vite
+# Safe Zone Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A lightweight, read-only web dashboard for Thyris Safe Zone, built with
+React, Vite, and TypeScript. See [issue #16](https://github.com/thyrisAI/safe-zone/issues/16)
+for the original feature request.
 
-Currently, two official plugins are available:
+For a general overview of what this dashboard shows and how it fits into
+the rest of the project, see the "Dashboard (Web UI)" section in the
+[repository root README](../README.md).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Prerequisites
 
-## React Compiler
+- Node.js 20.19+ or 22.12+ (required by the Vite tooling used here)
+- A running Safe Zone backend, reachable at `http://localhost:8080`
+  (see the root [Quick Start guide](../docs/QUICK_START.md))
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Development
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Open `http://localhost:5173`. Requests to the backend are proxied during
+development — see `vite.config.ts` for the proxy configuration. No backend
+URL is hardcoded anywhere in the frontend code.
+
+## Testing
+
+```bash
+npm run test
+```
+
+## Type Checking
+
+```bash
+npx tsc --noEmit
+```
+
+## Building
+
+```bash
+npm run build
+```
+
+Note: no production serving strategy has been decided yet for the built
+output. See `../docs/DASHBOARD_PRODUCTION_NOTES.md` for the open options
+under discussion.
+
+## Project Structure
+
+```text
+src/
+  api/          HTTP client and per-resource fetch functions
+  components/   Reusable UI pieces (status badges, pills)
+  layouts/      App shell (sidebar, header)
+  pages/        One component per route (Overview, Patterns, ...)
+  types/        TypeScript types mirroring backend response shapes
+```
+
+## Environment Variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `VITE_API_BASE_URL` | `/api` | Base path used by the API client; resolved through the Vite dev proxy to the backend. |
+
+## Known Limitations
+
+- Request counters and recent events are stored in memory on the backend
+  and reset on every backend restart (see `internal/metrics/store.go`).
+  This is a deliberate trade-off for the initial version, not a bug.
+- Enable/disable actions for patterns and guardrails are not implemented,
+  as the backend does not currently expose a reliable update endpoint for
+  them.
+- Allowlist and blocklist management are out of scope for this initial
+  version.

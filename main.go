@@ -208,6 +208,12 @@ func main() {
 	// Admin Endpoints
 	mux.Handle("POST /admin/reload", auth.RequirePermission("cache:admin")(http.HandlerFunc(handlers.ReloadCache)))
 
+	// Dashboard Endpoints (bkz. issue #16 -- read-only, in-memory metrics)
+
+	mux.Handle("GET /dashboard/summary", auth.RequirePermission("dashboard:read")(http.HandlerFunc(handlers.GetDashboardSummary)))
+	mux.Handle("GET /dashboard/events", auth.RequirePermission("dashboard:read")(http.HandlerFunc(handlers.GetDashboardEvents)))
+	mux.Handle("GET /dashboard/config", auth.RequirePermission("dashboard:read")(http.HandlerFunc(handlers.GetDashboardConfig)))
+
 	// ===== MILESTONE 1: MIDDLEWARE WRAPPING =====
 	// Wrap mux with middleware (applied in reverse order: last middleware is outermost)
 	var handler http.Handler = mux

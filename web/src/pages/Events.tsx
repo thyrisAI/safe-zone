@@ -98,9 +98,9 @@ export default function Events() {
             </tbody>
           </table>
 
-          {/* Backend gerçek sayfalama sunmuyor (sadece "son N event"),
-              bu yüzden klasik sayfa numaralı pagination yerine basit
-              bir "daha fazla göster" butonu kullanıyoruz. */}
+          {/* The backend does not support real pagination (only "most
+              recent N events"), so we use a simple "load more" button
+              instead of page-numbered pagination. */}
           {events.length === limit && limit < EXPANDED_LIMIT && (
             <button
               type="button"

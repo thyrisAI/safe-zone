@@ -1,17 +1,16 @@
 /**
- * Ortak API client. Tüm backend isteklerinin geçtiği tek nokta.
+ * Shared API client. Single entry point for all backend requests.
  *
- * Neden burada topluyoruz?
- * - Base URL, header, hata yönetimi gibi ortak mantığı tek yerde tutmak için.
- * - Bir endpoint şekli değişirse sadece burada veya ilgili api/*.ts
- *   dosyasında düzeltme yaparız, sayfalara (pages/) dokunmayız.
+ * Centralizing base URL, headers, and error handling here means an
+ * endpoint change only touches this file (or the relevant api/*.ts
+ * file), never the page components.
  */
 
-// Vite proxy ayarımız sayesinde burası hep "/api" -- gerçek backend adresi
-// (localhost:8080) hiçbir zaman frontend kodunda görünmüyor.
+// Resolved via the Vite proxy, so the real backend address
+// (localhost:8080) never appears in frontend code.
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
-// Bir isteğin çok uzun sürmesini engellemek için varsayılan zaman aşımı.
+// Default timeout to prevent a request from hanging indefinitely.
 const DEFAULT_TIMEOUT_MS = 8000
 
 export class ApiError extends Error {
@@ -24,8 +23,8 @@ export class ApiError extends Error {
 }
 
 /**
- * JSON döndüren endpoint'ler için (örn. /patterns, /validators).
- * T: beklenen response tipini çağıran taraf belirtir, örn. request<Pattern[]>('/patterns')
+ * For JSON-returning endpoints (e.g. /patterns, /validators).
+ * T is the expected response type, e.g. request<Pattern[]>('/patterns').
  */
 export async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const controller = new AbortController()
@@ -42,8 +41,7 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
     })
 
     if (!response.ok) {
-      // Backend'in ham hata metnini kullanıcıya olduğu gibi göstermiyoruz
-      // (senin kuralın: "raw backend stack trace gösterme").
+      // Never surface the raw backend error to the user.
       throw new ApiError(`Request failed with status ${response.status}`, response.status)
     }
 
@@ -60,8 +58,8 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
 }
 
 /**
- * Düz metin döndüren endpoint'ler için (örn. /healthz -> "UP", /ready -> "READY").
- * JSON parse etmeye çalışmıyoruz çünkü bu endpoint'ler JSON döndürmüyor.
+ * For plain-text endpoints (e.g. /healthz -> "UP", /ready -> "READY").
+ * These do not return JSON, so no parsing is attempted.
  */
 export async function requestText(path: string): Promise<{ text: string; ok: boolean }> {
   const controller = new AbortController()
@@ -72,8 +70,8 @@ export async function requestText(path: string): Promise<{ text: string; ok: boo
     const text = await response.text()
     return { text, ok: response.ok }
   } catch {
-    // Health check'lerde hata fırlatmak yerine "ulaşılamadı" bilgisini
-    // döndürüyoruz -- Overview ekranı bunu "Unreachable" olarak gösterecek.
+    // Return an "unreachable" result instead of throwing, so the
+    // Overview screen can render it as "Unreachable".
     return { text: '', ok: false }
   } finally {
     clearTimeout(timeoutId)

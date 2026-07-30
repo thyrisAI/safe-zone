@@ -34,7 +34,7 @@ export default function AppLayout() {
     <div className="app-shell">
       <header className="app-header">
         <div className="app-header-left">
-          {/* Sadece mobilde (CSS ile) görünen hamburger butonu */}
+          {/* Hamburger button, visible on mobile only (via CSS). */}
           <button
             type="button"
             className="hamburger-button"
@@ -50,7 +50,7 @@ export default function AppLayout() {
       </header>
       <div className="app-body">
         <Sidebar isOpen={isSidebarOpen} onNavigate={() => setIsSidebarOpen(false)} />
-        {/* Mobilde sidebar açıkken, dışarı tıklayınca kapatmak için bir overlay */}
+        {/* Overlay to close the sidebar on outside click (mobile only). */}
         {isSidebarOpen && (
           <div
             className="sidebar-overlay"

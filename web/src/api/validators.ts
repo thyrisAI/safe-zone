@@ -2,8 +2,8 @@ import { request } from './client'
 import type { Validator } from '../types/validator'
 
 /**
- * Backend'in ham /validators response'u -- "rule" alanını İÇERİR.
- * Bu tip SADECE bu dosyanın içinde kullanılır, dışarı asla export edilmez.
+ * Raw shape of the /validators response, INCLUDING the "rule" field.
+ * Used only within this file, never exported.
  */
 interface RawValidator {
   ID: number
@@ -15,10 +15,10 @@ interface RawValidator {
 }
 
 /**
- * Dashboard'un kullanacağı GÜVENLİ validator listesi.
- * "rule" alanını (tam AI prompt metnini) burada, backend'den geldiği
- * anda filtreleyip atıyoruz -- bu veri sayfalara (pages/) hiç ulaşmıyor.
- * Gerekçe: FAZ 6 ve FAZ 17 kararı, bkz. src/types/validator.ts yorumu.
+ * SAFE validator list for dashboard use. The "rule" field (the full
+ * AI prompt text) is stripped out here, right at the fetch boundary,
+ * so it never reaches page components. See src/types/validator.ts
+ * for the security rationale.
  */
 export async function getValidators(): Promise<Validator[]> {
   const raw = await request<RawValidator[]>('/validators')
@@ -29,6 +29,6 @@ export async function getValidators(): Promise<Validator[]> {
     type: v.type as Validator['type'],
     description: v.description,
     expected_response: v.expected_response,
-    // "rule" bilinçli olarak dahil edilmiyor.
+    // "rule" intentionally omitted.
   }))
 }

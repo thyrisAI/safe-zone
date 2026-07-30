@@ -1,19 +1,19 @@
 /**
- * Safe Zone backend'inin GET /patterns endpoint'inden döndüğü
- * ham (raw) pattern şekli.
+ * Raw pattern shape returned by the Safe Zone backend's
+ * GET /patterns endpoint.
  *
- * Not: Alan isimleri backend'deki gerçek JSON response'a göre
- * PascalCase'dir (GORM'un varsayılan serialize davranışı).
- * Bu, Validator tipinden farklıdır -- backend tutarsızlığını
- * burada olduğu gibi yansıtıyoruz, uydurmuyoruz.
+ * Field names use PascalCase, matching the backend's actual JSON
+ * response (GORM's default serialization). This differs from the
+ * Validator type -- we mirror the backend's inconsistency here
+ * rather than normalizing it away.
  */
 export interface Pattern {
-    ID: number
-    Name: string
-    Regex: string
-    Description: string
-    Category: 'PII' | 'SECRET' | 'INJECTION'
-    IsActive: boolean
-    BlockThreshold: number | null
-    AllowThreshold: number | null
-  }
+  ID: number
+  Name: string
+  Regex: string
+  Description: string
+  Category: 'PII' | 'SECRET' | 'INJECTION'
+  IsActive: boolean
+  BlockThreshold: number | null
+  AllowThreshold: number | null
+}

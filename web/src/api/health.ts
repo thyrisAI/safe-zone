@@ -3,8 +3,8 @@ import { requestText } from './client'
 export type SystemStatus = 'operational' | 'degraded' | 'unreachable'
 
 /**
- * healthz ve ready'yi birlikte kontrol edip tek bir sistem durumu üretir.
- * FAZ 15'te Overview ekranında bu duruma göre yeşil/amber/kırmızı gösterge çizeceğiz.
+ * Checks healthz and ready together to derive a single system status,
+ * rendered in the Overview screen as a green/amber/red indicator.
  */
 export async function getSystemStatus(): Promise<SystemStatus> {
   const health = await requestText('/healthz')
@@ -16,7 +16,7 @@ export async function getSystemStatus(): Promise<SystemStatus> {
   const ready = await requestText('/ready')
 
   if (!ready.ok) {
-    // Servis ayakta (healthz geçti) ama DB/Redis'e henüz bağlanamamış.
+    // Service is up (healthz passed) but not yet connected to DB/Redis.
     return 'degraded'
   }
 

@@ -92,6 +92,62 @@ TSZ provides official client libraries for common stacks:
 
 ---
 
+## Dashboard (Web UI)
+
+A lightweight, read-only web dashboard is available under `web/`, giving a
+visual view of PII detection patterns, guardrails, recent request activity,
+and safe (non-sensitive) configuration values — without needing to call the
+API directly.
+
+**Status:** initial version, currently runnable in development mode only.
+See `docs/DASHBOARD_PRODUCTION_NOTES.md` for open questions around
+production deployment (containerization strategy, default enabled/disabled
+state) pending maintainer input.
+
+### Running Locally
+
+1. Start the TSZ backend (see Quick Start above), so it is reachable at
+   `http://localhost:8080`.
+2. In a separate terminal:
+
+```bash
+   cd web
+   npm install
+   npm run dev
+```
+
+3. Open `http://localhost:5173` in a browser.
+
+Requests from the dashboard are proxied to the backend during development
+(see `web/vite.config.ts`); no backend URL is hardcoded in the frontend
+code.
+
+### What It Shows
+
+- **Overview** – system status (health/readiness) and request counters
+  since the last backend restart
+- **Patterns** – currently configured PII detection patterns
+- **Guardrails** – currently active AI-based validation rules
+- **Events** – a log of recent requests (allowed/blocked, and why), since
+  the last backend restart
+- **Configuration** – a read-only, allowlisted view of safe configuration
+  values (secrets, tokens, and credentials are never exposed)
+
+**Note on data persistence:** request counters and recent events are kept
+in memory only and reset whenever the backend restarts. This is a
+deliberate initial-version trade-off — see `internal/metrics/store.go`
+for details.
+
+### Testing
+
+```bash
+cd web
+npm run test
+```
+
+---
+
+
 ## Testing
 
 TSZ includes a comprehensive test suite with 55+ tests covering unit, integration, and end-to-end scenarios:

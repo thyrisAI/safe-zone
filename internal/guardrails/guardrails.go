@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"thyris-sz/internal/ai"
+	"thyris-sz/internal/metrics"
 	"thyris-sz/internal/models"
 	"thyris-sz/internal/repository"
 	"time"
@@ -363,6 +364,25 @@ func (d *Detector) Detect(req models.DetectRequest) models.DetectResponse {
 	if weight > 0 {
 		overall = overall / weight
 	}
+	//yeni ekledim
+	reason := "RULE"
+	if containsPII {
+		reason = "PII"
+	} else {
+		for _, v := range validatorResults {
+			if !v.Passed {
+				reason = "GUARDRAIL"
+				break
+			}
+		}
+	}
+
+	metrics.RecordEvent(metrics.Event{
+		Timestamp: time.Now(),
+		RequestID: req.RID,
+		Blocked:   blocked,
+		Reason:    reason,
+	})
 
 	return models.DetectResponse{
 		RedactedText:      redactedText,

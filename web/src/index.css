@@ -1,0 +1,319 @@
+/* ============================================
+   DESIGN TOKENS
+   Core values for the "Swiss functional aesthetic"
+   used throughout the dashboard. New components
+   should reference these variables rather than
+   hardcoding colors or spacing.
+   ============================================ */
+   :root {
+    /* Colors - neutral palette */
+    --color-bg: #ffffff;
+    --color-bg-subtle: #f8f9fa;
+    --color-border: #e5e7eb;
+    --color-text: #111827;
+    --color-text-muted: #6b7280;
+  
+    /* Single accent color (blue-600) */
+    --color-accent: #2563eb;
+    --color-accent-bg: #eff6ff;
+  
+    /* Semantic states (security-focused: allowed/blocked/warning) */
+    --color-success: #16a34a;
+    --color-success-bg: #f0fdf4;
+    --color-danger: #dc2626;
+    --color-danger-bg: #fef2f2;
+    --color-warning: #d97706;
+    --color-warning-bg: #fffbeb;
+    --color-neutral: #6b7280;
+    --color-neutral-bg: #f3f4f6;
+  
+    /* Typography */
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  
+    /* Spacing (8px grid) */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 16px;
+    --space-4: 24px;
+    --space-5: 32px;
+  
+    /* Misc */
+    --radius: 8px;
+    --sidebar-width: 220px;
+    --sidebar-width-collapsed: 56px;
+  }
+  
+  /* ============================================
+     GLOBAL RESET / BASE
+     ============================================ */
+  * {
+    box-sizing: border-box;
+  }
+  
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--color-text);
+    background: var(--color-bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  
+  h1, h2, h3, p {
+    margin: 0;
+  }
+  
+  a {
+    color: var(--color-accent);
+  }
+  
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  
+  /* ============================================
+     PAGE HEADERS (shared across all page components)
+     ============================================ */
+  .page-header {
+    margin-bottom: var(--space-4);
+  }
+  
+  .page-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: var(--space-1);
+  }
+  
+  .page-subtitle {
+    color: var(--color-text-muted);
+    font-size: 14px;
+  }
+  
+  /* ============================================
+     TABLES (shared by Patterns, Guardrails, Events)
+     ============================================ */
+  .data-table {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  
+  .data-table th {
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--color-text-muted);
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-bg-subtle);
+    border-bottom: 1px solid var(--color-border);
+  }
+  
+  .data-table td {
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+    font-size: 14px;
+  }
+  
+  .data-table tr:last-child td {
+    border-bottom: none;
+  }
+  
+  .data-table td:first-child {
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+  
+  /* ============================================
+     INFO / EMPTY MESSAGES (used by Overview, Events,
+     and Configuration for "no data yet" states)
+     ============================================ */
+  .info-message {
+    color: var(--color-text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: var(--space-3);
+    background: var(--color-bg-subtle);
+    border-radius: var(--radius);
+  }
+  
+  /* ============================================
+     RESPONSIVE TABLE -> CARD TRANSFORM (below 768px)
+     ============================================ */
+  @media (max-width: 768px) {
+    .data-table {
+      border: none;
+      border-radius: 0;
+    }
+  
+    .data-table thead {
+      display: none;
+    }
+  
+    .data-table,
+    .data-table tbody,
+    .data-table tr {
+      display: block;
+      width: 100%;
+    }
+  
+    .data-table tr {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      margin-bottom: var(--space-3);
+      padding: var(--space-4);
+      background: var(--color-bg);
+    }
+  
+    .data-table td {
+      display: block;
+      padding: 0;
+      border: none;
+      text-align: left;
+    }
+  
+    /* Card title: the Name field, large and bold, with a divider below. */
+    .data-table td:first-child {
+      font-size: 16px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      padding-bottom: var(--space-3);
+      margin-bottom: var(--space-3);
+      border-bottom: 1px solid var(--color-border);
+    }
+  
+    /* Each field (Category, Description, Status, etc.) gets its own
+       block with clear spacing, so it's easy to scan visually. */
+    .data-table td:not(:first-child) {
+      margin-bottom: var(--space-3);
+    }
+  
+    .data-table td:not(:first-child):last-child {
+      margin-bottom: 0;
+    }
+  
+    /* Label: small, muted, slightly spaced -- clearly distinct from the value. */
+    .data-table td:not(:first-child)::before {
+      content: attr(data-label);
+      display: block;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-text-muted);
+      margin-bottom: 4px;
+    }
+  
+    /* Value: normal size, full-contrast text -- the eye lands here first. */
+    .data-table td:not(:first-child) {
+      font-size: 14px;
+      color: var(--color-text);
+      line-height: 1.5;
+    }
+  
+    .data-table tr:last-child td:first-child {
+      border-bottom: 1px solid var(--color-border);
+    }
+  }
+  
+  /* ============================================
+     STAT CARDS (Overview screen)
+     ============================================ */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+  
+  .stat-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+  }
+  
+  .stat-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--color-text-muted);
+  }
+  
+  .stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+  }
+  
+  /* 2x2 grid on mobile, per the design spec. */
+  @media (max-width: 768px) {
+    .stat-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  
+  .load-more-button {
+    margin-top: var(--space-3);
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  
+  .load-more-button:hover {
+    background: var(--color-bg-subtle);
+  }
+  
+  .load-more-button:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+  
+  .config-section {
+    margin-bottom: var(--space-4);
+  }
+  
+  .config-list {
+    margin: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  
+  .config-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+  }
+  
+  .config-row:last-child {
+    border-bottom: none;
+  }
+  
+  .config-row dt {
+    font-size: 14px;
+    color: var(--color-text);
+  }
+  
+  .config-row dd {
+    margin: 0;
+    font-size: 14px;
+  }
+  
+  .config-mono {
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+  }

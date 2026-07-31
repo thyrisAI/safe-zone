@@ -1,0 +1,157 @@
+/* ============================================
+   APP SHELL - overall page skeleton
+   ============================================ */
+   .app-shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .app-header {
+    height: 56px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg);
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+  
+  .app-header-title {
+    font-weight: 600;
+    font-size: 15px;
+  }
+  
+  .app-body {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+  
+  .app-main {
+    flex: 1;
+    padding: var(--space-4);
+    overflow-y: auto;
+  }
+  
+  .app-main > * {
+    max-width: 960px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  
+  /* ============================================
+     SIDEBAR
+     ============================================ */
+  .sidebar {
+    width: var(--sidebar-width);
+    flex-shrink: 0;
+    border-right: 1px solid var(--color-border);
+    background: var(--color-bg);
+    padding: var(--space-3) 0;
+  }
+  
+  .sidebar-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  
+  .sidebar-link {
+    display: block;
+    padding: var(--space-2) var(--space-4);
+    color: var(--color-text-muted);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    border-left: 3px solid transparent;
+  }
+  
+  .sidebar-link:hover {
+    background: var(--color-bg-subtle);
+    color: var(--color-text);
+  }
+  
+  .sidebar-link-active {
+    color: var(--color-accent);
+    background: var(--color-accent-bg);
+    border-left-color: var(--color-accent);
+  }
+  
+  .sidebar-link:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+  
+  /* ============================================
+     HAMBURGER BUTTON (hidden on desktop by default)
+     ============================================ */
+  .app-header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  
+  .hamburger-button {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    padding: var(--space-1);
+    color: var(--color-text);
+  }
+  
+  .hamburger-button:focus-visible {
+    outline: 2px solid var(--color-accent);
+  }
+  
+  .sidebar-overlay {
+    display: none;
+  }
+  
+  /* ============================================
+     RESPONSIVE - below 768px (mobile/tablet)
+     ============================================ */
+  @media (max-width: 768px) {
+    .hamburger-button {
+      display: block;
+    }
+  
+    .sidebar {
+      position: fixed;
+      top: 56px;
+      left: 0;
+      bottom: 0;
+      z-index: 20;
+      transform: translateX(-100%);
+      transition: transform 0.2s ease;
+      box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+    }
+  
+    .sidebar-open {
+      transform: translateX(0);
+    }
+  
+    .sidebar-overlay {
+      display: block;
+      position: fixed;
+      top: 56px;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.3);
+      z-index: 10;
+    }
+  
+    .app-main {
+      padding: var(--space-3);
+    }
+  }

@@ -4,24 +4,6 @@ TSZ (Thyris Safe Zone) is a PII Detection and Guardrails System engineered by **
 
 TSZ provides real‑time scanning, redaction, and blocking capabilities so that you can safely integrate LLMs and third‑party APIs into your existing applications.
 
-### Sponsors
-
-<div align="center" style="border:1px solid #30363d; border-radius:12px; padding:20px; max-width:600px; margin:auto;">
-  <table>
-    <tr>
-      <td>
-        <img src="https://github.com/user-attachments/assets/9ad7a9e1-2db3-4e1f-b07f-d6fed5bfdb33" alt="Termius Logo" width="60"/>
-      </td>
-      <td style="padding-left:15px;">
-        <strong>Termius</strong><br/>
-        <a href="https://termius.com">Termius</a> provides a secure, reliable, and collaborative SSH client.
-      </td>
-    </tr>
-  </table>
-  <br/>
-</div>
-
-
 ---
 
 ## Features

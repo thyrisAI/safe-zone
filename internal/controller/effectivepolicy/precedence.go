@@ -1,0 +1,87 @@
+// Package effectivepolicy implements deterministic whole-policy attachment
+// selection for one effective Gateway API target.
+package effectivepolicy
+
+import (
+	"fmt"
+	"sort"
+
+	"thyris-sz/internal/controller/policyattach"
+)
+
+// AttachmentLevel orders policy attachment specificity.
+type AttachmentLevel int
+
+const (
+	LevelGatewayWide AttachmentLevel = iota
+	LevelListener
+	LevelRouteWide
+	LevelRule
+)
+
+// Candidate is one valid policy attachment considered for the same effective
+// request target. ID must uniquely identify the policy for conflict reporting.
+type Candidate struct {
+	ID     string
+	Target policyattach.ResolvedTarget
+}
+
+// ConflictError reports multiple policies at the same most-specific level.
+type ConflictError struct {
+	Level      AttachmentLevel
+	Candidates []Candidate
+}
+
+func (e *ConflictError) Error() string {
+	ids := make([]string, 0, len(e.Candidates))
+	for _, candidate := range e.Candidates {
+		ids = append(ids, candidate.ID)
+	}
+	return fmt.Sprintf("conflicting policies at attachment level %d: %v", e.Level, ids)
+}
+
+// LevelOf returns the specificity of a resolved target. An absent section name
+// is resource-wide; a section name is listener/rule-level. Section validity is
+// intentionally handled by target resolution/status, not silently downgraded.
+func LevelOf(target policyattach.ResolvedTarget) AttachmentLevel {
+	switch target.Kind {
+	case "HTTPRoute", "GRPCRoute":
+		if target.Ref.SectionName != nil {
+			return LevelRule
+		}
+		return LevelRouteWide
+	case "Gateway":
+		if target.Ref.SectionName != nil {
+			return LevelListener
+		}
+	}
+	return LevelGatewayWide
+}
+
+// SelectWinner selects the single most-specific whole policy. It never merges
+// fields from policies at different levels. A tie at the selected level is a
+// deterministic conflict for the status/conflict reconciliation phase.
+func SelectWinner(candidates []Candidate) (Candidate, *ConflictError) {
+	if len(candidates) == 0 {
+		return Candidate{}, nil
+	}
+
+	winningLevel := LevelGatewayWide
+	for index, candidate := range candidates {
+		if index == 0 || LevelOf(candidate.Target) > winningLevel {
+			winningLevel = LevelOf(candidate.Target)
+		}
+	}
+
+	winners := make([]Candidate, 0, len(candidates))
+	for _, candidate := range candidates {
+		if LevelOf(candidate.Target) == winningLevel {
+			winners = append(winners, candidate)
+		}
+	}
+	sort.Slice(winners, func(i, j int) bool { return winners[i].ID < winners[j].ID })
+	if len(winners) > 1 {
+		return Candidate{}, &ConflictError{Level: winningLevel, Candidates: winners}
+	}
+	return winners[0], nil
+}

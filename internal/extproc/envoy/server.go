@@ -152,9 +152,10 @@ func (s *Server) Process(stream extprocv3.ExternalProcessor_ProcessServer) error
 		}
 		if kind == envoyRequestHeaders {
 			resolved, err := s.policyResolver.ResolvePolicy(PolicyResolutionInput{
-				Headers: request.Headers,
-				Gateway: request.Gateway,
-				Route:   request.Route,
+				Headers:    request.Headers,
+				Gateway:    request.Gateway,
+				Route:      request.Route,
+				Attributes: request.Attributes,
 			})
 			if err != nil {
 				return status.Error(codes.InvalidArgument, err.Error())

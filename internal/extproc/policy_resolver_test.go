@@ -3,6 +3,8 @@ package extproc
 import (
 	"errors"
 	"testing"
+
+	"thyris-sz/internal/extproc/policy"
 )
 
 func TestHeaderPolicyResolverAcceptsExactlyOneTrustedPolicy(t *testing.T) {
@@ -17,6 +19,55 @@ func TestHeaderPolicyResolverAcceptsExactlyOneTrustedPolicy(t *testing.T) {
 	if resolved.PolicyID != "route-policy" || resolved.Tenant == nil || *resolved.Tenant != tenant {
 		t.Fatalf("ResolvePolicy() = %+v", resolved)
 	}
+}
+
+func TestAttributePolicyResolverUsesMostSpecificRouteIdentity(t *testing.T) {
+	mapper := routeMapper{bindings: map[policy.RouteIdentity]string{
+		{Gateway: "gateway", Listener: "https", Route: "orders", Rule: "checkout"}: "rule-policy",
+		{Gateway: "gateway", Listener: "https", Route: "orders"}:                   "route-policy",
+		{Gateway: "gateway", Listener: "https"}:                                    "listener-policy",
+		{Gateway: "gateway"}:                                                       "gateway-policy",
+	}}
+	resolved, err := (AttributePolicyResolver{Mapping: mapper}).ResolvePolicy(PolicyResolutionInput{Attributes: map[string]string{
+		"xds.gateway_name":    "gateway",
+		"xds.listener_name":   "https",
+		"xds.route_name":      "orders",
+		"xds.route_rule_name": "checkout",
+	}})
+	if err != nil {
+		t.Fatalf("ResolvePolicy() error = %v", err)
+	}
+	if resolved.PolicyID != "rule-policy" {
+		t.Fatalf("ResolvePolicy() policy = %q, want rule-policy", resolved.PolicyID)
+	}
+}
+
+func TestAttributePolicyResolverFallsBackAndRejectsMissingBinding(t *testing.T) {
+	resolver := AttributePolicyResolver{Mapping: routeMapper{bindings: map[policy.RouteIdentity]string{
+		{Gateway: "gateway", Listener: "https"}: "listener-policy",
+	}}}
+	resolved, err := resolver.ResolvePolicy(PolicyResolutionInput{Attributes: map[string]string{
+		"xds.gateway_name": "gateway", "xds.listener_name": "https", "xds.route_name": "orders",
+	}})
+	if err != nil {
+		t.Fatalf("ResolvePolicy() fallback error = %v", err)
+	}
+	if resolved.PolicyID != "listener-policy" {
+		t.Fatalf("ResolvePolicy() fallback policy = %q, want listener-policy", resolved.PolicyID)
+	}
+	_, err = resolver.ResolvePolicy(PolicyResolutionInput{Attributes: map[string]string{"xds.gateway_name": "other"}})
+	if !errors.Is(err, ErrRoutePolicyNotFound) {
+		t.Fatalf("ResolvePolicy() missing binding error = %v, want ErrRoutePolicyNotFound", err)
+	}
+}
+
+type routeMapper struct {
+	bindings map[policy.RouteIdentity]string
+}
+
+func (m routeMapper) LookupRoutePolicy(identity policy.RouteIdentity) (policy.RoutePolicyBinding, bool, error) {
+	policyID, found := m.bindings[identity]
+	return policy.RoutePolicyBinding{PolicyID: policyID}, found, nil
 }
 
 func TestHeaderPolicyResolverRejectsMissingDuplicateAndEmptyValues(t *testing.T) {

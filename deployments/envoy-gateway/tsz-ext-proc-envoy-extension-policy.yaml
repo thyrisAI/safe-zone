@@ -22,6 +22,11 @@ spec:
       processingMode:
         request:
           body: Buffered
+          # Envoy Gateway v1.8.3 exposes xds.route_* attributes to ext_proc.
+          # Native controller-generated attachments use this trusted context;
+          # the manual profile continues to resolve X-TSZ-Policy headers.
+          attributes:
+            - xds.route_name
       metadata:
         writableNamespaces:
           - io.thyris.tsz

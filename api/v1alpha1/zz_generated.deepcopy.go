@@ -223,6 +223,11 @@ func (in *TSZGuardrailPolicySpec) DeepCopyInto(out *TSZGuardrailPolicySpec) {
 		(*in).DeepCopyInto(*out)
 	}
 	out.FailurePolicy = in.FailurePolicy
+	if in.ProcessingTimeout != nil {
+		in, out := &in.ProcessingTimeout, &out.ProcessingTimeout
+		*out = new(v1.Duration)
+		**out = **in
+	}
 	if in.Streaming != nil {
 		in, out := &in.Streaming, &out.Streaming
 		*out = new(StreamingSpec)

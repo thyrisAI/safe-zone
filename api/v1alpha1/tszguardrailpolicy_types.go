@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
@@ -68,10 +70,15 @@ type TSZGuardrailPolicySpec struct {
 	Request   *RequestPolicySpec  `json:"request,omitempty"`
 	Response  *ResponsePolicySpec `json:"response,omitempty"`
 
-	FailurePolicy   FailurePolicySpec   `json:"failurePolicy"`
-	Streaming       *StreamingSpec      `json:"streaming,omitempty"`
-	ClientOverrides ClientOverridesSpec `json:"clientOverrides,omitempty"`
-	Telemetry       TelemetrySpec       `json:"telemetry,omitempty"`
+	// +optional
+	// +kubebuilder:default={request:FailClosed,response:FailClosed}
+	FailurePolicy FailurePolicySpec `json:"failurePolicy,omitempty"`
+	// +optional
+	// +kubebuilder:default="2s"
+	ProcessingTimeout *metav1.Duration    `json:"processingTimeout,omitempty"`
+	Streaming         *StreamingSpec      `json:"streaming,omitempty"`
+	ClientOverrides   ClientOverridesSpec `json:"clientOverrides,omitempty"`
+	Telemetry         TelemetrySpec       `json:"telemetry,omitempty"`
 }
 
 // PolicyReference identifies one immutable policy version in PostgreSQL.
@@ -118,8 +125,25 @@ type ValidatorReference struct {
 
 // FailurePolicySpec defines request and response failure behavior.
 type FailurePolicySpec struct {
-	Request  FailureMode `json:"request"`
+	// +kubebuilder:default=FailClosed
+	Request FailureMode `json:"request"`
+	// +kubebuilder:default=FailClosed
 	Response FailureMode `json:"response"`
+}
+
+// ProcessingTimeoutOrDefault returns the ext_proc timeout with the production
+// fail-closed default used when API defaulting has not run (for example tests).
+func (s TSZGuardrailPolicySpec) ProcessingTimeoutOrDefault() time.Duration {
+	if s.ProcessingTimeout == nil || s.ProcessingTimeout.Duration <= 0 {
+		return 2 * time.Second
+	}
+	return s.ProcessingTimeout.Duration
+}
+
+// FailOpen reports whether either request or response handling explicitly
+// opts into fail-open. Omitted failurePolicy defaults to fail-closed.
+func (s TSZGuardrailPolicySpec) FailOpen() bool {
+	return s.FailurePolicy.Request == FailureModeOpen || s.FailurePolicy.Response == FailureModeOpen
 }
 
 // StreamingSpec configures streaming enforcement for an attachment.

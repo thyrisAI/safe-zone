@@ -147,11 +147,9 @@ spec:
               value: postgres
           command: ["sh", "-ec"]
           args:
-            - >-
-              psql -v ON_ERROR_STOP=1
-              -h postgres.tsz-byg-demo.svc.cluster.local
-              -U postgres -d thyris
-              -f /migrations/000001_create_policy_snapshots.up.sql
+            - |
+              psql -v ON_ERROR_STOP=1 -h postgres.tsz-byg-demo.svc.cluster.local -U postgres -d thyris -f /migrations/000001_create_policy_snapshots.up.sql
+              psql -v ON_ERROR_STOP=1 -h postgres.tsz-byg-demo.svc.cluster.local -U postgres -d thyris -f /migrations/000002_create_route_policy_bindings.up.sql
           volumeMounts:
             - name: migrations
               mountPath: /migrations

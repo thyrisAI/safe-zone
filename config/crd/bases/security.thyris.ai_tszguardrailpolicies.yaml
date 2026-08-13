@@ -59,10 +59,14 @@ spec:
                     type: boolean
                 type: object
               failurePolicy:
+                default:
+                  request: FailClosed
+                  response: FailClosed
                 description: FailurePolicySpec defines request and response failure
                   behavior.
                 properties:
                   request:
+                    default: FailClosed
                     description: FailureMode describes how processing failures are
                       handled.
                     enum:
@@ -70,6 +74,7 @@ spec:
                     - FailClosed
                     type: string
                   response:
+                    default: FailClosed
                     description: FailureMode describes how processing failures are
                       handled.
                     enum:
@@ -104,6 +109,9 @@ spec:
                 enum:
                 - PostgresRef
                 - Inline
+                type: string
+              processingTimeout:
+                default: 2s
                 type: string
               request:
                 description: RequestPolicySpec is the CRD-native form of policy.RequestPolicy.
@@ -313,7 +321,6 @@ spec:
                     type: boolean
                 type: object
             required:
-            - failurePolicy
             - policySource
             - targetRefs
             type: object

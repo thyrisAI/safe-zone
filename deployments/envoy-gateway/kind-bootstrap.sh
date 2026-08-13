@@ -181,6 +181,7 @@ apply_policy_dependencies() {
     --dry-run=client -o yaml | kubectl apply -f -
   kubectl -n "$DEMO_NAMESPACE" create configmap tsz-byg-policy-migrations \
     --from-file=000001_create_policy_snapshots.up.sql="${SCRIPT_DIR}/../../internal/extproc/policy/migrations/000001_create_policy_snapshots.up.sql" \
+    --from-file=000002_create_route_policy_bindings.up.sql="${SCRIPT_DIR}/../../internal/extproc/policy/migrations/000002_create_route_policy_bindings.up.sql" \
     --dry-run=client -o yaml | kubectl apply -f -
   kubectl apply -f "${SCRIPT_DIR}/policy-dependencies.yaml"
   kubectl -n "$DEMO_NAMESPACE" rollout status deployment/postgres --timeout=180s

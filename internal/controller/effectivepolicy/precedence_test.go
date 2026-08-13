@@ -38,6 +38,13 @@ func TestSelectWinnerReportsSameLevelConflictDeterministically(t *testing.T) {
 	}
 }
 
+func TestDetectConflictsFindsOnlySameTargetAndLevel(t *testing.T) {
+	conflicts := DetectConflicts([]Candidate{candidate("a", "HTTPRoute", nil), candidate("b", "HTTPRoute", nil), candidate("gateway", "Gateway", nil)})
+	if len(conflicts) != 1 {
+		t.Fatalf("DetectConflicts() = %v, want one target conflict", conflicts)
+	}
+}
+
 func candidate(id, kind string, section *gatewayv1.SectionName) Candidate {
 	return Candidate{ID: id, Kind: kind,
 		Ref: gatewayv1alpha2.LocalPolicyTargetReferenceWithSectionName(gatewayv1.LocalPolicyTargetReferenceWithSectionName{

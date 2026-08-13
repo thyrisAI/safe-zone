@@ -242,6 +242,11 @@ spec:
                 properties:
                   enabled:
                     type: boolean
+                  mode:
+                    enum:
+                    - None
+                    - Windowed
+                    type: string
                 required:
                 - enabled
                 type: object

@@ -33,6 +33,34 @@ type ConflictError struct {
 	Candidates []Candidate
 }
 
+// DetectConflicts finds every effective target and specificity level that has
+// more than one claimant; no claimant is automatically selected.
+func DetectConflicts(candidates []Candidate) map[string][]ConflictError {
+	groups := map[string]map[AttachmentLevel][]Candidate{}
+	for _, candidate := range candidates {
+		section := ""
+		if candidate.Ref.SectionName != nil {
+			section = string(*candidate.Ref.SectionName)
+		}
+		key := fmt.Sprintf("%s/%s/%s/%s", candidate.Ref.Group, candidate.Ref.Kind, candidate.Ref.Name, section)
+		if groups[key] == nil {
+			groups[key] = map[AttachmentLevel][]Candidate{}
+		}
+		level := LevelOf(candidate)
+		groups[key][level] = append(groups[key][level], candidate)
+	}
+	conflicts := map[string][]ConflictError{}
+	for target, levels := range groups {
+		for level, members := range levels {
+			if len(members) > 1 {
+				sort.Slice(members, func(i, j int) bool { return members[i].ID < members[j].ID })
+				conflicts[target] = append(conflicts[target], ConflictError{Level: level, Candidates: members})
+			}
+		}
+	}
+	return conflicts
+}
+
 func (e *ConflictError) Error() string {
 	ids := make([]string, 0, len(e.Candidates))
 	for _, candidate := range e.Candidates {

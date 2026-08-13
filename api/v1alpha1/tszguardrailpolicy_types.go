@@ -149,6 +149,8 @@ func (s TSZGuardrailPolicySpec) FailOpen() bool {
 // StreamingSpec configures streaming enforcement for an attachment.
 type StreamingSpec struct {
 	Enabled bool `json:"enabled"`
+	// +kubebuilder:validation:Enum=None;Windowed
+	Mode string `json:"mode,omitempty"`
 }
 
 // ClientOverridesSpec controls opt-in client behavior for an attachment.

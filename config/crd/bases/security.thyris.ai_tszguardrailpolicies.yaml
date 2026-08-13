@@ -292,6 +292,11 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+                x-kubernetes-validations:
+                - message: targetRefs must use Gateway API Gateway, HTTPRoute, or
+                    GRPCRoute targets
+                  rule: self.all(ref, ref.group == 'gateway.networking.k8s.io' &&
+                    ref.kind in ['Gateway', 'HTTPRoute', 'GRPCRoute'])
               telemetry:
                 description: TelemetrySpec controls policy telemetry emitted by the
                   controller and runtime.

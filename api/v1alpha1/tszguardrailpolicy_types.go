@@ -56,6 +56,7 @@ type TSZGuardrailPolicy struct {
 type TSZGuardrailPolicySpec struct {
 	// TargetRefs identifies the Gateway API resources to which this attachment applies.
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:XValidation:rule="self.all(ref, ref.group == 'gateway.networking.k8s.io' && ref.kind in ['Gateway', 'HTTPRoute', 'GRPCRoute'])",message="targetRefs must use Gateway API Gateway, HTTPRoute, or GRPCRoute targets"
 	TargetRefs []gatewayv1alpha2.LocalPolicyTargetReferenceWithSectionName `json:"targetRefs"`
 
 	// PolicySource selects either an existing immutable Postgres snapshot or an

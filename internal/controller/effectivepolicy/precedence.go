@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	"thyris-sz/internal/controller/policyattach"
+	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 // AttachmentLevel orders policy attachment specificity.
@@ -22,8 +22,9 @@ const (
 // Candidate is one valid policy attachment considered for the same effective
 // request target. ID must uniquely identify the policy for conflict reporting.
 type Candidate struct {
-	ID     string
-	Target policyattach.ResolvedTarget
+	ID   string
+	Kind string
+	Ref  gatewayv1alpha2.LocalPolicyTargetReferenceWithSectionName
 }
 
 // ConflictError reports multiple policies at the same most-specific level.
@@ -43,7 +44,7 @@ func (e *ConflictError) Error() string {
 // LevelOf returns the specificity of a resolved target. An absent section name
 // is resource-wide; a section name is listener/rule-level. Section validity is
 // intentionally handled by target resolution/status, not silently downgraded.
-func LevelOf(target policyattach.ResolvedTarget) AttachmentLevel {
+func LevelOf(target Candidate) AttachmentLevel {
 	switch target.Kind {
 	case "HTTPRoute", "GRPCRoute":
 		if target.Ref.SectionName != nil {
@@ -68,14 +69,14 @@ func SelectWinner(candidates []Candidate) (Candidate, *ConflictError) {
 
 	winningLevel := LevelGatewayWide
 	for index, candidate := range candidates {
-		if index == 0 || LevelOf(candidate.Target) > winningLevel {
-			winningLevel = LevelOf(candidate.Target)
+		if index == 0 || LevelOf(candidate) > winningLevel {
+			winningLevel = LevelOf(candidate)
 		}
 	}
 
 	winners := make([]Candidate, 0, len(candidates))
 	for _, candidate := range candidates {
-		if LevelOf(candidate.Target) == winningLevel {
+		if LevelOf(candidate) == winningLevel {
 			winners = append(winners, candidate)
 		}
 	}

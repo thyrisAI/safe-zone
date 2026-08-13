@@ -3,8 +3,6 @@ package effectivepolicy
 import (
 	"testing"
 
-	"thyris-sz/internal/controller/policyattach"
-
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
@@ -12,10 +10,7 @@ import (
 func TestSelectWinnerUsesMostSpecificWholePolicy(t *testing.T) {
 	rule := gatewayv1.SectionName("inspect")
 	winner, conflict := SelectWinner([]Candidate{
-		{ID: "gateway", Target: resolvedTarget("Gateway", nil)},
-		{ID: "listener", Target: resolvedTarget("Gateway", &rule)},
-		{ID: "route", Target: resolvedTarget("HTTPRoute", nil)},
-		{ID: "rule", Target: resolvedTarget("HTTPRoute", &rule)},
+		candidate("gateway", "Gateway", nil), candidate("listener", "Gateway", &rule), candidate("route", "HTTPRoute", nil), candidate("rule", "HTTPRoute", &rule),
 	})
 	if conflict != nil {
 		t.Fatalf("SelectWinner() conflict = %v", conflict)
@@ -27,9 +22,7 @@ func TestSelectWinnerUsesMostSpecificWholePolicy(t *testing.T) {
 
 func TestSelectWinnerReportsSameLevelConflictDeterministically(t *testing.T) {
 	winner, conflict := SelectWinner([]Candidate{
-		{ID: "z-policy", Target: resolvedTarget("HTTPRoute", nil)},
-		{ID: "a-policy", Target: resolvedTarget("HTTPRoute", nil)},
-		{ID: "gateway", Target: resolvedTarget("Gateway", nil)},
+		candidate("z-policy", "HTTPRoute", nil), candidate("a-policy", "HTTPRoute", nil), candidate("gateway", "Gateway", nil),
 	})
 	if winner.ID != "" {
 		t.Fatalf("SelectWinner() winner = %q, want empty on conflict", winner.ID)
@@ -45,9 +38,8 @@ func TestSelectWinnerReportsSameLevelConflictDeterministically(t *testing.T) {
 	}
 }
 
-func resolvedTarget(kind string, section *gatewayv1.SectionName) policyattach.ResolvedTarget {
-	return policyattach.ResolvedTarget{
-		Kind: kind,
+func candidate(id, kind string, section *gatewayv1.SectionName) Candidate {
+	return Candidate{ID: id, Kind: kind,
 		Ref: gatewayv1alpha2.LocalPolicyTargetReferenceWithSectionName(gatewayv1.LocalPolicyTargetReferenceWithSectionName{
 			SectionName: section,
 		}),

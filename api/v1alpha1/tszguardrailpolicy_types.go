@@ -169,9 +169,17 @@ type TelemetrySpec struct {
 // TSZGuardrailPolicyStatus reports policy resolution and programming state.
 type TSZGuardrailPolicyStatus struct {
 	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
-	PolicyVersion      string             `json:"policyVersion,omitempty"`
+	PolicyVersion      *int               `json:"policyVersion,omitempty"`
 	EffectivePolicyID  string             `json:"effectivePolicyID,omitempty"`
 	Conditions         []metav1.Condition `json:"conditions,omitempty"`
+	TargetRefStatuses  []TargetRefStatus  `json:"targetRefStatuses,omitempty"`
+}
+
+// TargetRefStatus reports independent resolution and programming state for
+// one entry in spec.targetRefs.
+type TargetRefStatus struct {
+	TargetRef  gatewayv1alpha2.LocalPolicyTargetReferenceWithSectionName `json:"targetRef"`
+	Conditions []metav1.Condition                                        `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true

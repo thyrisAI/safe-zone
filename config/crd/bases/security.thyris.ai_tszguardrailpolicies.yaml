@@ -1,0 +1,394 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.5
+  name: tszguardrailpolicies.security.thyris.ai
+spec:
+  group: security.thyris.ai
+  names:
+    kind: TSZGuardrailPolicy
+    listKind: TSZGuardrailPolicyList
+    plural: tszguardrailpolicies
+    shortNames:
+    - tszgp
+    singular: tszguardrailpolicy
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Accepted")].status
+      name: Accepted
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Programmed")].status
+      name: Programmed
+      type: string
+    - jsonPath: .status.policyVersion
+      name: PolicyVersion
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: TSZGuardrailPolicy attaches a TSZ policy to Gateway API resources.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: TSZGuardrailPolicySpec declares one policy attachment.
+            properties:
+              clientOverrides:
+                description: ClientOverridesSpec controls opt-in client behavior for
+                  an attachment.
+                properties:
+                  allowPolicyHeader:
+                    type: boolean
+                type: object
+              failurePolicy:
+                description: FailurePolicySpec defines request and response failure
+                  behavior.
+                properties:
+                  request:
+                    description: FailureMode describes how processing failures are
+                      handled.
+                    enum:
+                    - FailOpen
+                    - FailClosed
+                    type: string
+                  response:
+                    description: FailureMode describes how processing failures are
+                      handled.
+                    enum:
+                    - FailOpen
+                    - FailClosed
+                    type: string
+                required:
+                - request
+                - response
+                type: object
+              policyRef:
+                description: PolicyRef identifies an immutable policy snapshot when
+                  policySource is PostgresRef.
+                properties:
+                  name:
+                    description: Name is the policy name.
+                    minLength: 1
+                    type: string
+                  version:
+                    description: Version is required by reconciliation to preserve
+                      immutable snapshot semantics.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                required:
+                - name
+                type: object
+              policySource:
+                description: |-
+                  PolicySource selects either an existing immutable Postgres snapshot or an
+                  inline policy definition stored by the controller.
+                enum:
+                - PostgresRef
+                - Inline
+                type: string
+              request:
+                description: RequestPolicySpec is the CRD-native form of policy.RequestPolicy.
+                properties:
+                  allowlistIDs:
+                    items:
+                      type: string
+                    type: array
+                  blocklistIDs:
+                    items:
+                      type: string
+                    type: array
+                  customPatternIDs:
+                    items:
+                      type: string
+                    type: array
+                  customValidators:
+                    items:
+                      description: ValidatorReference pins a custom validator to an
+                        immutable version.
+                      properties:
+                        id:
+                          minLength: 1
+                          type: string
+                        version:
+                          format: int32
+                          minimum: 1
+                          type: integer
+                      required:
+                      - id
+                      - version
+                      type: object
+                    type: array
+                  pii:
+                    description: PolicyAction is the Kubernetes representation of
+                      a guardrail action.
+                    enum:
+                    - Mask
+                    - Block
+                    - Allow
+                    - AuditOnly
+                    type: string
+                  promptInjection:
+                    description: PolicyAction is the Kubernetes representation of
+                      a guardrail action.
+                    enum:
+                    - Mask
+                    - Block
+                    - Allow
+                    - AuditOnly
+                    type: string
+                  secret:
+                    description: PolicyAction is the Kubernetes representation of
+                      a guardrail action.
+                    enum:
+                    - Mask
+                    - Block
+                    - Allow
+                    - AuditOnly
+                    type: string
+                required:
+                - pii
+                - promptInjection
+                - secret
+                type: object
+              response:
+                description: ResponsePolicySpec is the CRD-native form of policy.ResponsePolicy.
+                properties:
+                  customPatternIDs:
+                    items:
+                      type: string
+                    type: array
+                  customValidators:
+                    items:
+                      description: ValidatorReference pins a custom validator to an
+                        immutable version.
+                      properties:
+                        id:
+                          minLength: 1
+                          type: string
+                        version:
+                          format: int32
+                          minimum: 1
+                          type: integer
+                      required:
+                      - id
+                      - version
+                      type: object
+                    type: array
+                  enabled:
+                    type: boolean
+                  pii:
+                    description: PolicyAction is the Kubernetes representation of
+                      a guardrail action.
+                    enum:
+                    - Mask
+                    - Block
+                    - Allow
+                    - AuditOnly
+                    type: string
+                  secret:
+                    description: PolicyAction is the Kubernetes representation of
+                      a guardrail action.
+                    enum:
+                    - Mask
+                    - Block
+                    - Allow
+                    - AuditOnly
+                    type: string
+                  unsafeContent:
+                    description: PolicyAction is the Kubernetes representation of
+                      a guardrail action.
+                    enum:
+                    - Mask
+                    - Block
+                    - Allow
+                    - AuditOnly
+                    type: string
+                required:
+                - enabled
+                - pii
+                - secret
+                - unsafeContent
+                type: object
+              streaming:
+                description: StreamingSpec configures streaming enforcement for an
+                  attachment.
+                properties:
+                  enabled:
+                    type: boolean
+                required:
+                - enabled
+                type: object
+              targetRefs:
+                description: TargetRefs identifies the Gateway API resources to which
+                  this attachment applies.
+                items:
+                  description: |-
+                    LocalPolicyTargetReferenceWithSectionName identifies an API object to apply a
+                    direct policy to. This should be used as part of Policy resources that can
+                    target single resources. For more information on how this policy attachment
+                    mode works, and a sample Policy resource, refer to the policy attachment
+                    documentation for Gateway API.
+
+                    Note: This should only be used for direct policy attachment when references
+                    to SectionName are actually needed. In all other cases,
+                    LocalPolicyTargetReference should be used.
+                  properties:
+                    group:
+                      description: Group is the group of the target resource.
+                      maxLength: 253
+                      pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                      type: string
+                    kind:
+                      description: Kind is kind of the target resource.
+                      maxLength: 63
+                      minLength: 1
+                      pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
+                      type: string
+                    name:
+                      description: Name is the name of the target resource.
+                      maxLength: 253
+                      minLength: 1
+                      type: string
+                    sectionName:
+                      description: |-
+                        SectionName is the name of a section within the target resource. When
+                        unspecified, this targetRef targets the entire resource. In the following
+                        resources, SectionName is interpreted as the following:
+
+                        * Gateway: Listener name
+                        * HTTPRoute: HTTPRouteRule name
+                        * Service: Port name
+
+                        If a SectionName is specified, but does not exist on the targeted object,
+                        the Policy must fail to attach, and the policy implementation should record
+                        a `ResolvedRefs` or similar Condition in the Policy's status.
+                      maxLength: 253
+                      minLength: 1
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                      type: string
+                  required:
+                  - group
+                  - kind
+                  - name
+                  type: object
+                minItems: 1
+                type: array
+              telemetry:
+                description: TelemetrySpec controls policy telemetry emitted by the
+                  controller and runtime.
+                properties:
+                  enabled:
+                    type: boolean
+                  metricsEnabled:
+                    type: boolean
+                  sampleRate:
+                    maximum: 1
+                    minimum: 0
+                    type: number
+                  tracingEnabled:
+                    type: boolean
+                type: object
+            required:
+            - failurePolicy
+            - policySource
+            - targetRefs
+            type: object
+            x-kubernetes-validations:
+            - message: policyRef is required for PostgresRef; request and response
+                are required for Inline
+              rule: 'self.policySource == ''PostgresRef'' ? has(self.policyRef) :
+                has(self.request) && has(self.response)'
+          status:
+            description: TSZGuardrailPolicyStatus reports policy resolution and programming
+              state.
+            properties:
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              effectivePolicyID:
+                type: string
+              observedGeneration:
+                format: int64
+                type: integer
+              policyVersion:
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

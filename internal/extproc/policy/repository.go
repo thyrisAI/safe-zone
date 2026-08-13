@@ -24,6 +24,7 @@ type Repository interface {
 	CreateValidated(ctx context.Context, policyName string, definition PolicyDefinition) (snapshotID int64, err error)
 	PolicyByName(ctx context.Context, policyName string, tenant *string) (Policy, error)
 	SnapshotByID(ctx context.Context, snapshotID int64) (PolicySnapshot, error)
+	SnapshotByVersion(ctx context.Context, policyName string, tenant *string, version int) (PolicySnapshot, error)
 	ActiveSnapshot(ctx context.Context, policyName string, tenant *string) (PolicySnapshot, error)
 	ActiveSnapshots(ctx context.Context) ([]PolicySnapshot, error)
 	WithinTransaction(ctx context.Context, fn func(Transaction) error) error
@@ -165,6 +166,17 @@ func (r *PostgresRepository) PolicyForUpdate(ctx context.Context, policyName str
 
 func (r *PostgresRepository) SnapshotByID(ctx context.Context, snapshotID int64) (PolicySnapshot, error) {
 	return scanSnapshot(r.queryer().QueryRowContext(ctx, snapshotSelect+` WHERE s.id = $1`, snapshotID))
+}
+
+// SnapshotByVersion loads an immutable policy snapshot by its user-facing
+// version, never by the database's internal snapshot primary key.
+func (r *PostgresRepository) SnapshotByVersion(ctx context.Context, policyName string, tenant *string, version int) (PolicySnapshot, error) {
+	if version <= 0 {
+		return PolicySnapshot{}, fmt.Errorf("load policy snapshot by version: %w", ErrNotFound)
+	}
+	return scanSnapshot(r.queryer().QueryRowContext(ctx, snapshotSelect+`
+		WHERE p.name = $1 AND p.tenant IS NOT DISTINCT FROM $2 AND s.version = $3`,
+		strings.TrimSpace(policyName), tenant, version))
 }
 
 func (r *PostgresRepository) SnapshotForUpdate(ctx context.Context, snapshotID int64) (PolicySnapshot, error) {

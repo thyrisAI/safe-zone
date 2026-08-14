@@ -61,6 +61,21 @@ func TestAttributePolicyResolverFallsBackAndRejectsMissingBinding(t *testing.T) 
 	}
 }
 
+func TestAttributePolicyResolverUsesRouteOnlyFallback(t *testing.T) {
+	resolver := AttributePolicyResolver{Mapping: routeMapper{bindings: map[policy.RouteIdentity]string{
+		{Route: "httproute/demo/orders/rule/0"}: "route-policy",
+	}}}
+	resolved, err := resolver.ResolvePolicy(PolicyResolutionInput{Attributes: map[string]string{
+		"xds.gateway_name": "gateway", "xds.route_name": "httproute/demo/orders/rule/0",
+	}})
+	if err != nil {
+		t.Fatalf("ResolvePolicy() fallback error = %v", err)
+	}
+	if resolved.PolicyID != "route-policy" {
+		t.Fatalf("ResolvePolicy() policy = %q, want route-policy", resolved.PolicyID)
+	}
+}
+
 type routeMapper struct {
 	bindings map[policy.RouteIdentity]string
 }

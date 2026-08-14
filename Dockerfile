@@ -10,21 +10,22 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o api main.go \
-    && CGO_ENABLED=0 GOOS=linux go build -o tsz-ext-proc ./cmd/tsz-ext-proc \
-    && CGO_ENABLED=0 GOOS=linux go build -o tsz-controller ./cmd/tsz-controller \
-    && CGO_ENABLED=0 GOOS=linux go build -o tsz-policy ./cmd/tsz-policy \
-    && CGO_ENABLED=0 GOOS=linux go build -o byg-mock-openai ./cmd/byg-mock-openai
+RUN mkdir -p /out \
+    && CGO_ENABLED=0 GOOS=linux go build -o /out/api main.go \
+    && CGO_ENABLED=0 GOOS=linux go build -o /out/tsz-ext-proc ./cmd/tsz-ext-proc \
+    && CGO_ENABLED=0 GOOS=linux go build -o /out/tsz-controller ./cmd/tsz-controller \
+    && CGO_ENABLED=0 GOOS=linux go build -o /out/tsz-policy ./cmd/tsz-policy \
+    && CGO_ENABLED=0 GOOS=linux go build -o /out/byg-mock-openai ./cmd/byg-mock-openai
 
 FROM alpine:latest
 
 WORKDIR /app
 
-COPY --from=builder /app/api .
-COPY --from=builder /app/tsz-ext-proc .
-COPY --from=builder /app/tsz-controller .
-COPY --from=builder /app/tsz-policy .
-COPY --from=builder /app/byg-mock-openai .
+COPY --from=builder /out/api ./api
+COPY --from=builder /out/tsz-ext-proc ./tsz-ext-proc
+COPY --from=builder /out/tsz-controller ./tsz-controller
+COPY --from=builder /out/tsz-policy ./tsz-policy
+COPY --from=builder /out/byg-mock-openai ./byg-mock-openai
 
 EXPOSE 8080
 EXPOSE 9002

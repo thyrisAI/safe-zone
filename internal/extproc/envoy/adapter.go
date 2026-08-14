@@ -285,10 +285,55 @@ func attributesFromEnvoy(attributes map[string]*structpb.Struct) map[string]stri
 		if value == nil {
 			continue
 		}
+		// Envoy wraps configured attributes under the ext_proc filter name,
+		// e.g. envoy.filters.http.ext_proc: {"xds.route_name": "..."}.
+		// Flatten that trusted envelope so resolvers receive the configured
+		// attribute names, rather than the transport wrapper name.
+		if flattenAttributeValues(result, value.AsMap()) {
+			continue
+		}
+		if stringValue, found := attributeString(value.AsMap()); found {
+			result[key] = stringValue
+			continue
+		}
 		encoded, err := json.Marshal(value.AsMap())
 		if err == nil {
 			result[key] = string(encoded)
 		}
 	}
 	return result
+}
+
+func flattenAttributeValues(result map[string]string, values map[string]any) bool {
+	found := false
+	for key, value := range values {
+		switch typed := value.(type) {
+		case string:
+			if typed != "" {
+				result[key] = typed
+				found = true
+			}
+		case map[string]any:
+			if flattenAttributeValues(result, typed) {
+				found = true
+			}
+		}
+	}
+	return found
+}
+
+func attributeString(value map[string]any) (string, bool) {
+	for _, key := range []string{"value", "name", "route_name", "listener_name", "gateway_name", "cluster_name"} {
+		if text, ok := value[key].(string); ok && text != "" {
+			return text, true
+		}
+	}
+	for _, nested := range value {
+		if child, ok := nested.(map[string]any); ok {
+			if text, found := attributeString(child); found {
+				return text, true
+			}
+		}
+	}
+	return "", false
 }

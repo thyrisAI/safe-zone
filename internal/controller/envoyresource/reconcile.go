@@ -72,7 +72,11 @@ func BuildEnvoyExtensionPolicy(owner *securityv1alpha1.TSZGuardrailPolicy, targe
 				BackendCluster: egv1alpha1.BackendCluster{BackendRefs: []egv1alpha1.BackendRef{{BackendObjectReference: gatewayv1.BackendObjectReference{Group: &group, Kind: &kind, Name: "tsz-ext-proc", Port: &port}}}},
 				MessageTimeout: &messageTimeout,
 				FailOpen:       &failOpen,
-				ProcessingMode: &egv1alpha1.ExtProcProcessingMode{Request: &egv1alpha1.ProcessingModeOptions{Body: bodyMode()}},
+				// Envoy Gateway v1.8 only admits xds.route_* attributes. Route name is
+				// sufficient for the native attachment lookup; the resolver falls back
+				// from a fully-qualified XDS route name to the controller's HTTPRoute
+				// identity when necessary.
+				ProcessingMode: &egv1alpha1.ExtProcProcessingMode{Request: &egv1alpha1.ProcessingModeOptions{Body: bodyMode(), Attributes: []string{"xds.route_name"}}},
 				Metadata:       &egv1alpha1.ExtProcMetadata{WritableNamespaces: []string{"io.thyris.tsz"}},
 			}},
 		},

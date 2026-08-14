@@ -169,8 +169,15 @@ apply_demo() {
   log "Applying Gateway, HTTPRoute, and mock OpenAI backend"
   kubectl apply -f "${SCRIPT_DIR}/echo-demo.yaml"
   kubectl -n "$DEMO_NAMESPACE" rollout status deployment/mock-openai --timeout=180s
-  kubectl -n "$DEMO_NAMESPACE" wait \
-    --for=condition=Programmed "gateway/${GATEWAY_NAME}" --timeout=180s
+  # In a reused Kind cluster Envoy Gateway can retain a stale Gateway
+  # Programmed=False/NoResources condition while the data-plane Service and
+  # HTTPRoute are healthy. Route acceptance and the later real Envoy request
+  # are the authoritative bootstrap checks, so do not reject that usable
+  # state before reaching them.
+  if ! kubectl -n "$DEMO_NAMESPACE" wait \
+    --for=condition=Programmed "gateway/${GATEWAY_NAME}" --timeout=30s; then
+    log "Gateway Programmed condition is not True yet; continuing to verify the accepted route with real traffic"
+  fi
   wait_for_route_accepted
 }
 
@@ -354,6 +361,93 @@ verify_replica_lifecycle() {
   done <<<"$pods"
 }
 
+verify_controller_reconciliation() {
+  local envoy_service temp_dir port_forward_pid response_file status_code conflict_a conflict_b
+  command -v docker >/dev/null 2>&1 || fail "Docker is required"
+  docker info >/dev/null 2>&1 || fail "Docker daemon is not running"
+  install_tools
+  ensure_cluster
+  apply_demo
+  apply_policy_dependencies
+
+  log "Building and loading the local controller/ext-proc image into Kind"
+  docker build -t thyris-sz:local "${SCRIPT_DIR}/../.."
+  "$KIND" load docker-image thyris-sz:local --name "$CLUSTER_NAME"
+  kubectl apply -f "${SCRIPT_DIR}/../../config/crd/bases/security.thyris.ai_tszguardrailpolicies.yaml"
+  kubectl apply -f "${SCRIPT_DIR}/../../config/rbac/role.yaml"
+  kubectl apply -f "${SCRIPT_DIR}/tsz-ext-proc.yaml"
+  kubectl apply -f "${SCRIPT_DIR}/controller/controller.yaml"
+  kubectl -n "$DEMO_NAMESPACE" rollout restart deployment/tsz-ext-proc deployment/tsz-controller
+  kubectl -n "$DEMO_NAMESPACE" rollout status deployment/tsz-ext-proc --timeout=180s
+  kubectl -n "$DEMO_NAMESPACE" rollout status deployment/tsz-controller --timeout=180s
+
+  # Start clean so a previous run cannot satisfy a wait using stale status.
+  kubectl -n "$DEMO_NAMESPACE" delete tszguardrailpolicy \
+    checkpoint-inline checkpoint-conflict-a checkpoint-conflict-b --ignore-not-found
+  kubectl -n "$DEMO_NAMESPACE" delete envoyextensionpolicy \
+    -l security.thyris.ai/managed-by=tsz-controller --ignore-not-found
+
+  log "Checking inline policy reconciliation and native Envoy route binding"
+  kubectl apply -f "${SCRIPT_DIR}/controller/checkpoint-inline-policy.yaml"
+  kubectl -n "$DEMO_NAMESPACE" wait --for=condition=Programmed \
+    tszguardrailpolicy/checkpoint-inline --timeout=90s
+  kubectl -n "$DEMO_NAMESPACE" get tszguardrailpolicy checkpoint-inline \
+    -o jsonpath='{.status.conditions[?(@.type=="Programmed")].reason}' | grep -Fxq ExtProcConfigured || \
+    fail "inline policy was not programmed by EnvoyExtensionPolicy reconciliation"
+
+  envoy_service="$(kubectl -n envoy-gateway-system get service \
+    -l "gateway.envoyproxy.io/owning-gateway-namespace=${DEMO_NAMESPACE},gateway.envoyproxy.io/owning-gateway-name=${GATEWAY_NAME}" \
+    -o jsonpath='{.items[0].metadata.name}')"
+  [[ -n "$envoy_service" ]] || fail "Envoy data-plane service was not found"
+  temp_dir="$(mktemp -d)"
+  response_file="${temp_dir}/response.json"
+  kubectl -n envoy-gateway-system port-forward "service/${envoy_service}" "${LOCAL_PORT}:80" >"${temp_dir}/port-forward.log" 2>&1 &
+  port_forward_pid=$!
+  cleanup_controller_port_forward() {
+    kill "$port_forward_pid" >/dev/null 2>&1 || true
+    wait "$port_forward_pid" >/dev/null 2>&1 || true
+    rm -rf "$temp_dir"
+  }
+  trap cleanup_controller_port_forward RETURN
+  sleep 2
+  status_code="$(curl --silent --output "$response_file" --write-out '%{http_code}' \
+    -X POST "http://127.0.0.1:${LOCAL_PORT}/v1/chat/completions" \
+    -H 'content-type: application/json' \
+    --data '{"messages":[{"role":"user","content":"my email is jane@example.com"}]}')"
+  [[ "$status_code" == "400" ]] || fail "native inline policy request returned HTTP ${status_code}, want 400"
+  grep -Fq 'TSZ_GUARDRAIL_BLOCKED' "$response_file" || fail "native inline policy did not block PII"
+  grep -Fq 'crd/tsz-byg-demo/checkpoint-inline/' "$response_file" || fail "response did not report the controller-created policy"
+  cleanup_controller_port_forward
+  trap - RETURN
+
+  log "Checking owner-reference garbage collection"
+  kubectl -n "$DEMO_NAMESPACE" delete tszguardrailpolicy/checkpoint-inline --wait=true
+  for _ in $(seq 1 60); do
+    if [[ -z "$(kubectl -n "$DEMO_NAMESPACE" get envoyextensionpolicy -l security.thyris.ai/managed-by=tsz-controller -o name)" ]]; then
+      break
+    fi
+    sleep 1
+  done
+  [[ -z "$(kubectl -n "$DEMO_NAMESPACE" get envoyextensionpolicy -l security.thyris.ai/managed-by=tsz-controller -o name)" ]] || \
+    fail "owned EnvoyExtensionPolicy was not garbage collected"
+
+  log "Checking deterministic same-level conflict rejection"
+  kubectl apply -f "${SCRIPT_DIR}/controller/conflicting-inline-policies.yaml"
+  for _ in $(seq 1 60); do
+    conflict_a="$(kubectl -n "$DEMO_NAMESPACE" get tszguardrailpolicy/checkpoint-conflict-a -o jsonpath='{.status.conditions[?(@.type=="Programmed")].reason}')"
+    conflict_b="$(kubectl -n "$DEMO_NAMESPACE" get tszguardrailpolicy/checkpoint-conflict-b -o jsonpath='{.status.conditions[?(@.type=="Programmed")].reason}')"
+    [[ "$conflict_a" == "Conflicted" && "$conflict_b" == "Conflicted" ]] && break
+    sleep 1
+  done
+  [[ "$conflict_a" == "Conflicted" && "$conflict_b" == "Conflicted" ]] || \
+    fail "same-level policies were not both marked Conflicted"
+  [[ -z "$(kubectl -n "$DEMO_NAMESPACE" get envoyextensionpolicy -l security.thyris.ai/managed-by=tsz-controller -o name)" ]] || \
+    fail "a conflicted policy left an EnvoyExtensionPolicy programmed"
+  kubectl -n "$DEMO_NAMESPACE" delete tszguardrailpolicy checkpoint-conflict-a checkpoint-conflict-b --ignore-not-found
+
+  log "Verified controller reconciliation: native block, owner GC, and conflict rejection"
+}
+
 down() {
   install_tools
   if cluster_exists; then
@@ -366,7 +460,7 @@ down() {
 }
 
 usage() {
-  printf 'Usage: %s {up|verify|verify-policy-store-readiness|verify-replica-lifecycle|down}\n' "$0"
+  printf 'Usage: %s {up|verify|verify-policy-store-readiness|verify-replica-lifecycle|verify-controller-reconciliation|down}\n' "$0"
 }
 
 case "${1:-up}" in
@@ -377,6 +471,7 @@ case "${1:-up}" in
     ;;
   verify-policy-store-readiness) verify_policy_store_readiness ;;
   verify-replica-lifecycle) verify_replica_lifecycle ;;
+  verify-controller-reconciliation) verify_controller_reconciliation ;;
   down) down ;;
   *) usage; exit 2 ;;
 esac

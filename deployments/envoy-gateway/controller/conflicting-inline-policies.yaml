@@ -1,0 +1,49 @@
+# Two same-level attachments for the bootstrap HTTPRoute. Applying both must
+# leave neither policy Programmed and must not leave an EnvoyExtensionPolicy.
+apiVersion: security.thyris.ai/v1alpha1
+kind: TSZGuardrailPolicy
+metadata:
+  name: checkpoint-conflict-a
+  namespace: tsz-byg-demo
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-openai
+  policySource: Inline
+  request:
+    pii: Block
+    secret: Mask
+    promptInjection: Block
+  response:
+    enabled: false
+    pii: Allow
+    secret: Allow
+    unsafeContent: Allow
+  failurePolicy:
+    request: FailClosed
+    response: FailClosed
+---
+apiVersion: security.thyris.ai/v1alpha1
+kind: TSZGuardrailPolicy
+metadata:
+  name: checkpoint-conflict-b
+  namespace: tsz-byg-demo
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-openai
+  policySource: Inline
+  request:
+    pii: Mask
+    secret: Mask
+    promptInjection: Block
+  response:
+    enabled: false
+    pii: Allow
+    secret: Allow
+    unsafeContent: Allow
+  failurePolicy:
+    request: FailClosed
+    response: FailClosed

@@ -45,6 +45,24 @@ func TestRequestFromEnvoyCarriesHeadersIntoBufferedBody(t *testing.T) {
 	}
 }
 
+func TestRequestFromEnvoyFlattensExtProcAttributeEnvelope(t *testing.T) {
+	message := requestHeadersForAdapterTest(true)
+	message.Attributes = map[string]*structpb.Struct{
+		"envoy.filters.http.ext_proc": {
+			Fields: map[string]*structpb.Value{
+				"xds.route_name": structpb.NewStringValue("httproute/demo/orders/rule/0/match/0/*"),
+			},
+		},
+	}
+	request, _, err := requestFromEnvoy(message, newEnvoyStreamState())
+	if err != nil {
+		t.Fatalf("requestFromEnvoy() error = %v", err)
+	}
+	if got, want := request.Attributes["xds.route_name"], "httproute/demo/orders/rule/0/match/0/*"; got != want {
+		t.Fatalf("route attribute = %q, want %q (attributes=%v)", got, want, request.Attributes)
+	}
+}
+
 func TestRequestFromEnvoyHandlesResponseStagesEmptyBodiesAndEndOfStream(t *testing.T) {
 	state := newEnvoyStreamState()
 	messages := []struct {

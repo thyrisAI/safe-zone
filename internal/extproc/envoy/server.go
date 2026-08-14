@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -78,6 +79,10 @@ func NewServerWithAuditor(processor Processor, policyCache PolicyCache, auditor 
 
 func NewServerWithSettings(processor Processor, policyCache PolicyCache, auditor guardrails.Auditor, settings ServerSettings, maxConcurrentStreams ...uint32) (*Server, error) {
 	return newServer(processor, policyCache, HeaderPolicyResolver{}, auditor, settings, maxConcurrentStreams...)
+}
+
+func NewServerWithResolverAndSettings(processor Processor, policyCache PolicyCache, resolver PolicyResolver, auditor guardrails.Auditor, settings ServerSettings, maxConcurrentStreams ...uint32) (*Server, error) {
+	return newServer(processor, policyCache, resolver, auditor, settings, maxConcurrentStreams...)
 }
 
 func newServer(processor Processor, policyCache PolicyCache, resolver PolicyResolver, auditor guardrails.Auditor, settings ServerSettings, maxConcurrentStreams ...uint32) (*Server, error) {
@@ -158,6 +163,10 @@ func (s *Server) Process(stream extprocv3.ExternalProcessor_ProcessServer) error
 				Attributes: request.Attributes,
 			})
 			if err != nil {
+				// Attribute values are trusted Envoy route identifiers. Logging them
+				// on a resolution failure makes native attachment mismatches
+				// diagnosable without recording client headers or request content.
+				log.Printf("native policy resolution failed: attributes=%v error=%v", request.Attributes, err)
 				return status.Error(codes.InvalidArgument, err.Error())
 			}
 			request.PolicyID = resolved.PolicyID

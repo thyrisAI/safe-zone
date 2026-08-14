@@ -1,0 +1,26 @@
+# Live checkpoint fixture for the Phase 2.5 controller. It targets the Kind
+# bootstrap's mock-openai HTTPRoute and is safe to apply repeatedly.
+apiVersion: security.thyris.ai/v1alpha1
+kind: TSZGuardrailPolicy
+metadata:
+  name: checkpoint-inline
+  namespace: tsz-byg-demo
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-openai
+  policySource: Inline
+  request:
+    pii: Block
+    secret: Mask
+    promptInjection: Block
+  response:
+    enabled: false
+    pii: Allow
+    secret: Allow
+    unsafeContent: Allow
+  failurePolicy:
+    request: FailClosed
+    response: FailClosed
+  processingTimeout: 2s

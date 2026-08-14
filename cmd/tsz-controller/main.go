@@ -60,6 +60,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("initialize Inline policy ownership tracker: %v", err)
 	}
+	bindings, err := policy.NewPostgresRoutePolicyBindingStore(sqlDB)
+	if err != nil {
+		log.Fatalf("initialize native route binding store: %v", err)
+	}
 
 	scheme, err := controller.NewScheme()
 	if err != nil {
@@ -84,7 +88,7 @@ func main() {
 		&effectivepolicy.Compiler{Repo: repository, Compiler: compiler, Activator: activator},
 		&envoyresource.EnvoyResourceReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()},
 		ownership,
-	)
+	).WithRoutePolicyBindings(bindings)
 	if err := reconciler.SetupWithManager(mgr); err != nil {
 		log.Fatalf("configure policy attachment controller: %v", err)
 	}

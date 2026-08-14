@@ -115,6 +115,12 @@ func routeIdentityCandidates(attributes map[string]string) []policy.RouteIdentit
 	}
 	if route != "" {
 		candidates = append(candidates, policy.RouteIdentity{Gateway: gateway, Listener: listener, Route: route})
+		if gateway != "" || listener != "" {
+			// Envoy Gateway v1.8 exposes xds.route_name but not gateway/listener
+			// attributes. Keep a route-only fallback for its fully-qualified XDS
+			// route identity; the Postgres mapper rejects ambiguous matches.
+			candidates = append(candidates, policy.RouteIdentity{Route: route})
+		}
 	}
 	if listener != "" {
 		candidates = append(candidates, policy.RouteIdentity{Gateway: gateway, Listener: listener})

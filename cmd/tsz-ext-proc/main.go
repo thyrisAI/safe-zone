@@ -67,7 +67,15 @@ func main() {
 		log.Println("BYG example audit fault injection is enabled")
 		auditor = exampleFaultAuditor{}
 	}
-	transport, err := envoy.NewServerWithSettings(processor, policyCache, auditor, envoy.ServerSettings{
+	resolver := extproc.PolicyResolver(extproc.HeaderPolicyResolver{})
+	if os.Getenv("TSZ_POLICY_RESOLVER") == "attribute" {
+		bindings, err := policy.NewPostgresRoutePolicyBindingStore(sqlDB)
+		if err != nil {
+			log.Fatalf("initialize native route binding store: %v", err)
+		}
+		resolver = extproc.AttributePolicyResolver{Mapping: bindings}
+	}
+	transport, err := envoy.NewServerWithResolverAndSettings(processor, policyCache, resolver, auditor, envoy.ServerSettings{
 		FailMode: policy.FailureMode(extProcConfig.FailMode), MaxBodyBytes: extProcConfig.MaxBodyBytes,
 		ProcessingTimeout: extProcConfig.ProcessingTimeout,
 	}, extProcConfig.MaxConcurrentStreams)

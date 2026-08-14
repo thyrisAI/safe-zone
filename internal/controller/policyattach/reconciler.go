@@ -52,6 +52,7 @@ type PolicyAttachmentReconciler struct {
 	effectiveCompiler *effectivepolicy.Compiler
 	envoyReconciler   EnvoyReconciler
 	ownershipTracker  OwnershipTracker
+	routeBindings     RouteBindingStore
 }
 
 type TargetResolver interface {
@@ -67,6 +68,10 @@ type OwnershipTracker interface {
 	ClaimOwnership(context.Context, string, *string, string, string) error
 	ReleaseOwnership(context.Context, string, *string, string, string) error
 }
+type RouteBindingStore interface {
+	UpsertRoutePolicy(context.Context, extprocpolicy.RouteIdentity, extprocpolicy.RoutePolicyBinding) error
+	DeleteRoutePolicy(context.Context, extprocpolicy.RouteIdentity) error
+}
 
 func NewPolicyAttachmentReconciler(c client.Client, targets TargetResolver, precedence PrecedenceSelector, references *effectivepolicy.ReferenceResolver, compiler *effectivepolicy.Compiler, envoy EnvoyReconciler, ownership ...OwnershipTracker) *PolicyAttachmentReconciler {
 	reconciler := &PolicyAttachmentReconciler{Client: c, targetResolver: targets, precedence: precedence, referenceResolver: references, effectiveCompiler: compiler, envoyReconciler: envoy}
@@ -74,6 +79,11 @@ func NewPolicyAttachmentReconciler(c client.Client, targets TargetResolver, prec
 		reconciler.ownershipTracker = ownership[0]
 	}
 	return reconciler
+}
+
+func (r *PolicyAttachmentReconciler) WithRoutePolicyBindings(store RouteBindingStore) *PolicyAttachmentReconciler {
+	r.routeBindings = store
+	return r
 }
 
 // Reconcile resolves targets so target disappearance and section changes are
@@ -132,6 +142,9 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			winner, conflict := r.precedence.Select(candidates)
 			if conflict != nil {
 				controllermetrics.IncEffectivePolicyConflict()
+				if err := r.removeOwnedExtensionPolicy(ctx, policy, target); err != nil {
+					return ctrl.Result{}, err
+				}
 				r.publishConflict(ctx, policy, conflict)
 				continue
 			}
@@ -172,6 +185,11 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					policy.Status.PolicyVersion = &version
 				}
 				policy.Status.EffectivePolicyID = dbPolicyName
+				if r.routeBindings != nil {
+					if err := r.routeBindings.UpsertRoutePolicy(ctx, nativeRouteIdentity(target), extprocpolicy.RoutePolicyBinding{PolicyID: dbPolicyName}); err != nil {
+						return r.ownershipUnavailable(ctx, policy, err)
+					}
+				}
 				securityv1alpha1.SetStatusCondition(&policy.Status.Conditions, metav1.Condition{Type: securityv1alpha1.ConditionPolicySynced, Status: metav1.ConditionTrue, Reason: securityv1alpha1.ReasonSnapshotActive, Message: "activation published; per-replica confirmation not yet implemented", ObservedGeneration: policy.Generation})
 			}
 			_, err = r.envoyReconciler.ReconcileExtensionPolicy(ctx, policy, target.Ref, envoyresource.EffectivePolicy{ProcessingTimeout: policy.Spec.ProcessingTimeoutOrDefault(), FailOpen: policy.Spec.FailOpen()})
@@ -185,6 +203,22 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
+}
+
+func nativeRouteIdentity(target ResolvedTarget) extprocpolicy.RouteIdentity {
+	identity := extprocpolicy.RouteIdentity{}
+	if target.Kind == "Gateway" {
+		identity.Gateway = string(target.Ref.Name)
+	} else {
+		identity.Route = string(target.Ref.Name)
+		if route, ok := target.Object.(*gatewayv1.HTTPRoute); ok && len(route.Spec.ParentRefs) > 0 {
+			identity.Gateway = string(route.Spec.ParentRefs[0].Name)
+		}
+	}
+	if target.Ref.SectionName != nil {
+		identity.Rule = string(*target.Ref.SectionName)
+	}
+	return identity
 }
 
 func (r *PolicyAttachmentReconciler) recordManagedExtensionPolicies(ctx context.Context) {
@@ -274,6 +308,7 @@ func policyIdentity(object *securityv1alpha1.TSZGuardrailPolicy) string {
 	return object.Namespace + "/" + object.Name
 }
 func (r *PolicyAttachmentReconciler) publishConflict(ctx context.Context, object *securityv1alpha1.TSZGuardrailPolicy, conflict *effectivepolicy.ConflictError) {
+	before := object.DeepCopy().Status
 	others := make([]string, 0, len(conflict.Candidates))
 	for _, candidate := range conflict.Candidates {
 		if candidate.ID != policyIdentity(object) {
@@ -281,7 +316,29 @@ func (r *PolicyAttachmentReconciler) publishConflict(ctx context.Context, object
 		}
 	}
 	securityv1alpha1.SetStatusCondition(&object.Status.Conditions, metav1.Condition{Type: securityv1alpha1.ConditionProgrammed, Status: metav1.ConditionFalse, Reason: securityv1alpha1.ReasonConflicted, Message: "conflicts with TSZGuardrailPolicy/" + strings.Join(others, ","), ObservedGeneration: object.Generation})
-	_ = r.Status().Update(ctx, object)
+	if !reflect.DeepEqual(before, object.Status) {
+		_ = r.Status().Update(ctx, object)
+	}
+}
+
+// removeOwnedExtensionPolicy withdraws a configuration only when this CRD is
+// its controller owner. A same-level conflict is an explicit safety rejection,
+// not a compilation failure, so no conflicted policy may remain programmed.
+func (r *PolicyAttachmentReconciler) removeOwnedExtensionPolicy(ctx context.Context, owner *securityv1alpha1.TSZGuardrailPolicy, target ResolvedTarget) error {
+	resource := &egv1alpha1.EnvoyExtensionPolicy{}
+	key := types.NamespacedName{Namespace: owner.Namespace, Name: envoyresource.DeterministicName(target.Ref)}
+	if err := r.Get(ctx, key, resource); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	for _, reference := range resource.OwnerReferences {
+		if reference.Controller != nil && *reference.Controller && reference.UID == owner.UID {
+			if err := r.Delete(ctx, resource); err != nil {
+				return fmt.Errorf("delete conflicted EnvoyExtensionPolicy %s/%s: %w", key.Namespace, key.Name, err)
+			}
+			return nil
+		}
+	}
+	return nil
 }
 
 func (r *PolicyAttachmentReconciler) lastKnownGoodFailure(ctx context.Context, object *securityv1alpha1.TSZGuardrailPolicy, err error) (ctrl.Result, error) {
@@ -430,11 +487,38 @@ func (r *PolicyAttachmentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&securityv1alpha1.TSZGuardrailPolicy{}).
+		// A policy addition, edit, or deletion can turn every sibling targeting
+		// the same Gateway API object into (or out of) a conflict.
+		Watches(&securityv1alpha1.TSZGuardrailPolicy{}, handler.EnqueueRequestsFromMapFunc(r.policiesSharingTargetRefs)).
 		Watches(&gatewayv1.Gateway{}, handler.EnqueueRequestsFromMapFunc(r.policiesTargetingGateway)).
 		Watches(&gatewayv1.HTTPRoute{}, handler.EnqueueRequestsFromMapFunc(r.policiesTargetingHTTPRoute)).
 		Watches(&gatewayv1.GRPCRoute{}, handler.EnqueueRequestsFromMapFunc(r.policiesTargetingGRPCRoute)).
 		Owns(&egv1alpha1.EnvoyExtensionPolicy{}).
 		Complete(r)
+}
+
+func (r *PolicyAttachmentReconciler) policiesSharingTargetRefs(ctx context.Context, object client.Object) []reconcile.Request {
+	policy, ok := object.(*securityv1alpha1.TSZGuardrailPolicy)
+	if !ok {
+		return nil
+	}
+	requests := map[types.NamespacedName]struct{}{}
+	for _, ref := range policy.Spec.TargetRefs {
+		policies := &securityv1alpha1.TSZGuardrailPolicyList{}
+		key := targetRefKey(string(ref.Group), string(ref.Kind), string(ref.Name))
+		if err := r.List(ctx, policies, client.InNamespace(policy.Namespace), client.MatchingFields{targetRefIndex: key}); err != nil {
+			log.FromContext(ctx).Error(err, "list policies sharing target reference", "namespace", policy.Namespace, "name", policy.Name)
+			continue
+		}
+		for _, candidate := range policies.Items {
+			requests[types.NamespacedName{Namespace: candidate.Namespace, Name: candidate.Name}] = struct{}{}
+		}
+	}
+	result := make([]reconcile.Request, 0, len(requests))
+	for name := range requests {
+		result = append(result, reconcile.Request{NamespacedName: name})
+	}
+	return result
 }
 
 func (r *PolicyAttachmentReconciler) policiesTargetingGateway(ctx context.Context, object client.Object) []reconcile.Request {

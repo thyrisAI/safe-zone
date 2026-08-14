@@ -18,7 +18,32 @@ func TestNewActivatorRequiresPublisher(t *testing.T) {
 	}
 }
 
+func TestActivatorRepublishActivationUsesCurrentActiveVersion(t *testing.T) {
+	version := 7
+	publisher := &recordingPublisher{}
+	activator, err := NewActivator(activeSnapshotRepository{snapshot: PolicySnapshot{ID: 12, PolicyName: "inline-policy", Version: &version, Status: StatusActive}}, publisher)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := activator.RepublishActivation(context.Background(), "inline-policy", nil); err != nil {
+		t.Fatalf("RepublishActivation() error = %v", err)
+	}
+	events := publisher.Events()
+	if len(events) != 1 || events[0] != (ActivationEvent{PolicyID: "inline-policy", Version: 7}) {
+		t.Fatalf("events = %+v", events)
+	}
+}
+
 type stubRepository struct{ Repository }
+
+type activeSnapshotRepository struct {
+	stubRepository
+	snapshot PolicySnapshot
+}
+
+func (r activeSnapshotRepository) ActiveSnapshot(context.Context, string, *string) (PolicySnapshot, error) {
+	return r.snapshot, nil
+}
 
 type recordingPublisher struct {
 	mu     sync.Mutex

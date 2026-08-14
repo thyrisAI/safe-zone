@@ -20,6 +20,16 @@ type Compiler struct {
 	Activator *policy.Activator
 }
 
+// RepublishActivation retries only Redis notification for a snapshot that is
+// already Active. It must be used after ActivationPublishError instead of
+// running the activation transaction a second time.
+func (c *Compiler) RepublishActivation(ctx context.Context, policyName string, tenant *string) error {
+	if c == nil || c.Activator == nil {
+		return errors.New("effective policy activator is required")
+	}
+	return c.Activator.RepublishActivation(ctx, policyName, tenant)
+}
+
 // EnsureCompiledAndActive creates, compiles, and activates a new snapshot only
 // when the active definition differs from def. Repository errors other than a
 // missing active snapshot are returned: a controller must not write a policy

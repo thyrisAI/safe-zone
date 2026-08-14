@@ -20,19 +20,11 @@ import (
 func main() {
 	name := flag.String("name", "", "route-owned policy name")
 	definitionFile := flag.String("file", "", "path to a policy definition JSON file")
+	rollback := flag.Bool("rollback", false, "restore the latest superseded version of -name")
 	flag.Parse()
-	if *name == "" || *definitionFile == "" {
+	if *name == "" || (!*rollback && *definitionFile == "") {
 		flag.Usage()
 		os.Exit(2)
-	}
-
-	definitionBytes, err := os.ReadFile(*definitionFile)
-	if err != nil {
-		log.Fatalf("read policy definition: %v", err)
-	}
-	var definition policy.PolicyDefinition
-	if err := json.Unmarshal(definitionBytes, &definition); err != nil {
-		log.Fatalf("decode policy definition: %v", err)
 	}
 
 	config.LoadConfig()
@@ -49,6 +41,38 @@ func main() {
 	if err != nil {
 		log.Fatalf("initialize policy repository: %v", err)
 	}
+	publisher, err := policy.NewRedisActivationPublisher(cache.RDB)
+	if err != nil {
+		log.Fatalf("initialize policy activation publisher: %v", err)
+	}
+	activator, err := policy.NewActivator(repository, publisher)
+	if err != nil {
+		log.Fatalf("initialize policy activator: %v", err)
+	}
+	if *rollback {
+		current, err := repository.PolicyByName(ctx, *name, nil)
+		if err != nil {
+			log.Fatalf("load policy for rollback: %v", err)
+		}
+		if err := activator.Rollback(ctx, current.ID); err != nil {
+			log.Fatalf("rollback policy: %v", err)
+		}
+		snapshot, err := repository.ActiveSnapshot(ctx, *name, nil)
+		if err != nil {
+			log.Fatalf("read rolled-back policy: %v", err)
+		}
+		fmt.Printf("rolled back policy=%s version=%d snapshot=%d\n", *name, *snapshot.Version, snapshot.ID)
+		return
+	}
+
+	definitionBytes, err := os.ReadFile(*definitionFile)
+	if err != nil {
+		log.Fatalf("read policy definition: %v", err)
+	}
+	var definition policy.PolicyDefinition
+	if err := json.Unmarshal(definitionBytes, &definition); err != nil {
+		log.Fatalf("decode policy definition: %v", err)
+	}
 	snapshotID, err := repository.CreateValidated(ctx, *name, definition)
 	if err != nil {
 		log.Fatalf("validate policy snapshot: %v", err)
@@ -59,14 +83,6 @@ func main() {
 	}
 	if err := compiler.Compile(ctx, snapshotID); err != nil {
 		log.Fatalf("compile policy snapshot: %v", err)
-	}
-	publisher, err := policy.NewRedisActivationPublisher(cache.RDB)
-	if err != nil {
-		log.Fatalf("initialize policy activation publisher: %v", err)
-	}
-	activator, err := policy.NewActivator(repository, publisher)
-	if err != nil {
-		log.Fatalf("initialize policy activator: %v", err)
 	}
 	if err := activator.Activate(ctx, snapshotID); err != nil {
 		log.Fatalf("activate policy snapshot: %v", err)

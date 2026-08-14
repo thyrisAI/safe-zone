@@ -138,6 +138,32 @@ func TestReconcileCompileFailureKeepsLastKnownGoodProgrammed(t *testing.T) {
 	}
 }
 
+func TestReconcileDeletionReleasesInlineOwnershipAndRemovesFinalizer(t *testing.T) {
+	scheme, _ := controller.NewScheme()
+	ref := target("HTTPRoute", gatewayv1.ObjectName("orders"), nil)
+	object := inlinePolicy("deleting", ref)
+	now := metav1.Now()
+	object.DeletionTimestamp = &now
+	object.Finalizers = []string{policyAttachmentFinalizer}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(object).Build()
+	ownership := &recordingOwnership{}
+	r := NewPolicyAttachmentReconciler(c, staticTargets{}, selector{}, nil, nil, nil, ownership)
+	if _, err := r.Reconcile(context.Background(), request(object)); err != nil {
+		t.Fatalf("Reconcile() error = %v", err)
+	}
+	if len(ownership.releases) != 1 {
+		t.Fatalf("released policies = %+v", ownership.releases)
+	}
+	want := effectivepolicy.InlinePolicyName("apps", "deleting", targetRefKeyFromRef(ref))
+	if ownership.releases[0] != want {
+		t.Fatalf("released policy = %q, want %q", ownership.releases[0], want)
+	}
+	got := &securityv1alpha1.TSZGuardrailPolicy{}
+	if err := c.Get(context.Background(), client.ObjectKeyFromObject(object), got); err == nil && controllerutil.ContainsFinalizer(got, policyAttachmentFinalizer) {
+		t.Fatal("cleanup finalizer was not removed")
+	}
+}
+
 func TestReconcileInlinePolicyIsIdempotentAgainstPostgres(t *testing.T) {
 	dsn := os.Getenv("TSZ_POLICY_TEST_DSN")
 	if dsn == "" {
@@ -233,6 +259,21 @@ type recordingEnvoy struct{ calls int }
 func (r *recordingEnvoy) ReconcileExtensionPolicy(context.Context, *securityv1alpha1.TSZGuardrailPolicy, gatewayv1alpha2.LocalPolicyTargetReferenceWithSectionName, envoyresource.EffectivePolicy) (controllerutil.OperationResult, error) {
 	r.calls++
 	return controllerutil.OperationResultCreated, nil
+}
+
+type recordingOwnership struct {
+	claims   []string
+	releases []string
+}
+
+func (r *recordingOwnership) ClaimOwnership(_ context.Context, policyName string, _ *string, _, _ string) error {
+	r.claims = append(r.claims, policyName)
+	return nil
+}
+
+func (r *recordingOwnership) ReleaseOwnership(_ context.Context, policyName string, _ *string, _, _ string) error {
+	r.releases = append(r.releases, policyName)
+	return nil
 }
 func request(object client.Object) ctrl.Request {
 	return ctrl.Request{NamespacedName: types.NamespacedName{Namespace: object.GetNamespace(), Name: object.GetName()}}

@@ -126,6 +126,27 @@ func (a *Activator) Rollback(ctx context.Context, policyID int64) error {
 	return nil
 }
 
+// RepublishActivation retries Redis notification for an already-active
+// snapshot. Unlike Activate, it never opens an activation transaction or
+// changes snapshot state, so it is safe after an ActivationPublishError.
+func (a *Activator) RepublishActivation(ctx context.Context, policyName string, tenant *string) error {
+	if a == nil || a.repository == nil || a.publisher == nil {
+		return errors.New("policy activator dependencies are required")
+	}
+	snapshot, err := a.repository.ActiveSnapshot(ctx, policyName, tenant)
+	if err != nil {
+		return fmt.Errorf("load active snapshot for republish: %w", err)
+	}
+	if snapshot.Version == nil {
+		return fmt.Errorf("active snapshot %d has no version", snapshot.ID)
+	}
+	event := ActivationEvent{PolicyID: PolicyIdentifier(snapshot.PolicyName, snapshot.Tenant), Version: *snapshot.Version}
+	if err := a.publisher.PublishActivation(ctx, event); err != nil {
+		return &ActivationPublishError{Event: event, Err: err}
+	}
+	return nil
+}
+
 // ActivationPublishError means PostgreSQL activation committed successfully,
 // but the Redis notification must be retried. Callers must not roll back or
 // repeat the activation transaction.

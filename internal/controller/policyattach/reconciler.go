@@ -2,6 +2,7 @@ package policyattach
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -12,7 +13,7 @@ import (
 	"thyris-sz/internal/controller/capabilities"
 	"thyris-sz/internal/controller/effectivepolicy"
 	"thyris-sz/internal/controller/envoyresource"
-	"thyris-sz/internal/extproc/policy"
+	extprocpolicy "thyris-sz/internal/extproc/policy"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -26,7 +27,11 @@ import (
 	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
-const targetRefIndex = ".spec.targetRefs"
+const (
+	targetRefIndex                = ".spec.targetRefs"
+	policyAttachmentFinalizer     = "security.thyris.ai/tsz-guardrail-policy-cleanup"
+	activationNotificationPending = "activation committed, notification pending"
+)
 
 // PolicyAttachmentReconciler reconciles TSZ policy attachments. Subsequent
 // phases add policy resolution, effective-policy compilation, and status
@@ -38,6 +43,7 @@ type PolicyAttachmentReconciler struct {
 	referenceResolver *effectivepolicy.ReferenceResolver
 	effectiveCompiler *effectivepolicy.Compiler
 	envoyReconciler   EnvoyReconciler
+	ownershipTracker  OwnershipTracker
 }
 
 type TargetResolver interface {
@@ -49,9 +55,17 @@ type PrecedenceSelector interface {
 type EnvoyReconciler interface {
 	ReconcileExtensionPolicy(context.Context, *securityv1alpha1.TSZGuardrailPolicy, gatewayv1alpha2.LocalPolicyTargetReferenceWithSectionName, envoyresource.EffectivePolicy) (controllerutil.OperationResult, error)
 }
+type OwnershipTracker interface {
+	ClaimOwnership(context.Context, string, *string, string, string) error
+	ReleaseOwnership(context.Context, string, *string, string, string) error
+}
 
-func NewPolicyAttachmentReconciler(c client.Client, targets TargetResolver, precedence PrecedenceSelector, references *effectivepolicy.ReferenceResolver, compiler *effectivepolicy.Compiler, envoy EnvoyReconciler) *PolicyAttachmentReconciler {
-	return &PolicyAttachmentReconciler{Client: c, targetResolver: targets, precedence: precedence, referenceResolver: references, effectiveCompiler: compiler, envoyReconciler: envoy}
+func NewPolicyAttachmentReconciler(c client.Client, targets TargetResolver, precedence PrecedenceSelector, references *effectivepolicy.ReferenceResolver, compiler *effectivepolicy.Compiler, envoy EnvoyReconciler, ownership ...OwnershipTracker) *PolicyAttachmentReconciler {
+	reconciler := &PolicyAttachmentReconciler{Client: c, targetResolver: targets, precedence: precedence, referenceResolver: references, effectiveCompiler: compiler, envoyReconciler: envoy}
+	if len(ownership) > 0 {
+		reconciler.ownershipTracker = ownership[0]
+	}
+	return reconciler
 }
 
 // Reconcile resolves targets so target disappearance and section changes are
@@ -60,6 +74,15 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	policy := &securityv1alpha1.TSZGuardrailPolicy{}
 	if err := r.Get(ctx, req.NamespacedName, policy); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	if !policy.DeletionTimestamp.IsZero() {
+		return r.handleDeletion(ctx, policy)
+	}
+	if policy.Spec.PolicySource == securityv1alpha1.PolicySourceInline && !controllerutil.ContainsFinalizer(policy, policyAttachmentFinalizer) {
+		controllerutil.AddFinalizer(policy, policyAttachmentFinalizer)
+		if err := r.Update(ctx, policy); err != nil {
+			return ctrl.Result{}, fmt.Errorf("add policy attachment finalizer: %w", err)
+		}
 	}
 	if err := capabilities.CheckCapabilities(policy.Spec, capabilities.EnvoyGatewayCapabilities); err != nil {
 		securityv1alpha1.SetStatusCondition(&policy.Status.Conditions, metav1.Condition{Type: securityv1alpha1.ConditionProgrammed, Status: metav1.ConditionFalse, Reason: securityv1alpha1.ReasonUnsupportedCapability, Message: err.Error(), ObservedGeneration: policy.Generation})
@@ -96,14 +119,34 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				continue
 			}
 			if policy.Spec.PolicySource == securityv1alpha1.PolicySourceInline && r.effectiveCompiler != nil {
+				dbPolicyName := effectivepolicy.InlinePolicyName(policy.Namespace, policy.Name, targetKey(target))
 				definition, err := effectivepolicy.ToPolicyDefinition(policy.Spec, policyScope(target))
 				if err != nil {
 					return r.lastKnownGoodFailure(ctx, policy, err)
 				}
-				_, _, err = r.effectiveCompiler.EnsureCompiledAndActive(ctx, effectivepolicy.InlinePolicyName(policy.Namespace, policy.Name, targetKey(target)), definition)
+				snapshot, _, err := r.effectiveCompiler.EnsureCompiledAndActive(ctx, dbPolicyName, definition)
 				if err != nil {
+					var publishErr *extprocpolicy.ActivationPublishError
+					if errors.As(err, &publishErr) {
+						return r.activationNotificationPending(ctx, policy, publishErr)
+					}
 					return r.lastKnownGoodFailure(ctx, policy, err)
 				}
+				if isActivationNotificationPending(policy) {
+					if err := r.effectiveCompiler.RepublishActivation(ctx, dbPolicyName, definition.Scope.Tenant); err != nil {
+						return r.activationNotificationPending(ctx, policy, err)
+					}
+				}
+				if r.ownershipTracker != nil {
+					if err := r.ownershipTracker.ClaimOwnership(ctx, dbPolicyName, definition.Scope.Tenant, policy.Namespace, policy.Name); err != nil {
+						return r.ownershipUnavailable(ctx, policy, err)
+					}
+				}
+				if snapshot.Version != nil {
+					version := *snapshot.Version
+					policy.Status.PolicyVersion = &version
+				}
+				policy.Status.EffectivePolicyID = dbPolicyName
 				securityv1alpha1.SetStatusCondition(&policy.Status.Conditions, metav1.Condition{Type: securityv1alpha1.ConditionPolicySynced, Status: metav1.ConditionTrue, Reason: securityv1alpha1.ReasonSnapshotActive, Message: "activation published; per-replica confirmation not yet implemented", ObservedGeneration: policy.Generation})
 			}
 			_, err = r.envoyReconciler.ReconcileExtensionPolicy(ctx, policy, target.Ref, envoyresource.EffectivePolicy{ProcessingTimeout: policy.Spec.ProcessingTimeoutOrDefault(), FailOpen: policy.Spec.FailOpen()})
@@ -215,6 +258,63 @@ func (r *PolicyAttachmentReconciler) lastKnownGoodFailure(ctx context.Context, o
 	}
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 }
+
+func (r *PolicyAttachmentReconciler) activationNotificationPending(ctx context.Context, object *securityv1alpha1.TSZGuardrailPolicy, err error) (ctrl.Result, error) {
+	// The active snapshot transaction has committed, but ext-proc replicas have
+	// not yet been notified. Keep the previously reported version until Redis
+	// publish succeeds, then retry only the notification path.
+	securityv1alpha1.SetStatusCondition(&object.Status.Conditions, metav1.Condition{Type: securityv1alpha1.ConditionPolicySynced, Status: metav1.ConditionFalse, Reason: securityv1alpha1.ReasonProcessorUnavailable, Message: activationNotificationPending, ObservedGeneration: object.Generation})
+	if updateErr := r.Status().Update(ctx, object); updateErr != nil {
+		return ctrl.Result{}, fmt.Errorf("update activation notification status: %w", updateErr)
+	}
+	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+}
+
+func (r *PolicyAttachmentReconciler) ownershipUnavailable(ctx context.Context, object *securityv1alpha1.TSZGuardrailPolicy, err error) (ctrl.Result, error) {
+	securityv1alpha1.SetStatusCondition(&object.Status.Conditions, metav1.Condition{Type: securityv1alpha1.ConditionPolicySynced, Status: metav1.ConditionFalse, Reason: securityv1alpha1.ReasonProcessorUnavailable, Message: fmt.Sprintf("record Inline policy ownership: %v", err), ObservedGeneration: object.Generation})
+	if updateErr := r.Status().Update(ctx, object); updateErr != nil {
+		return ctrl.Result{}, fmt.Errorf("update ownership status: %w", updateErr)
+	}
+	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+}
+
+func isActivationNotificationPending(object *securityv1alpha1.TSZGuardrailPolicy) bool {
+	for _, condition := range object.Status.Conditions {
+		if condition.Type == securityv1alpha1.ConditionPolicySynced && condition.Status == metav1.ConditionFalse && condition.Reason == securityv1alpha1.ReasonProcessorUnavailable && condition.Message == activationNotificationPending {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *PolicyAttachmentReconciler) handleDeletion(ctx context.Context, object *securityv1alpha1.TSZGuardrailPolicy) (ctrl.Result, error) {
+	if !controllerutil.ContainsFinalizer(object, policyAttachmentFinalizer) {
+		return ctrl.Result{}, nil
+	}
+	if object.Spec.PolicySource == securityv1alpha1.PolicySourceInline && r.ownershipTracker != nil {
+		for _, ref := range object.Spec.TargetRefs {
+			name := effectivepolicy.InlinePolicyName(object.Namespace, object.Name, targetRefKeyFromRef(ref))
+			if err := r.ownershipTracker.ReleaseOwnership(ctx, name, nil, object.Namespace, object.Name); err != nil {
+				return ctrl.Result{}, fmt.Errorf("release Inline policy ownership: %w", err)
+			}
+		}
+	}
+	// Child EnvoyExtensionPolicies are deliberately not deleted here: their
+	// controller owner reference lets Kubernetes garbage collection remove them.
+	controllerutil.RemoveFinalizer(object, policyAttachmentFinalizer)
+	if err := r.Update(ctx, object); err != nil {
+		return ctrl.Result{}, fmt.Errorf("remove policy attachment finalizer: %w", err)
+	}
+	return ctrl.Result{}, nil
+}
+
+func targetRefKeyFromRef(ref gatewayv1alpha2.LocalPolicyTargetReferenceWithSectionName) string {
+	section := ""
+	if ref.SectionName != nil {
+		section = string(*ref.SectionName)
+	}
+	return strings.Join([]string{string(ref.Group), string(ref.Kind), string(ref.Name), section}, "/")
+}
 func targetKey(target ResolvedTarget) string {
 	section := ""
 	if target.Ref.SectionName != nil {
@@ -222,8 +322,8 @@ func targetKey(target ResolvedTarget) string {
 	}
 	return strings.Join([]string{string(target.Ref.Group), target.Kind, string(target.Ref.Name), section}, "/")
 }
-func policyScope(target ResolvedTarget) policy.Scope {
-	scope := policy.Scope{}
+func policyScope(target ResolvedTarget) extprocpolicy.Scope {
+	scope := extprocpolicy.Scope{}
 	if target.Kind == "Gateway" {
 		scope.Gateway = string(target.Ref.Name)
 	} else {

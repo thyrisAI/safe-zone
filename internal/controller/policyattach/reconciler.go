@@ -11,6 +11,7 @@ import (
 	egv1alpha1 "github.com/envoyproxy/gateway/api/v1alpha1"
 	securityv1alpha1 "thyris-sz/api/v1alpha1"
 	"thyris-sz/internal/controller/capabilities"
+	"thyris-sz/internal/controller/controllermetrics"
 	"thyris-sz/internal/controller/effectivepolicy"
 	"thyris-sz/internal/controller/envoyresource"
 	extprocpolicy "thyris-sz/internal/extproc/policy"
@@ -31,7 +32,14 @@ const (
 	targetRefIndex                = ".spec.targetRefs"
 	policyAttachmentFinalizer     = "security.thyris.ai/tsz-guardrail-policy-cleanup"
 	activationNotificationPending = "activation committed, notification pending"
+	managedExtensionPolicyLabel   = "security.thyris.ai/managed-by"
 )
+
+// +kubebuilder:rbac:groups=security.thyris.ai,resources=tszguardrailpolicies,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=security.thyris.ai,resources=tszguardrailpolicies/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=gateway.envoyproxy.io,resources=envoyextensionpolicies,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways;httproutes;grpcroutes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch;delete
 
 // PolicyAttachmentReconciler reconciles TSZ policy attachments. Subsequent
 // phases add policy resolution, effective-policy compilation, and status
@@ -70,7 +78,18 @@ func NewPolicyAttachmentReconciler(c client.Client, targets TargetResolver, prec
 
 // Reconcile resolves targets so target disappearance and section changes are
 // observed immediately. Conditions are written by the status phase.
-func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, reconcileErr error) {
+	started := time.Now()
+	defer func() {
+		outcome := "success"
+		if reconcileErr != nil {
+			outcome = "error"
+		} else if result.Requeue || result.RequeueAfter > 0 {
+			outcome = "requeue"
+		}
+		controllermetrics.ObserveReconcile("tszguardrailpolicy", outcome, time.Since(started))
+		r.recordManagedExtensionPolicies(ctx)
+	}()
 	policy := &securityv1alpha1.TSZGuardrailPolicy{}
 	if err := r.Get(ctx, req.NamespacedName, policy); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -112,6 +131,7 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			}
 			winner, conflict := r.precedence.Select(candidates)
 			if conflict != nil {
+				controllermetrics.IncEffectivePolicyConflict()
 				r.publishConflict(ctx, policy, conflict)
 				continue
 			}
@@ -124,13 +144,18 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				if err != nil {
 					return r.lastKnownGoodFailure(ctx, policy, err)
 				}
-				snapshot, _, err := r.effectiveCompiler.EnsureCompiledAndActive(ctx, dbPolicyName, definition)
+				snapshot, changed, err := r.effectiveCompiler.EnsureCompiledAndActive(ctx, dbPolicyName, definition)
 				if err != nil {
 					var publishErr *extprocpolicy.ActivationPublishError
 					if errors.As(err, &publishErr) {
+						controllermetrics.IncPolicyActivation("notification_pending")
 						return r.activationNotificationPending(ctx, policy, publishErr)
 					}
+					controllermetrics.IncPolicyActivation("failed")
 					return r.lastKnownGoodFailure(ctx, policy, err)
+				}
+				if changed {
+					controllermetrics.IncPolicyActivation("success")
 				}
 				if isActivationNotificationPending(policy) {
 					if err := r.effectiveCompiler.RepublishActivation(ctx, dbPolicyName, definition.Scope.Tenant); err != nil {
@@ -160,6 +185,17 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
+}
+
+func (r *PolicyAttachmentReconciler) recordManagedExtensionPolicies(ctx context.Context) {
+	if r.Client == nil {
+		return
+	}
+	resources := &egv1alpha1.EnvoyExtensionPolicyList{}
+	if err := r.List(ctx, resources, client.MatchingLabels{managedExtensionPolicyLabel: "tsz-controller"}); err != nil {
+		return
+	}
+	controllermetrics.SetManagedExtensionPolicies(len(resources.Items))
 }
 
 func (r *PolicyAttachmentReconciler) candidatesForTarget(ctx context.Context, current *securityv1alpha1.TSZGuardrailPolicy, target ResolvedTarget) ([]effectivepolicy.Candidate, error) {

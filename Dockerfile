@@ -1,4 +1,4 @@
-FROM golang:1.23-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
 
@@ -12,6 +12,7 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o api main.go \
     && CGO_ENABLED=0 GOOS=linux go build -o tsz-ext-proc ./cmd/tsz-ext-proc \
+    && CGO_ENABLED=0 GOOS=linux go build -o tsz-controller ./cmd/tsz-controller \
     && CGO_ENABLED=0 GOOS=linux go build -o tsz-policy ./cmd/tsz-policy \
     && CGO_ENABLED=0 GOOS=linux go build -o byg-mock-openai ./cmd/byg-mock-openai
 
@@ -21,6 +22,7 @@ WORKDIR /app
 
 COPY --from=builder /app/api .
 COPY --from=builder /app/tsz-ext-proc .
+COPY --from=builder /app/tsz-controller .
 COPY --from=builder /app/tsz-policy .
 COPY --from=builder /app/byg-mock-openai .
 

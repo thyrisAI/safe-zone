@@ -27,6 +27,14 @@ type Candidate struct {
 	Ref  gatewayv1alpha2.LocalPolicyTargetReferenceWithSectionName
 }
 
+// Selector adapts SelectWinner for dependency injection into the attachment
+// reconciler without coupling it to a particular persistence implementation.
+type Selector struct{}
+
+func (Selector) Select(candidates []Candidate) (Candidate, *ConflictError) {
+	return SelectWinner(candidates)
+}
+
 // ConflictError reports multiple policies at the same most-specific level.
 type ConflictError struct {
 	Level      AttachmentLevel

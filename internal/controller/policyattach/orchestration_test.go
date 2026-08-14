@@ -61,6 +61,83 @@ func TestReconcileUsesRouteOverGatewayCandidate(t *testing.T) {
 	}
 }
 
+func TestReconcileSameLevelConflictProgramsNeitherPolicy(t *testing.T) {
+	scheme, _ := controller.NewScheme()
+	routeName := gatewayv1.ObjectName("orders")
+	first, second := inlinePolicy("first", target("HTTPRoute", routeName, nil)), inlinePolicy("second", target("HTTPRoute", routeName, nil))
+	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(first, second).WithIndex(&securityv1alpha1.TSZGuardrailPolicy{}, targetRefIndex, targetRefIndexValues).WithObjects(first, second).Build()
+	targetObject := &gatewayv1.HTTPRoute{ObjectMeta: metav1.ObjectMeta{Name: "orders", Namespace: "apps"}}
+	envoy := &recordingEnvoy{}
+	targets := staticTargets{targets: []ResolvedTarget{{Kind: "HTTPRoute", Ref: first.Spec.TargetRefs[0], Object: targetObject, SectionOK: true}}}
+	for _, object := range []*securityv1alpha1.TSZGuardrailPolicy{first, second} {
+		r := NewPolicyAttachmentReconciler(c, targets, selector{}, nil, nil, envoy)
+		if _, err := r.Reconcile(context.Background(), request(object)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if envoy.calls != 0 {
+		t.Fatalf("Envoy calls = %d, want 0", envoy.calls)
+	}
+	for _, object := range []*securityv1alpha1.TSZGuardrailPolicy{first, second} {
+		got := &securityv1alpha1.TSZGuardrailPolicy{}
+		_ = c.Get(context.Background(), client.ObjectKeyFromObject(object), got)
+		condition := findCondition(got.Status.Conditions, securityv1alpha1.ConditionProgrammed)
+		if condition.Status != metav1.ConditionFalse || condition.Reason != securityv1alpha1.ReasonConflicted {
+			t.Fatalf("%s Programmed = %+v", object.Name, condition)
+		}
+	}
+}
+
+func TestReconcileRejectsUnsupportedCapability(t *testing.T) {
+	scheme, _ := controller.NewScheme()
+	object := inlinePolicy("streaming", target("HTTPRoute", gatewayv1.ObjectName("orders"), nil))
+	object.Spec.Streaming = &securityv1alpha1.StreamingSpec{Mode: "Windowed"}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(object).WithObjects(object).Build()
+	r := NewPolicyAttachmentReconciler(c, staticTargets{}, selector{}, nil, nil, &recordingEnvoy{})
+	if _, err := r.Reconcile(context.Background(), request(object)); err != nil {
+		t.Fatal(err)
+	}
+	got := &securityv1alpha1.TSZGuardrailPolicy{}
+	_ = c.Get(context.Background(), client.ObjectKeyFromObject(object), got)
+	condition := findCondition(got.Status.Conditions, securityv1alpha1.ConditionProgrammed)
+	if condition.Status != metav1.ConditionFalse || condition.Reason != securityv1alpha1.ReasonUnsupportedCapability {
+		t.Fatalf("Programmed = %+v", condition)
+	}
+}
+
+func TestReconcileCompileFailureKeepsLastKnownGoodProgrammed(t *testing.T) {
+	scheme, _ := controller.NewScheme()
+	routeName := gatewayv1.ObjectName("orders")
+	object := compilingInlinePolicy("last-known-good", target("HTTPRoute", routeName, nil))
+	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(object).WithIndex(&securityv1alpha1.TSZGuardrailPolicy{}, targetRefIndex, targetRefIndexValues).WithObjects(object).Build()
+	envoy := &recordingEnvoy{calls: 1} // represents the previously programmed child resource
+	r := NewPolicyAttachmentReconciler(c, staticTargets{targets: []ResolvedTarget{{Kind: "HTTPRoute", Ref: object.Spec.TargetRefs[0], Object: &gatewayv1.HTTPRoute{ObjectMeta: metav1.ObjectMeta{Name: "orders", Namespace: "apps"}}, SectionOK: true}}}, selector{}, nil, &effectivepolicy.Compiler{}, envoy)
+
+	result, err := r.Reconcile(context.Background(), request(object))
+	if err != nil {
+		t.Fatalf("Reconcile() error = %v", err)
+	}
+	if result.RequeueAfter != 30*time.Second {
+		t.Fatalf("RequeueAfter = %s, want 30s", result.RequeueAfter)
+	}
+	if envoy.calls != 1 {
+		t.Fatalf("Envoy calls = %d, want unchanged 1", envoy.calls)
+	}
+
+	got := &securityv1alpha1.TSZGuardrailPolicy{}
+	if err := c.Get(context.Background(), client.ObjectKeyFromObject(object), got); err != nil {
+		t.Fatal(err)
+	}
+	programmed := findCondition(got.Status.Conditions, securityv1alpha1.ConditionProgrammed)
+	if programmed.Status != metav1.ConditionTrue || programmed.Reason != securityv1alpha1.ReasonExtProcConfigured {
+		t.Fatalf("Programmed = %+v", programmed)
+	}
+	synced := findCondition(got.Status.Conditions, securityv1alpha1.ConditionPolicySynced)
+	if synced.Status != metav1.ConditionFalse || synced.Reason != securityv1alpha1.ReasonSnapshotRejected {
+		t.Fatalf("PolicySynced = %+v", synced)
+	}
+}
+
 func TestReconcileInlinePolicyIsIdempotentAgainstPostgres(t *testing.T) {
 	dsn := os.Getenv("TSZ_POLICY_TEST_DSN")
 	if dsn == "" {
@@ -123,6 +200,13 @@ func TestReconcileInlinePolicyIsIdempotentAgainstPostgres(t *testing.T) {
 	}
 	if first != 1 || second != first {
 		t.Fatalf("snapshot counts = %d then %d, want 1 then 1", first, second)
+	}
+	got := &securityv1alpha1.TSZGuardrailPolicy{}
+	_ = c.Get(ctx, client.ObjectKeyFromObject(object), got)
+	for _, conditionType := range []string{securityv1alpha1.ConditionAccepted, securityv1alpha1.ConditionResolvedRefs, securityv1alpha1.ConditionProgrammed, securityv1alpha1.ConditionPolicySynced} {
+		if condition := findCondition(got.Status.Conditions, conditionType); condition.Status != metav1.ConditionTrue {
+			t.Fatalf("%s = %+v, want true", conditionType, condition)
+		}
 	}
 }
 

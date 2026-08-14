@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	egv1alpha1 "github.com/envoyproxy/gateway/api/v1alpha1"
 	securityv1alpha1 "thyris-sz/api/v1alpha1"
@@ -97,13 +98,11 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			if policy.Spec.PolicySource == securityv1alpha1.PolicySourceInline && r.effectiveCompiler != nil {
 				definition, err := effectivepolicy.ToPolicyDefinition(policy.Spec, policyScope(target))
 				if err != nil {
-					r.publishLifecycleFailure(ctx, policy, err)
-					continue
+					return r.lastKnownGoodFailure(ctx, policy, err)
 				}
 				_, _, err = r.effectiveCompiler.EnsureCompiledAndActive(ctx, effectivepolicy.InlinePolicyName(policy.Namespace, policy.Name, targetKey(target)), definition)
 				if err != nil {
-					r.publishLifecycleFailure(ctx, policy, err)
-					continue
+					return r.lastKnownGoodFailure(ctx, policy, err)
 				}
 				securityv1alpha1.SetStatusCondition(&policy.Status.Conditions, metav1.Condition{Type: securityv1alpha1.ConditionPolicySynced, Status: metav1.ConditionTrue, Reason: securityv1alpha1.ReasonSnapshotActive, Message: "activation published; per-replica confirmation not yet implemented", ObservedGeneration: policy.Generation})
 			}
@@ -206,9 +205,15 @@ func (r *PolicyAttachmentReconciler) publishConflict(ctx context.Context, object
 	_ = r.Status().Update(ctx, object)
 }
 
-func (r *PolicyAttachmentReconciler) publishLifecycleFailure(ctx context.Context, object *securityv1alpha1.TSZGuardrailPolicy, err error) {
+func (r *PolicyAttachmentReconciler) lastKnownGoodFailure(ctx context.Context, object *securityv1alpha1.TSZGuardrailPolicy, err error) (ctrl.Result, error) {
 	securityv1alpha1.SetStatusCondition(&object.Status.Conditions, metav1.Condition{Type: securityv1alpha1.ConditionPolicySynced, Status: metav1.ConditionFalse, Reason: securityv1alpha1.ReasonSnapshotRejected, Message: err.Error(), ObservedGeneration: object.Generation})
-	_ = r.Status().Update(ctx, object)
+	// No EnvoyExtensionPolicy operation is attempted here. Any existing child
+	// remains the last known good configuration while the update is retried.
+	securityv1alpha1.SetStatusCondition(&object.Status.Conditions, metav1.Condition{Type: securityv1alpha1.ConditionProgrammed, Status: metav1.ConditionTrue, Reason: securityv1alpha1.ReasonExtProcConfigured, Message: "last known good EnvoyExtensionPolicy remains programmed", ObservedGeneration: object.Generation})
+	if updateErr := r.Status().Update(ctx, object); updateErr != nil {
+		return ctrl.Result{}, fmt.Errorf("update last-known-good status: %w", updateErr)
+	}
+	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 }
 func targetKey(target ResolvedTarget) string {
 	section := ""

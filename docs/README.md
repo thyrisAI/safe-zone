@@ -36,6 +36,12 @@ The documentation set is organized as follows:
 - **Architecture & Security Overview** – Technical architecture, data flows and security controls  
   `ARCHITECTURE_SECURITY.md`
 
+- **Bring Your Gateway** – Supported gateway integration levels and policy identity model
+  `concepts/BRING_YOUR_GATEWAY.md`
+
+- **Envoy Gateway Integration** – Preview/manual and native/managed installation profiles
+  `integrations/ENVOY_GATEWAY.md`
+
 - **Security Roadmap** – Detailed hardening milestones and implementation status  
   `SECURITY_ROADMAP.md`
 

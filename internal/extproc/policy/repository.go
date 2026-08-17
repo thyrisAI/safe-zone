@@ -273,6 +273,11 @@ func (r *PostgresRepository) ResolveReferences(ctx context.Context, definition P
 	if err := ValidateDefinition(definition); err != nil {
 		return PolicyDefinition{}, err
 	}
+	resolvedDefinition, err := r.resolveTemplateReferences(ctx, definition)
+	if err != nil {
+		return PolicyDefinition{}, err
+	}
+	definition = resolvedDefinition
 	if err := r.requireReferences(ctx, "patterns", definition.Request.CustomPatternIDs); err != nil {
 		return PolicyDefinition{}, fmt.Errorf("resolve request custom patterns: %w", err)
 	}
@@ -319,6 +324,32 @@ func (r *PostgresRepository) ResolveReferences(ctx context.Context, definition P
 				return PolicyDefinition{}, wrapReferenceError(fmt.Sprintf("%s validator %s version %d", group.name, reference.ID, reference.Version), err)
 			}
 		}
+	}
+	return definition, nil
+}
+
+func (r *PostgresRepository) resolveTemplateReferences(ctx context.Context, definition PolicyDefinition) (PolicyDefinition, error) {
+	for _, reference := range definition.TemplateRefs {
+		var encoded []byte
+		err := r.tx.QueryRowContext(ctx, `
+			SELECT s.definition
+			FROM guardrail_template_snapshots s
+			JOIN guardrail_templates t ON t.id = s.template_id
+			WHERE t.name = $1 AND t.tenant IS NOT DISTINCT FROM $2 AND s.version = $3
+			FOR KEY SHARE`, strings.TrimSpace(reference.Name), definition.Scope.Tenant, reference.Version).Scan(&encoded)
+		if err != nil {
+			return PolicyDefinition{}, wrapReferenceError(fmt.Sprintf("template %s version %d", reference.Name, reference.Version), err)
+		}
+		var template TemplateDefinition
+		if err := json.Unmarshal(encoded, &template); err != nil {
+			return PolicyDefinition{}, fmt.Errorf("decode template %s version %d: %w", reference.Name, reference.Version, err)
+		}
+		definition.Request.CustomPatternIDs = append(definition.Request.CustomPatternIDs, template.Request.CustomPatternIDs...)
+		definition.Request.AllowlistIDs = append(definition.Request.AllowlistIDs, template.Request.AllowlistIDs...)
+		definition.Request.BlocklistIDs = append(definition.Request.BlocklistIDs, template.Request.BlocklistIDs...)
+		definition.Request.CustomValidators = append(definition.Request.CustomValidators, template.Request.CustomValidators...)
+		definition.Response.CustomPatternIDs = append(definition.Response.CustomPatternIDs, template.Response.CustomPatternIDs...)
+		definition.Response.CustomValidators = append(definition.Response.CustomValidators, template.Response.CustomValidators...)
 	}
 	return definition, nil
 }
@@ -532,6 +563,11 @@ func ValidateDefinition(definition PolicyDefinition) error {
 			if strings.TrimSpace(validator.ID) == "" || validator.Version <= 0 {
 				return fmt.Errorf("%w: validator references require an id and positive version", ErrInvalidDefinition)
 			}
+		}
+	}
+	for _, template := range definition.TemplateRefs {
+		if strings.TrimSpace(template.Name) == "" || template.Version <= 0 {
+			return fmt.Errorf("%w: template references require a name and positive version", ErrInvalidDefinition)
 		}
 	}
 	return nil

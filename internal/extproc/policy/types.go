@@ -67,6 +67,36 @@ type PolicyDefinition struct {
 	Limits        Limits            `json:"limits"`
 	Audit         AuditSettings     `json:"audit"`
 	Telemetry     TelemetrySettings `json:"telemetry"`
+	// TemplateRefs records the immutable template versions resolved into this
+	// compiled snapshot. It is retained for auditability and integrity hashing.
+	TemplateRefs []TemplateReference `json:"template_refs,omitempty"`
+}
+
+// TemplateReference pins a reusable guardrail template to one immutable
+// version. Template contents are resolved during compilation, never at
+// request time.
+type TemplateReference struct {
+	Name    string `json:"name"`
+	Version int    `json:"version"`
+}
+
+// TemplateDefinition is the immutable rule material stored in a template
+// snapshot. Actions remain policy-owned; a template contributes references.
+type TemplateDefinition struct {
+	Request  TemplateRequestRules  `json:"request,omitempty"`
+	Response TemplateResponseRules `json:"response,omitempty"`
+}
+
+type TemplateRequestRules struct {
+	CustomPatternIDs []string             `json:"custom_pattern_ids,omitempty"`
+	AllowlistIDs     []string             `json:"allowlist_ids,omitempty"`
+	BlocklistIDs     []string             `json:"blocklist_ids,omitempty"`
+	CustomValidators []ValidatorReference `json:"custom_validators,omitempty"`
+}
+
+type TemplateResponseRules struct {
+	CustomPatternIDs []string             `json:"custom_pattern_ids,omitempty"`
+	CustomValidators []ValidatorReference `json:"custom_validators,omitempty"`
 }
 
 type Scope struct {

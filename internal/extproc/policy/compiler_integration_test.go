@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"os"
 	"reflect"
@@ -73,6 +74,56 @@ func TestCompilerCompilesValidatedSnapshotAndLocksDefinition(t *testing.T) {
 	}
 	if err := compiler.Compile(ctx, snapshotID); !errors.Is(err, ErrInvalidTransition) {
 		t.Fatalf("second Compile() error = %v, want ErrInvalidTransition", err)
+	}
+}
+
+func TestCompilerResolvesImmutableTemplateReferences(t *testing.T) {
+	db, repository := openCompilerTestRepository(t)
+	migration, err := MigrationFiles.ReadFile("migrations/000004_create_guardrail_template_snapshots.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(string(migration)); err != nil {
+		t.Fatal(err)
+	}
+	patternID, _, _, validatorID := insertReferenceFixtures(t, db)
+	template, err := json.Marshal(TemplateDefinition{Request: TemplateRequestRules{
+		CustomPatternIDs: []string{strconv.FormatInt(patternID, 10)},
+		CustomValidators: []ValidatorReference{{ID: strconv.FormatInt(validatorID, 10), Version: 1}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var templateID int64
+	if err := db.QueryRow(`INSERT INTO guardrail_templates (name) VALUES ('banking') RETURNING id`).Scan(&templateID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO guardrail_template_snapshots (template_id, version, definition) VALUES ($1, 2, $2::jsonb)`, templateID, template); err != nil {
+		t.Fatal(err)
+	}
+	definition := validPolicyDefinition()
+	definition.TemplateRefs = []TemplateReference{{Name: "banking", Version: 2}}
+	ctx := context.Background()
+	snapshotID, err := repository.CreateValidated(ctx, "templated", definition)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiler, err := NewCompiler(repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := compiler.Compile(ctx, snapshotID); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := repository.SnapshotByID(ctx, snapshotID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshot.Definition.TemplateRefs) != 1 || snapshot.Definition.TemplateRefs[0].Name != "banking" || snapshot.Definition.TemplateRefs[0].Version != 2 {
+		t.Fatalf("resolved templates = %+v", snapshot.Definition.TemplateRefs)
+	}
+	if len(snapshot.Definition.Request.CompiledRules.CustomPatterns) != 1 || len(snapshot.Definition.Request.CompiledRules.Validators) != 1 {
+		t.Fatalf("template material was not compiled: %+v", snapshot.Definition.Request.CompiledRules)
 	}
 }
 

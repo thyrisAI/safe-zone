@@ -325,6 +325,27 @@ spec:
                   tracingEnabled:
                     type: boolean
                 type: object
+              templateRefs:
+                description: |-
+                  TemplateRefs pins reusable guardrail templates to immutable versions.
+                  The controller resolves their pattern and validator references during
+                  effective-policy compilation.
+                items:
+                  description: TemplateReference identifies one immutable reusable
+                    guardrail template.
+                  properties:
+                    name:
+                      minLength: 1
+                      type: string
+                    version:
+                      format: int32
+                      minimum: 1
+                      type: integer
+                  required:
+                  - name
+                  - version
+                  type: object
+                type: array
             required:
             - policySource
             - targetRefs

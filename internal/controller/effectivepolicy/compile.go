@@ -105,11 +105,20 @@ func ToPolicyDefinition(spec securityv1alpha1.TSZGuardrailPolicySpec, scope poli
 			Enabled: spec.Telemetry.Enabled, MetricsEnabled: spec.Telemetry.MetricsEnabled,
 			TracingEnabled: spec.Telemetry.TracingEnabled, SampleRate: spec.Telemetry.SampleRate,
 		},
+		TemplateRefs: toTemplateReferences(spec.TemplateRefs),
 	}
 	if err := policy.ValidateDefinition(definition); err != nil {
 		return policy.PolicyDefinition{}, err
 	}
 	return definition, nil
+}
+
+func toTemplateReferences(references []securityv1alpha1.TemplateReference) []policy.TemplateReference {
+	converted := make([]policy.TemplateReference, 0, len(references))
+	for _, reference := range references {
+		converted = append(converted, policy.TemplateReference{Name: reference.Name, Version: int(reference.Version)})
+	}
+	return converted
 }
 
 // InlinePolicyName returns a stable, database-safe identity for one CRD and

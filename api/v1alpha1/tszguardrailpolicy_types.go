@@ -66,9 +66,13 @@ type TSZGuardrailPolicySpec struct {
 	PolicySource PolicySource `json:"policySource"`
 
 	// PolicyRef identifies an immutable policy snapshot when policySource is PostgresRef.
-	PolicyRef *PolicyReference    `json:"policyRef,omitempty"`
-	Request   *RequestPolicySpec  `json:"request,omitempty"`
-	Response  *ResponsePolicySpec `json:"response,omitempty"`
+	PolicyRef *PolicyReference `json:"policyRef,omitempty"`
+	// TemplateRefs pins reusable guardrail templates to immutable versions.
+	// The controller resolves their pattern and validator references during
+	// effective-policy compilation.
+	TemplateRefs []TemplateReference `json:"templateRefs,omitempty"`
+	Request      *RequestPolicySpec  `json:"request,omitempty"`
+	Response     *ResponsePolicySpec `json:"response,omitempty"`
 
 	// +optional
 	// +kubebuilder:default={request:FailClosed,response:FailClosed}
@@ -90,6 +94,14 @@ type PolicyReference struct {
 	// +optional
 	// +kubebuilder:validation:Minimum=1
 	Version *int32 `json:"version,omitempty"`
+}
+
+// TemplateReference identifies one immutable reusable guardrail template.
+type TemplateReference struct {
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+	// +kubebuilder:validation:Minimum=1
+	Version int32 `json:"version"`
 }
 
 // RequestPolicySpec is the CRD-native form of policy.RequestPolicy.

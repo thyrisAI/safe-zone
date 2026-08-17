@@ -88,6 +88,35 @@ func TestReconcileSameLevelConflictProgramsNeitherPolicy(t *testing.T) {
 	}
 }
 
+func TestReconcileDifferentRouteSectionsDoNotConflict(t *testing.T) {
+	scheme, _ := controller.NewScheme()
+	routeName := gatewayv1.ObjectName("orders")
+	firstSection, secondSection := gatewayv1.SectionName("checkout"), gatewayv1.SectionName("refund")
+	first, second := inlinePolicy("checkout", target("HTTPRoute", routeName, &firstSection)), inlinePolicy("refund", target("HTTPRoute", routeName, &secondSection))
+	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(first, second).WithIndex(&securityv1alpha1.TSZGuardrailPolicy{}, targetRefIndex, targetRefIndexValues).WithObjects(first, second).Build()
+	route := &gatewayv1.HTTPRoute{ObjectMeta: metav1.ObjectMeta{Name: "orders", Namespace: "apps"}, Spec: gatewayv1.HTTPRouteSpec{Rules: []gatewayv1.HTTPRouteRule{{Name: &firstSection}, {Name: &secondSection}}}}
+	envoy := &recordingEnvoy{}
+	for _, object := range []*securityv1alpha1.TSZGuardrailPolicy{first, second} {
+		target := ResolvedTarget{Kind: "HTTPRoute", Ref: object.Spec.TargetRefs[0], Object: route, SectionOK: true}
+		r := NewPolicyAttachmentReconciler(c, staticTargets{targets: []ResolvedTarget{target}}, selector{}, nil, nil, envoy)
+		if _, err := r.Reconcile(context.Background(), request(object)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if envoy.calls != 2 {
+		t.Fatalf("Envoy calls = %d, want 2 for independent route sections", envoy.calls)
+	}
+}
+
+func TestNativeRouteIdentityUsesEnvoyGatewayRuleIndex(t *testing.T) {
+	firstSection, secondSection := gatewayv1.SectionName("checkout"), gatewayv1.SectionName("refund")
+	route := &gatewayv1.HTTPRoute{Spec: gatewayv1.HTTPRouteSpec{Rules: []gatewayv1.HTTPRouteRule{{Name: &firstSection}, {Name: &secondSection}}}}
+	identity := nativeRouteIdentity(ResolvedTarget{Kind: "HTTPRoute", Ref: target("HTTPRoute", "orders", &secondSection), Object: route})
+	if identity.Route != "orders" || identity.Rule != "1" {
+		t.Fatalf("native route identity = %+v, want route orders and rule index 1", identity)
+	}
+}
+
 func TestReconcileRejectsUnsupportedCapability(t *testing.T) {
 	scheme, _ := controller.NewScheme()
 	object := inlinePolicy("streaming", target("HTTPRoute", gatewayv1.ObjectName("orders"), nil))

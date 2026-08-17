@@ -110,6 +110,11 @@ func routeIdentityCandidates(attributes map[string]string) []policy.RouteIdentit
 	rule := strings.TrimSpace(attributes["xds.route_rule_name"])
 
 	candidates := make([]policy.RouteIdentity, 0, 4)
+	if parsed, ok := envoyGatewayRouteIdentity(route); ok {
+		parsed.Gateway = gateway
+		parsed.Listener = listener
+		candidates = append(candidates, parsed)
+	}
 	if route != "" && rule != "" {
 		candidates = append(candidates, policy.RouteIdentity{Gateway: gateway, Listener: listener, Route: route, Rule: rule})
 	}
@@ -129,4 +134,20 @@ func routeIdentityCandidates(attributes map[string]string) []policy.RouteIdentit
 		candidates = append(candidates, policy.RouteIdentity{Gateway: gateway})
 	}
 	return candidates
+}
+
+// envoyGatewayRouteIdentity extracts the Gateway API route and rule index from
+// Envoy Gateway's generated route name. Envoy Gateway v1.8 permits xds.route.*
+// ext_proc attributes; xds.route_name is the supported trusted source for this
+// information and has the form httproute/<namespace>/<name>/rule/<index>/....
+func envoyGatewayRouteIdentity(route string) (policy.RouteIdentity, bool) {
+	parts := strings.Split(strings.TrimSpace(route), "/")
+	for index := 0; index+4 < len(parts); index++ {
+		kind, namespace, name := strings.ToLower(parts[index]), parts[index+1], parts[index+2]
+		if (kind != "httproute" && kind != "grpcroute") || namespace == "" || name == "" || parts[index+3] != "rule" || parts[index+4] == "" {
+			continue
+		}
+		return policy.RouteIdentity{Route: name, Rule: parts[index+4]}, true
+	}
+	return policy.RouteIdentity{}, false
 }

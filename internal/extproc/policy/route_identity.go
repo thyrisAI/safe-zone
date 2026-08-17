@@ -78,12 +78,25 @@ func (s *PostgresRoutePolicyBindingStore) LookupRoutePolicy(id RouteIdentity) (R
 	// not supply a gateway attribute, resolve an unambiguous suffix match. Exact
 	// identities above always win; ambiguity is rejected instead of selecting a
 	// policy silently.
-	if id.Gateway != "" || id.Listener != "" || id.Rule != "" || id.Route == "" {
+	if id.Gateway != "" || id.Listener != "" || id.Route == "" {
 		return RoutePolicyBinding{}, false, nil
 	}
-	rows, err := s.db.Query(`SELECT policy_name FROM route_policy_bindings
+	// A parsed XDS route identity has a bare Gateway API route name and a rule
+	// index. This resolves a section-level attachment without weakening the
+	// match to every rule of the same HTTPRoute.
+	if id.Rule != "" {
+		return s.lookupUnambiguous(`SELECT policy_name FROM route_policy_bindings
+			WHERE route_name=$1 AND rule_name IS NOT DISTINCT FROM $2
+			ORDER BY updated_at DESC LIMIT 2`, id.Route, nullable(id.Rule))
+	}
+
+	return s.lookupUnambiguous(`SELECT policy_name FROM route_policy_bindings
 		WHERE route_name IS NOT NULL AND ($1 = route_name OR $1 LIKE '%' || route_name || '%')
 		ORDER BY updated_at DESC LIMIT 2`, id.Route)
+}
+
+func (s *PostgresRoutePolicyBindingStore) lookupUnambiguous(query string, args ...any) (RoutePolicyBinding, bool, error) {
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return RoutePolicyBinding{}, false, err
 	}
@@ -105,7 +118,7 @@ func (s *PostgresRoutePolicyBindingStore) LookupRoutePolicy(id RouteIdentity) (R
 	case 1:
 		return RoutePolicyBinding{PolicyID: matches[0]}, true, nil
 	default:
-		return RoutePolicyBinding{}, false, fmt.Errorf("ambiguous native route policy binding for %q", id.Route)
+		return RoutePolicyBinding{}, false, fmt.Errorf("ambiguous native route policy binding")
 	}
 }
 

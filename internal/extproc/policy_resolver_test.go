@@ -76,6 +76,21 @@ func TestAttributePolicyResolverUsesRouteOnlyFallback(t *testing.T) {
 	}
 }
 
+func TestAttributePolicyResolverExtractsEnvoyGatewayRuleIndex(t *testing.T) {
+	resolver := AttributePolicyResolver{Mapping: routeMapper{bindings: map[policy.RouteIdentity]string{
+		{Route: "orders", Rule: "1"}: "orders-rule-policy",
+	}}}
+	resolved, err := resolver.ResolvePolicy(PolicyResolutionInput{Attributes: map[string]string{
+		"xds.route_name": "httproute/apps/orders/rule/1/match/0/*",
+	}})
+	if err != nil {
+		t.Fatalf("ResolvePolicy() error = %v", err)
+	}
+	if resolved.PolicyID != "orders-rule-policy" {
+		t.Fatalf("ResolvePolicy() policy = %q, want orders-rule-policy", resolved.PolicyID)
+	}
+}
+
 type routeMapper struct {
 	bindings map[policy.RouteIdentity]string
 }

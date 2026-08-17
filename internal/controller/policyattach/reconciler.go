@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -209,16 +210,41 @@ func nativeRouteIdentity(target ResolvedTarget) extprocpolicy.RouteIdentity {
 	identity := extprocpolicy.RouteIdentity{}
 	if target.Kind == "Gateway" {
 		identity.Gateway = string(target.Ref.Name)
+		if target.Ref.SectionName != nil {
+			identity.Listener = string(*target.Ref.SectionName)
+		}
 	} else {
 		identity.Route = string(target.Ref.Name)
 		if route, ok := target.Object.(*gatewayv1.HTTPRoute); ok && len(route.Spec.ParentRefs) > 0 {
 			identity.Gateway = string(route.Spec.ParentRefs[0].Name)
 		}
-	}
-	if target.Ref.SectionName != nil {
-		identity.Rule = string(*target.Ref.SectionName)
+		if target.Ref.SectionName != nil {
+			identity.Rule = routeRuleIndex(target.Object, *target.Ref.SectionName)
+		}
 	}
 	return identity
+}
+
+// routeRuleIndex translates the Gateway API rule section name to the stable
+// rule index used in Envoy Gateway's xds.route_name, for example
+// httproute/<namespace>/<route>/rule/0/match/0/*. A section is already
+// validated by Resolver before this function is reached.
+func routeRuleIndex(object client.Object, section gatewayv1.SectionName) string {
+	switch route := object.(type) {
+	case *gatewayv1.HTTPRoute:
+		for index, rule := range route.Spec.Rules {
+			if rule.Name != nil && *rule.Name == section {
+				return strconv.Itoa(index)
+			}
+		}
+	case *gatewayv1.GRPCRoute:
+		for index, rule := range route.Spec.Rules {
+			if rule.Name != nil && *rule.Name == section {
+				return strconv.Itoa(index)
+			}
+		}
+	}
+	return ""
 }
 
 func (r *PolicyAttachmentReconciler) recordManagedExtensionPolicies(ctx context.Context) {
@@ -287,7 +313,7 @@ func candidateRefApplies(target ResolvedTarget, ref gatewayv1alpha2.LocalPolicyT
 		return false
 	}
 	if string(ref.Kind) == target.Kind && ref.Name == target.Ref.Name {
-		return true
+		return sameSection(ref.SectionName, target.Ref.SectionName)
 	}
 	if (target.Kind == "HTTPRoute" || target.Kind == "GRPCRoute") && string(ref.Kind) == "Gateway" {
 		if ref.SectionName == nil {
@@ -297,6 +323,13 @@ func candidateRefApplies(target ResolvedTarget, ref gatewayv1alpha2.LocalPolicyT
 		return found
 	}
 	return false
+}
+
+func sameSection(left, right *gatewayv1.SectionName) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
 }
 func sectionKey(ref gatewayv1alpha2.LocalPolicyTargetReferenceWithSectionName) string {
 	if ref.SectionName == nil {

@@ -41,6 +41,36 @@ func TestReconcileWritesPolicyNotFoundInsteadOfProgrammingRoute(t *testing.T) {
 	if condition.Status != metav1.ConditionFalse || condition.Reason != securityv1alpha1.ReasonPolicyNotFound {
 		t.Fatalf("ResolvedRefs = %+v", condition)
 	}
+	accepted := findCondition(got.Status.Conditions, securityv1alpha1.ConditionAccepted)
+	if accepted.Status != metav1.ConditionTrue || accepted.Reason != securityv1alpha1.ReasonValid {
+		t.Fatalf("Accepted = %+v", accepted)
+	}
+}
+
+func TestReconcilePublishesPolicySyncedForResolvedPostgresReference(t *testing.T) {
+	scheme, _ := controller.NewScheme()
+	version := int32(4)
+	object := &securityv1alpha1.TSZGuardrailPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "referenced", Namespace: "apps"},
+		Spec: securityv1alpha1.TSZGuardrailPolicySpec{
+			PolicySource: securityv1alpha1.PolicySourcePostgresRef,
+			PolicyRef:    &securityv1alpha1.PolicyReference{Name: "banking", Version: &version},
+			TargetRefs:   []gatewayv1alpha2.LocalPolicyTargetReferenceWithSectionName{target("HTTPRoute", "orders", nil)},
+		},
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(object).WithIndex(&securityv1alpha1.TSZGuardrailPolicy{}, targetRefIndex, targetRefIndexValues).WithObjects(object).Build()
+	target := ResolvedTarget{Kind: "HTTPRoute", Ref: object.Spec.TargetRefs[0], Object: &gatewayv1.HTTPRoute{ObjectMeta: metav1.ObjectMeta{Name: "orders", Namespace: "apps"}}, SectionOK: true}
+	envoy := &recordingEnvoy{}
+	r := NewPolicyAttachmentReconciler(c, staticTargets{targets: []ResolvedTarget{target}}, selector{}, &effectivepolicy.ReferenceResolver{Repo: resolvedReferenceRepository{snapshot: policy.PolicySnapshot{Version: intPointer(4), Status: policy.StatusActive}}}, nil, envoy)
+	if _, err := r.Reconcile(context.Background(), request(object)); err != nil {
+		t.Fatal(err)
+	}
+	got := &securityv1alpha1.TSZGuardrailPolicy{}
+	_ = c.Get(context.Background(), client.ObjectKeyFromObject(object), got)
+	condition := findCondition(got.Status.Conditions, securityv1alpha1.ConditionPolicySynced)
+	if condition.Status != metav1.ConditionTrue || condition.Reason != securityv1alpha1.ReasonSnapshotActive {
+		t.Fatalf("PolicySynced = %+v", condition)
+	}
 }
 
 func TestReconcileUsesRouteOverGatewayCandidate(t *testing.T) {
@@ -266,6 +296,21 @@ func TestReconcileInlinePolicyIsIdempotentAgainstPostgres(t *testing.T) {
 }
 
 type staticTargets struct{ targets []ResolvedTarget }
+
+type resolvedReferenceRepository struct {
+	policy.Repository
+	snapshot policy.PolicySnapshot
+}
+
+func (r resolvedReferenceRepository) PolicyByName(context.Context, string, *string) (policy.Policy, error) {
+	return policy.Policy{ID: 1, Name: "banking"}, nil
+}
+
+func (r resolvedReferenceRepository) SnapshotByVersion(context.Context, string, *string, int) (policy.PolicySnapshot, error) {
+	return r.snapshot, nil
+}
+
+func intPointer(value int) *int { return &value }
 
 func (s staticTargets) ResolveTargets(context.Context, *securityv1alpha1.TSZGuardrailPolicy) []ResolvedTarget {
 	return s.targets

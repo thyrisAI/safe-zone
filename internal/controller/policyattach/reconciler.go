@@ -130,6 +130,12 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			r.publishReferenceFailure(ctx, policy, result)
 			return ctrl.Result{}, result.Err
 		}
+		if result.Snapshot.Version != nil {
+			version := *result.Snapshot.Version
+			policy.Status.PolicyVersion = &version
+		}
+		policy.Status.EffectivePolicyID = policy.Spec.PolicyRef.Name
+		securityv1alpha1.SetStatusCondition(&policy.Status.Conditions, metav1.Condition{Type: securityv1alpha1.ConditionPolicySynced, Status: metav1.ConditionTrue, Reason: securityv1alpha1.ReasonSnapshotActive, Message: "referenced immutable policy snapshot resolved", ObservedGeneration: policy.Generation})
 	}
 	if r.envoyReconciler != nil {
 		for _, target := range resolved {
@@ -463,6 +469,7 @@ func (r *PolicyAttachmentReconciler) publishReferenceFailure(ctx context.Context
 	if result.Err != nil {
 		message = result.Err.Error()
 	}
+	securityv1alpha1.SetStatusCondition(&policy.Status.Conditions, metav1.Condition{Type: securityv1alpha1.ConditionAccepted, Status: metav1.ConditionTrue, Reason: securityv1alpha1.ReasonValid, Message: "policy spec accepted", ObservedGeneration: policy.Generation})
 	securityv1alpha1.SetStatusCondition(&policy.Status.Conditions, metav1.Condition{Type: securityv1alpha1.ConditionResolvedRefs, Status: metav1.ConditionFalse, Reason: result.Reason, Message: message, ObservedGeneration: policy.Generation})
 	_ = r.Status().Update(ctx, policy)
 }

@@ -202,7 +202,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version-file: pkg/tsz-cli/go.mod
 
       - name: Install PostgreSQL client
         run: |

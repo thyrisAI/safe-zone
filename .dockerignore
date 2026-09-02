@@ -1,0 +1,16 @@
+# Git
+.git
+.github
+
+# Frontend depencencies and build output
+web/node_modules
+web/dist
+
+#Documentation
+docs
+*.md
+
+# Secrets 
+.env
+.env.*
+!.env.example

@@ -22,7 +22,7 @@ COPY --from=builder /app/api .
 
 RUN chown tsz:tsz /app/api
 
-USER tsz
+USER tsz:tsz
 
 EXPOSE 8080
 

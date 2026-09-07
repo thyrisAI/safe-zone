@@ -14,6 +14,11 @@ kubectl -n tsz-byg-demo delete -f deployments/envoy-gateway/tsz-ext-proc-envoy-e
 # Remove that template mutation before deleting the ConfigMap, otherwise the
 # next buffered example's bootstrap can wait forever for a missing volume.
 if kubectl -n tsz-byg-demo get deployment mock-openai >/dev/null 2>&1; then
+  # Clear streaming mode before removing its fixture volume. Otherwise the
+  # replacement pod starts in SSE mode without the fixture and never becomes
+  # ready, leaving local suites stuck in cleanup.
+  kubectl -n tsz-byg-demo set env deployment/mock-openai \
+    BYG_MOCK_RESPONSE_MODE- BYG_MOCK_SSE_FIXTURE-
   kubectl -n tsz-byg-demo patch deployment mock-openai --type=strategic -p \
     '{"spec":{"template":{"spec":{"containers":[{"name":"nginx","volumeMounts":[{"mountPath":"/fixtures","$patch":"delete"}]}],"volumes":[{"name":"tsz-mock-response-fixture","$patch":"delete"}]}}}}'
   kubectl -n tsz-byg-demo rollout status deployment/mock-openai --timeout=90s

@@ -32,7 +32,18 @@ kubectl -n "$namespace" rollout status deployment/tsz-ext-proc --timeout=180s
 kubectl -n "$namespace" delete envoyextensionpolicy tsz-request-guardrail --ignore-not-found
 kubectl apply -f "${example_dir}/resources.yaml"
 kubectl -n "$namespace" wait --for=condition=Accepted backend/tsz-ext-proc-mtls --timeout=90s
-kubectl -n "$namespace" wait --for=condition=Accepted envoyextensionpolicy/tsz-request-guardrail-mtls --timeout=90s
+for _ in $(seq 1 90); do
+  policy_statuses="$(kubectl -n "$namespace" get envoyextensionpolicy tsz-request-guardrail-mtls \
+    -o jsonpath='{range .status.ancestors[*].conditions[?(@.type=="Accepted")]}{.status}{"\n"}{end}' 2>/dev/null || true)"
+  if grep -Fxq 'True' <<<"$policy_statuses"; then
+    break
+  fi
+  sleep 1
+done
+grep -Fxq 'True' <<<"${policy_statuses:-}" || {
+  echo "mTLS EnvoyExtensionPolicy was not accepted within 90s" >&2
+  exit 1
+}
 envoy_service="$(kubectl -n envoy-gateway-system get service -l "gateway.envoyproxy.io/owning-gateway-namespace=${namespace},gateway.envoyproxy.io/owning-gateway-name=echo-gateway" -o jsonpath='{.items[0].metadata.name}')"
 [[ -n "$envoy_service" ]] || { echo "Envoy data-plane Service not found" >&2; exit 1; }
 port="$((29000 + ($$ % 2000)))"

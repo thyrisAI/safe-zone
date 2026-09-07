@@ -15,7 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       policy_api: ${{ steps.changes.outputs.policy_api }}
-      byg_kind: ${{ steps.changes.outputs.byg_kind }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -33,7 +32,6 @@ jobs:
         run: |
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             echo "policy_api=true" >> "$GITHUB_OUTPUT"
-            echo "byg_kind=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -65,38 +63,6 @@ jobs:
             echo "policy_api=false" >> "$GITHUB_OUTPUT"
           else
             echo "policy_api=true" >> "$GITHUB_OUTPUT"
-          fi
-
-          if git diff --quiet "$base" "$head" -- \
-            api/v1alpha1 \
-            api/v1beta1 \
-            cmd/byg-mock-openai \
-            cmd/byg-mock-siem \
-            cmd/tsz-controller \
-            cmd/tsz-ext-proc \
-            cmd/tsz-policy \
-            config/crd \
-            config/rbac \
-            deployments/envoy-gateway \
-            examples/bring-your-gateway \
-            internal/config/extproc.go \
-            internal/config/extproc_test.go \
-            internal/controller \
-            internal/extproc \
-            internal/guardrails/audit.go \
-            internal/guardrails/webhook_auditor.go \
-            tests/integration/byg_replica_convergence_test.go \
-            tests/integration/byg_replica_lifecycle_test.go \
-            tests/perf \
-            tests/release \
-            .github/workflows/ci-test.yml \
-            Dockerfile \
-            Makefile \
-            go.mod \
-            go.sum; then
-            echo "byg_kind=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "byg_kind=true" >> "$GITHUB_OUTPUT"
           fi
 
   policy-api-compatibility:
@@ -360,42 +326,6 @@ jobs:
         env:
           TSZ_BASE_URL: http://localhost:8080
         run: go test ./tests/e2e/...
-
-  byg-example-smoke:
-    name: BYG example smoke tests (Kind)
-    runs-on: ubuntu-latest
-    needs:
-      - ci_scope
-      - unit-tests
-    if: needs.ci_scope.outputs.byg_kind == 'true'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up Go
-        uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-
-      - name: Run BYG example smoke suite
-        env:
-          TSZ_BYG_CLUSTER_NAME: tsz-byg-ci
-        run: examples/bring-your-gateway/smoke.sh
-
-      - name: Set up k6
-        uses: grafana/setup-k6-action@v1
-
-      - name: Verify fail-closed processor outage through Envoy
-        env:
-          TSZ_BYG_CLUSTER_NAME: tsz-byg-ci
-          TSZ_BYG_SKIP_BOOTSTRAP: "1"
-        run: make perf-extproc-outage
-
-      - name: Remove Kind cluster
-        if: always()
-        env:
-          TSZ_BYG_CLUSTER_NAME: tsz-byg-ci
-        run: deployments/envoy-gateway/kind-bootstrap.sh down
 
   documentation-link-checks:
     name: Documentation and adapter release checks

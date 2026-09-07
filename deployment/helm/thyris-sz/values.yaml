@@ -45,7 +45,10 @@ ingress:
           pathType: Prefix
   tls: []
 
-resources: {}
+resources:
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
 
 autoscaling:
   enabled: false
@@ -128,7 +131,10 @@ postgresql:
     enabled: true
     size: 8Gi
     storageClass: ""
-  resources: {}
+  resources:
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
 
 redis:
   enabled: true
@@ -144,4 +150,7 @@ redis:
     enabled: false
     size: 2Gi
     storageClass: ""
-  resources: {}
+  resources:
+    limits:
+      memory: "512Mi"
+      cpu: "500m"

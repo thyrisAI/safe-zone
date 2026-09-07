@@ -4,10 +4,6 @@ This file is the public reference list for organizations that have adopted
 Thyris Safe Zone (TSZ). To add or update an entry, follow the
 [adoption guide](docs/ADOPTION.md).
 
-Organizations covered by Section 10 of the [license](LICENSE) must complete
-the adoption process before qualifying production use. Other users are warmly
-invited to adopt voluntarily.
-
 Entries must be authorized, accurate, and kept in alphabetical order. Inclusion
 is a factual statement of use and does not imply endorsement by either party.
 

@@ -17,10 +17,14 @@ Run it from the repository root:
 make perf-extproc-regex-only
 ```
 
-The runner requires Docker, Kind, `kubectl`, `curl`, and `k6`. It creates or
+The runner requires Docker, Kind, `kubectl`, `curl`, `jq`, and `k6`. It creates or
 refreshes the pinned Kind reference environment, activates the minimal policy,
 attaches the `EnvoyExtensionPolicy`, verifies one functional request, opens a
-temporary Envoy port-forward, and writes the k6 JSON summary.
+temporary Envoy port-forward, and writes two k6 JSON summaries. It first
+measures the protected route, then removes only the `EnvoyExtensionPolicy` and
+measures the same warm route as its baseline. The attachment is restored on
+every exit path. The command fails when protected p95 minus baseline p95
+exceeds `TSZ_PERF_MAX_ADDED_P95_MS` (default `20`).
 
 The default load profile is 25 requests per second for two minutes. Adjust it
 without changing the scenario:
@@ -30,7 +34,8 @@ TSZ_PERF_RATE=50 TSZ_PERF_DURATION=5m make perf-extproc-regex-only
 ```
 
 Additional knobs are `TSZ_PERF_PRE_ALLOCATED_VUS`, `TSZ_PERF_MAX_VUS`,
-`TSZ_PERF_LOCAL_PORT`, and `TSZ_PERF_RESULTS_DIR`. Set
+`TSZ_PERF_LOCAL_PORT`, `TSZ_PERF_RESULTS_DIR`,
+`TSZ_PERF_MAX_ADDED_P95_MS`, and `TSZ_PERF_XDS_SETTLE_SECONDS`. Set
 `TSZ_BYG_SKIP_BOOTSTRAP=1` only when the same prepared Kind environment is
 already running.
 
@@ -88,6 +93,8 @@ OpenAI upstream, k6 v2.2.0.
 | --- | --- | --- | ---: | ---: | ---: | ---: |
 | 2026-08-28 | regex-only request path | 25 RPS for 2 min | 3,001 | 0 | 12.105 ms | 7.023 ms |
 
-This is an end-to-end baseline, not a measurement of TSZ's added latency. To
-validate the issue's regex-only added-latency target, run an equivalent route
-without the `EnvoyExtensionPolicy` and compare its p95 with this result.
+The historical row predates the paired comparison and is an end-to-end
+protected-path baseline, not proof of added latency. New runs produce protected
+and unprotected summaries and enforce the issue's regex-only added-p95 target.
+Record a new result only from those paired artifacts; do not subtract results
+from different clusters, rates, durations, or request shapes.

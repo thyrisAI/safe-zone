@@ -38,6 +38,11 @@ type streamState struct {
 	responseOnlyHandled bool
 }
 
+type asyncAuditJob struct {
+	request ProcessingRequest
+	events  []OpenAISSEEvent
+}
+
 func newStreamState() *streamState {
 	return &streamState{rid: NewBYGRID(), protocol: newEnvoyStreamState()}
 }
@@ -59,6 +64,7 @@ type Server struct {
 	metricsObserver       MetricsObserver
 	traceObserver         TraceObserver
 	operationalAudits     chan guardrails.AuditEvent
+	asyncAuditJobs        chan asyncAuditJob
 	operationalStop       context.CancelFunc
 	operationalWorkers    sync.WaitGroup
 	closeOnce             sync.Once
@@ -212,12 +218,14 @@ func newServer(processor Processor, policyCache PolicyCache, resolver PolicyReso
 		metricsObserver:       settings.MetricsObserver,
 		traceObserver:         settings.TraceObserver,
 		operationalAudits:     make(chan guardrails.AuditEvent, 100),
+		asyncAuditJobs:        make(chan asyncAuditJob, 100),
 	}
 	operationalCtx, cancelOperational := context.WithCancel(context.Background())
 	server.operationalStop = cancelOperational
 	for range 4 {
-		server.operationalWorkers.Add(1)
+		server.operationalWorkers.Add(2)
 		go server.runOperationalAuditWorker(operationalCtx)
+		go server.runAsyncAuditWorker(operationalCtx)
 	}
 	return server, nil
 }
@@ -316,13 +324,21 @@ func (s *Server) Process(stream extprocv3.ExternalProcessor_ProcessServer) error
 			state.pinPolicy(request, s.policyCache, s.defaultFailureMode)
 		}
 		state.apply(&request)
-		if kind == envoyResponseHeaders && state.hasPolicySnapshot && state.policySnapshot.Definition.Streaming.Mode == policy.StreamingModeWindowed {
-			state.protocol.enableWindowedResponse(state.policySnapshot.Definition.Streaming.WindowBytesOrDefault())
+		if kind == envoyResponseHeaders && state.hasPolicySnapshot {
+			switch state.policySnapshot.Definition.Streaming.Mode {
+			case policy.StreamingModeWindowed:
+				state.protocol.enableWindowedResponse(state.policySnapshot.Definition.Streaming.WindowBytesOrDefault())
+			case policy.StreamingModeAsyncAudit:
+				state.protocol.enableAsyncAuditResponse()
+			}
 		}
 		if immediateStatus, exceeded := bodyLimitStatus(kind, request.Headers, request.Body, s.maxBodyBytes); exceeded {
 			s.metricsObserver.IncFailure("body_limit")
 			result := ProcessingResult{Action: ActionBlock, ImmediateStatus: immediateStatus}
 			enrichResultIdentity(&result, request, kind, 0)
+			if err := s.auditDecision(ctx, request, result); err != nil {
+				s.metricsObserver.IncFailure("audit")
+			}
 			s.observeDecision(request, result, 0)
 			response, adaptErr := responseToEnvoy(kind, request.Stage, result)
 			if adaptErr != nil {
@@ -334,6 +350,18 @@ func (s *Server) Process(stream extprocv3.ExternalProcessor_ProcessServer) error
 			return nil
 		}
 		if kind == envoyResponseBody && state.protocol.isStreamingResponse() {
+			if state.protocol.asyncAuditResponse {
+				response, adaptErr := s.processAsyncAuditResponse(state, request)
+				if adaptErr != nil {
+					return status.Error(codes.Internal, adaptErr.Error())
+				}
+				if !message.GetObservabilityMode() {
+					if err := stream.Send(response); err != nil {
+						return err
+					}
+				}
+				continue
+			}
 			response, terminal, adaptErr := s.processWindowedResponse(ctx, state, request)
 			if adaptErr != nil {
 				if contextErr := grpcContextError(ctx, adaptErr); contextErr != nil {
@@ -364,7 +392,7 @@ func (s *Server) Process(stream extprocv3.ExternalProcessor_ProcessServer) error
 			enrichResultIdentity(&result, request, kind, 0)
 			s.metricsObserver.IncFailure("policy_resolution")
 			s.observeDecision(request, result, 0)
-			_ = s.auditRequest(ctx, request, result)
+			_ = s.auditDecision(ctx, request, result)
 			response, adaptErr := responseToEnvoy(kind, request.Stage, result)
 			if adaptErr != nil {
 				return status.Error(codes.Internal, adaptErr.Error())
@@ -404,18 +432,18 @@ func (s *Server) Process(stream extprocv3.ExternalProcessor_ProcessServer) error
 			return err
 		}
 		enrichResultIdentity(&result, request, kind, time.Since(started))
-		if err := s.auditRequest(ctx, request, result); err != nil {
+		if err := s.auditDecision(ctx, request, result); err != nil {
 			s.metricsObserver.IncFailure("audit")
-			// Audit sink failure must not expose or alter request content. The
-			// request failure policy decides whether the already-made enforcement
+			// Audit sink failure must not expose or alter content. The pinned
+			// stage failure policy decides whether the already-made enforcement
 			// decision can proceed in degraded mode.
 			result.Degraded = true
 			if auditFailureClosed(request) {
 				result.Action = ActionBlock
 				result.Body = nil
 				result.HeaderMutations = nil
-				result.Metadata.Action = ActionBlock
 			}
+			enrichResultIdentity(&result, request, kind, time.Since(started))
 		}
 		s.observeDecision(request, result, time.Since(started))
 		response, err := responseToEnvoy(kind, request.Stage, result)
@@ -432,6 +460,22 @@ func (s *Server) Process(stream extprocv3.ExternalProcessor_ProcessServer) error
 			return err
 		}
 	}
+}
+
+func (s *Server) processAsyncAuditResponse(state *streamState, request ProcessingRequest) (*extprocv3.ProcessingResponse, error) {
+	events, ready, dropped := state.protocol.takeAsyncAudit(request.EndOfStream)
+	if dropped {
+		s.metricsObserver.IncFailure("async_audit_buffer")
+	}
+	if ready && !dropped && len(events) > 0 {
+		request.Body = nil
+		select {
+		case s.asyncAuditJobs <- asyncAuditJob{request: request, events: events}:
+		default:
+			s.metricsObserver.IncFailure("async_audit_queue")
+		}
+	}
+	return responseToEnvoy(envoyResponseBody, StageResponse, ProcessingResult{Action: ActionAllow})
 }
 
 func (s *Server) processWindowedResponse(ctx context.Context, state *streamState, request ProcessingRequest) (*extprocv3.ProcessingResponse, bool, error) {
@@ -452,6 +496,9 @@ func (s *Server) processWindowedResponse(ctx context.Context, state *streamState
 		result := s.failureResult(request)
 		enrichResultIdentity(&result, request, envoyResponseBody, 0)
 		s.metricsObserver.IncFailure("processor")
+		if err := s.auditDecision(ctx, request, result); err != nil {
+			s.metricsObserver.IncFailure("audit")
+		}
 		s.observeDecision(request, result, 0)
 		if result.Action == ActionBlock {
 			s.metricsObserver.IncStreamHalt()
@@ -483,6 +530,14 @@ func (s *Server) processWindowedResponse(ctx context.Context, state *streamState
 		mutated = events
 	}
 	enrichResultIdentity(&result, request, envoyResponseBody, 0)
+	if err := s.auditDecision(ctx, request, result); err != nil {
+		s.metricsObserver.IncFailure("audit")
+		result.Degraded = true
+		if auditFailureClosed(request) {
+			result = s.failureResult(request)
+		}
+		enrichResultIdentity(&result, request, envoyResponseBody, time.Since(started))
+	}
 	s.observeDecision(request, result, time.Since(started))
 	if result.Action == ActionBlock {
 		s.metricsObserver.IncStreamHalt()
@@ -541,6 +596,47 @@ func (s *Server) runOperationalAuditWorker(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (s *Server) runAsyncAuditWorker(ctx context.Context) {
+	defer s.operationalWorkers.Done()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case job := <-s.asyncAuditJobs:
+			s.processAsyncAuditJob(ctx, job)
+		}
+	}
+}
+
+func (s *Server) processAsyncAuditJob(workerCtx context.Context, job asyncAuditJob) {
+	processor, ok := s.processor.(StreamingWindowProcessor)
+	if !ok {
+		s.metricsObserver.IncFailure("async_audit_processor")
+		return
+	}
+	started := time.Now()
+	processingCtx, cancel := context.WithTimeout(workerCtx, s.processingTimeout)
+	tracedCtx, endTrace := s.traceObserver.StartGuardrail(processingCtx, job.request)
+	result, _, err := processor.ProcessSSEWindow(tracedCtx, job.request, job.events)
+	endTrace(result, err)
+	cancel()
+	if err != nil {
+		s.metricsObserver.IncFailure("async_audit_processor")
+		result = ProcessingResult{Action: ActionAllow, Degraded: true}
+	} else if result.Action != ActionAllow {
+		// AsyncAudit is observational: findings are recorded, but an action can
+		// never mutate or halt bytes that have already been delivered.
+		result.Action = ActionAuditOnly
+		result.Body = nil
+		result.HeaderMutations = nil
+	}
+	enrichResultIdentity(&result, job.request, envoyResponseBody, time.Since(started))
+	if err := s.auditDecision(workerCtx, job.request, result); err != nil {
+		s.metricsObserver.IncFailure("audit")
+	}
+	s.observeDecision(job.request, result, time.Since(started))
 }
 
 // responseOnlyResult handles the exceptional case where Envoy invokes
@@ -692,19 +788,20 @@ func enrichResultIdentity(result *ProcessingResult, request ProcessingRequest, k
 	result.HeaderMutations["x-tsz-envoy-request-id"] = request.EnvoyReqID
 }
 
-func (s *Server) auditRequest(ctx context.Context, request ProcessingRequest, result ProcessingResult) error {
-	if request.Stage != StageRequest {
-		return nil
-	}
+func (s *Server) auditDecision(ctx context.Context, request ProcessingRequest, result ProcessingResult) error {
 	action := guardrails.RuleAction(result.Action)
 	if err := action.Validate(); err != nil {
 		return err
+	}
+	stage := guardrails.AuditStageRequest
+	if request.Stage == StageResponse {
+		stage = guardrails.AuditStageResponse
 	}
 	return s.auditor.Audit(ctx, guardrails.AuditEvent{
 		Timestamp: time.Now().UTC(), EventType: "guardrail_decision", RID: request.RID, RequestID: request.EnvoyReqID, TraceID: request.TraceID,
 		Adapter: "envoy-gateway", Target: guardrails.BuildAuditTarget(request.Gateway, request.Tenant, request.Route),
 		Gateway: request.Gateway, Route: request.Route, Tenant: request.Tenant,
-		PolicyID: request.PolicyID, PolicyVersion: request.PolicyVersion, Stage: guardrails.AuditStageRequest,
+		PolicyID: request.PolicyID, PolicyVersion: request.PolicyVersion, Stage: stage,
 		Action: action, Categories: append([]string(nil), result.Metadata.Categories...),
 		DetectionCount: result.DetectionCount, ProcessorLatencyMS: result.Metadata.ProcessorLatencyMS,
 		Degraded: result.Degraded,

@@ -1,0 +1,1 @@
+{"model":"mock-openai","messages":[{"role":"user","content":"Return the local asynchronous audit fixture."}],"stream":true}

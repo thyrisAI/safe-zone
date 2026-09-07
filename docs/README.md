@@ -42,6 +42,12 @@ The documentation set is organized as follows:
 - **Envoy Gateway Integration** – Preview/manual and native/managed installation profiles
   `integrations/ENVOY_GATEWAY.md`
 
+- **Gateway Integration Matrix** – Supported, deferred, validation-candidate and planned adapters
+  `integrations/README.md`
+
+- **Envoy AI Gateway Compatibility Track** – Deferred status, validation matrix and promotion gates
+  `integrations/ENVOY_AI_GATEWAY.md`
+
 - **Envoy Gateway Runnable Examples** – Local mock-provider verification for safe, masking, blocking, failure and telemetry paths
   [examples/bring-your-gateway/README.md](../examples/bring-your-gateway/README.md)
 
@@ -71,6 +77,9 @@ The documentation set is organized as follows:
 
 - **BYG Extension Server Security Evaluation** – Experimental-control-plane decision and promotion criteria
   `security/BYG_EXTENSION_SERVER_EVALUATION.md`
+
+- **BYG Threat Model** – Assets, trust boundaries, bypass and leakage threats, mitigations and residual risks
+  `security/BYG_THREAT_MODEL.md`
 
 - **Security Roadmap** – Detailed hardening milestones and implementation status  
   `SECURITY_ROADMAP.md`

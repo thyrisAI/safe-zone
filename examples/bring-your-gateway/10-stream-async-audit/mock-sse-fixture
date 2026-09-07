@@ -1,0 +1,4 @@
+data: {"id":"chatcmpl-async","choices":[{"delta":{"content":"alice@example.com"}}]}
+
+data: [DONE]
+

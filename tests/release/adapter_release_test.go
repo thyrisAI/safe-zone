@@ -17,6 +17,10 @@ var requiredExampleScenarios = []string{
 	"safe_request",
 	"request_masking",
 	"request_blocking",
+	"audit_only",
+	"stream_async_audit",
+	"stream_window",
+	"stream_halt",
 	"response_masking",
 	"response_blocking",
 	"fail_open",
@@ -69,6 +73,33 @@ func TestEveryGatewayAdapterHasReleaseDocumentationAndExamples(t *testing.T) {
 		}
 	}
 	requireAllNumberedExamplesDocumented(t, repoRoot)
+}
+
+func TestBYGDocumentationSetIsComplete(t *testing.T) {
+	repoRoot := repositoryRoot(t)
+	required := map[string][]string{
+		"README.md":                                        {"bring your gateway"},
+		"SECURITY.md":                                      {"byg threat model", "policy-bypass"},
+		"CHANGELOG.md":                                     {"bring your gateway", "envoy gateway", "maturity"},
+		"docs/README.md":                                   {"gateway integration matrix", "envoy ai gateway compatibility", "byg threat model"},
+		"docs/WHAT_IS_TSZ.md":                              {"bring your gateway", "client headers are never authoritative"},
+		"docs/PRODUCT_OVERVIEW.md":                         {"bring your gateway", "existing envoy gateway"},
+		"docs/QUICK_START.md":                              {"byg quick start", "kind"},
+		"docs/concepts/BRING_YOUR_GATEWAY.md":              {"gateway-neutral", "envoy ai gateway"},
+		"docs/concepts/STREAMING.md":                       {"windowed", "stream-halt", "zero-leakage"},
+		"docs/integrations/README.md":                      {"source of truth", "maturity", "tested version"},
+		"docs/integrations/ENVOY_GATEWAY.md":               {"support status", "runnable"},
+		"docs/integrations/ENVOY_AI_GATEWAY.md":            {"deferred", "promotion gate"},
+		"docs/operations/BYG_DEPLOYMENT.md":                {"shared service", "sidecar"},
+		"docs/operations/BYG_OBSERVABILITY.md":             {"metrics", "tracing", "siem"},
+		"docs/operations/BYG_TROUBLESHOOTING.md":           {"policy attachment", "cleanup"},
+		"docs/security/BYG_THREAT_MODEL.md":                {"trust boundaries", "policy spoofing", "residual risks"},
+		"docs/security/BYG_EXTENSION_SERVER_EVALUATION.md": {"experimental", "xds"},
+	}
+	for path, terms := range required {
+		requireRegularFile(t, repoRoot, path, "BYG documentation deliverable")
+		requireTextContains(t, repoRoot, path, terms)
+	}
 }
 
 func validateAdapterRelease(t *testing.T, repoRoot string, adapter adapterRelease, names map[string]struct{}) {

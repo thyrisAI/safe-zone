@@ -81,9 +81,10 @@ type StreamingSettings struct {
 }
 
 const (
-	StreamingModeNone     = "None"
-	StreamingModeWindowed = "Windowed"
-	DefaultWindowBytes    = 4096
+	StreamingModeNone       = "None"
+	StreamingModeAsyncAudit = "AsyncAudit"
+	StreamingModeWindowed   = "Windowed"
+	DefaultWindowBytes      = 4096
 )
 
 func (s StreamingSettings) WindowBytesOrDefault() int {

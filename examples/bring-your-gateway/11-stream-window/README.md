@@ -27,7 +27,8 @@ because already emitted deltas cannot be retracted.
 email exists only in the local SSE response fixture. The runner also verifies
 that the mock upstream received that request.
 
-Block/halt is not part of this example; see `12-stream-halt`.
+Block/halt is not part of this example; see the
+[12-stream-halt example](../12-stream-halt/README.md).
 
 ## Run, verify, and clean up
 

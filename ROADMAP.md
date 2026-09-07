@@ -188,58 +188,58 @@ The roadmap is split into phases. Each bullet is a concrete, actionable item.
 
 ### Bring Your Gateway (BYG) Integration Framework
 
-**Goal:** Allow users to attach TSZ guardrails to an existing API or AI gateway without replacing its routing, authentication, rate limiting, provider management or operational tooling. Envoy Gateway and Envoy AI Gateway will be the first reference adapters; the internal contract must remain gateway-neutral.
+**Goal:** Allow users to attach TSZ guardrails to an existing API or AI gateway without replacing its routing, authentication, rate limiting, provider management or operational tooling. Envoy Gateway is the first supported reference adapter. Envoy AI Gateway remains a compatibility track until its versioned validation matrix passes; the internal contract remains gateway-neutral.
 
-- [ ] Define and document the gateway-neutral BYG processing contract (request/response stages, actions, policy resolution, mutations, metadata, errors and adapter capabilities)
-- [ ] Implement the first native adapter using Envoy External Processing (`ext_proc`) and `EnvoyExtensionPolicy`
-- [ ] Keep Envoy/protobuf/Kubernetes-specific types outside the core guardrail engine so future gateway adapters do not require guardrail rewrites
-- [ ] Support request enforcement first, followed by buffered response enforcement and explicitly scoped streaming modes
+- [x] Define and document the gateway-neutral BYG processing contract (request/response stages, actions, policy resolution, mutations, metadata, errors and adapter capabilities)
+- [x] Implement the first native adapter using Envoy External Processing (`ext_proc`) and `EnvoyExtensionPolicy`
+- [x] Keep Envoy/protobuf/Kubernetes-specific types outside the core guardrail engine so future gateway adapters do not require guardrail rewrites
+- [x] Support request enforcement first, followed by buffered response enforcement and explicitly scoped streaming modes
 - [ ] Publish and maintain an Envoy Gateway and Envoy AI Gateway compatibility matrix
 - [x] Add reusable data-plane adapter contract tests for normalized request/response mapping, ownership, mutations, safe blocking and metadata
 - [x] Add a cross-gateway conformance suite for request masking, blocking, response filtering, failure modes and telemetry
-- [ ] Build a native BYG control plane around the existing TSZ policy and audit capabilities:
-  - [ ] Add immutable, versioned compiled-policy snapshots backed by PostgreSQL and distributed through Redis invalidation/version notifications
-  - [ ] Reuse the existing detector, validators, templates, allowlist/blocklist and SIEM pipeline through a transport-neutral policy runtime
-  - [ ] Guarantee atomic policy activation, consistent request/response policy versions and last-known-good rollback
-  - [ ] Add a `TSZGuardrailPolicy` CRD following Gateway API `targetRefs`, section attachment, precedence and status conventions
+- [x] Build a native BYG control plane around the existing TSZ policy and audit capabilities:
+  - [x] Add immutable, versioned compiled-policy snapshots backed by PostgreSQL and distributed through Redis invalidation/version notifications
+  - [x] Reuse the existing detector, validators, templates, allowlist/blocklist and SIEM pipeline through a transport-neutral policy runtime
+  - [x] Guarantee atomic policy activation, consistent request/response policy versions and last-known-good rollback
+  - [x] Add a `TSZGuardrailPolicy` CRD following Gateway API `targetRefs`, section attachment, precedence and status conventions
   - [x] Add a compatible `TSZGuardrailPolicy` v1beta1 API, retain served v1alpha1, test storage upgrade and document rollback ([graduation record](docs/operations/TSZ_POLICY_API_UPGRADE.md))
   - [ ] Record CRD-specific adopter feedback and full-stack upgrade/rollback evidence before GA
-  - [ ] Add a TSZ Gateway Controller that resolves policies and reconciles owned `EnvoyExtensionPolicy` resources
-  - [ ] Publish `Accepted`, `ResolvedRefs`, `Programmed`, `PolicySynced`, conflict and degraded status conditions
-  - [ ] Add a PII-safe `io.thyris.tsz` dynamic metadata contract for Envoy access logs and telemetry
-  - [ ] Add adapter capability discovery so unsupported enforcement requirements are rejected rather than silently downgraded
-  - [ ] Add controller leader election, RBAC, readiness, metrics and version-skew handling
-  - [ ] Evaluate Envoy Gateway Extension Server support only as an experimental advanced profile due to xDS privilege and version-coupling risks
-- [ ] Update the core documentation set:
-  - [ ] `README.md` — add Bring Your Gateway to the feature overview and getting-started paths
-  - [ ] `docs/README.md` — add the BYG documentation and examples to the documentation index
-  - [ ] `docs/WHAT_IS_TSZ.md` — explain gateway-neutral deployment and responsibility boundaries
-  - [ ] `docs/PRODUCT_OVERVIEW.md` — describe the BYG product capability and supported gateway model
-  - [ ] `docs/ARCHITECTURE_SECURITY.md` — document trust boundaries, fail-open/fail-closed behavior, data flows, network isolation and mTLS
-  - [ ] `docs/API_REFERENCE.md` — document processor configuration, headers, metadata, actions and error contracts
-  - [ ] `docs/QUICK_START.md` — add a minimal Envoy-based BYG quick start
-  - [ ] `docs/concepts/BRING_YOUR_GATEWAY.md` — add the gateway-neutral architecture, adapter contract and capability model
-  - [ ] `docs/concepts/STREAMING.md` — document BYG async, windowed, halt and strict-streaming guarantees
-  - [ ] `docs/integrations/README.md` — index supported gateways and their compatibility levels
-  - [ ] `docs/integrations/ENVOY_GATEWAY.md` — installation, configuration, verification, troubleshooting and cleanup
-  - [ ] `docs/integrations/ENVOY_AI_GATEWAY.md` — filter ordering, provider transformations, fallback, quotas and known limitations
-  - [ ] `SECURITY.md` — reference the BYG threat model and private vulnerability-reporting expectations
-  - [ ] `CHANGELOG.md` and release notes — identify the adapter maturity level and breaking configuration changes
+  - [x] Add a TSZ Gateway Controller that resolves policies and reconciles owned `EnvoyExtensionPolicy` resources
+  - [x] Publish `Accepted`, `ResolvedRefs`, `Programmed`, `PolicySynced`, conflict and degraded status conditions
+  - [x] Add a PII-safe `io.thyris.tsz` dynamic metadata contract for Envoy access logs and telemetry
+  - [x] Add adapter capability discovery so unsupported enforcement requirements are rejected rather than silently downgraded
+  - [x] Add controller leader election, RBAC, readiness, metrics and version-skew handling
+  - [x] Evaluate Envoy Gateway Extension Server support only as an experimental advanced profile due to xDS privilege and version-coupling risks
+- [x] Update the core documentation set:
+  - [x] `README.md` — add Bring Your Gateway to the feature overview and getting-started paths
+  - [x] `docs/README.md` — add the BYG documentation and examples to the documentation index
+  - [x] `docs/WHAT_IS_TSZ.md` — explain gateway-neutral deployment and responsibility boundaries
+  - [x] `docs/PRODUCT_OVERVIEW.md` — describe BYG as a product capability and explain why users keep their existing gateway
+  - [x] `docs/ARCHITECTURE_SECURITY.md` — document trust boundaries, fail-open/fail-closed behavior, data flows, network isolation and mTLS
+  - [x] `docs/API_REFERENCE.md` — document processor configuration, headers, metadata, actions and error contracts
+  - [x] `docs/QUICK_START.md` — add a minimal Envoy-based BYG quick start
+  - [x] `docs/concepts/BRING_YOUR_GATEWAY.md` — add the gateway-neutral architecture, adapter contract and capability model
+  - [x] `docs/concepts/STREAMING.md` — document BYG windowed mask/halt and strict-streaming guarantees; keep legacy async mode distinct
+  - [x] `docs/integrations/README.md` — index supported gateways and their compatibility levels
+  - [x] `docs/integrations/ENVOY_GATEWAY.md` — installation, configuration, verification, troubleshooting and cleanup
+  - [x] `docs/integrations/ENVOY_AI_GATEWAY.md` — record deferred status, filter-order risks and the required compatibility matrix without claiming support
+  - [x] `SECURITY.md` — reference the BYG threat model and private vulnerability-reporting expectations
+  - [x] `CHANGELOG.md` and release notes — identify the adapter maturity level and breaking configuration changes
 - [ ] Provide runnable, self-contained BYG examples with prerequisites, expected output, verification and cleanup instructions:
-  - [ ] Envoy Gateway minimal request inspection
-  - [ ] Request PII masking before the upstream receives the payload
-  - [ ] Request blocking with an OpenAI-compatible error
-  - [ ] Buffered non-streaming response masking and blocking
-  - [ ] Async streaming audit with an explicit leakage warning
-  - [ ] Windowed streaming filtering and stream halt behavior
-  - [ ] Route-owned policy selection that cannot be disabled by a client header
-  - [ ] Fail-open, fail-closed and audit-only rollouts
-  - [ ] Envoy JWT/API-key authentication combined with TSZ guardrails
+  - [x] Envoy Gateway minimal request inspection
+  - [x] Request PII masking before the upstream receives the payload
+  - [x] Request blocking with an OpenAI-compatible error
+  - [x] Buffered non-streaming response masking and blocking
+  - [x] Async streaming audit with an explicit leakage warning
+  - [x] Windowed streaming filtering and stream halt behavior
+  - [x] Route-owned policy selection that cannot be disabled by a client header
+  - [x] Fail-open, fail-closed and audit-only rollouts
+  - [x] Envoy JWT/API-key authentication combined with TSZ guardrails
   - [ ] Envoy local/global rate limiting combined with TSZ guardrails
   - [ ] Multi-tenant and per-route guardrail policies
   - [ ] Shared TSZ processor deployment and sidecar-style deployment
-  - [ ] Envoy-to-TSZ TLS/mTLS and `NetworkPolicy`
-  - [ ] Prometheus, OpenTelemetry and SIEM correlation
+  - [x] Envoy-to-TSZ TLS/mTLS and `NetworkPolicy`
+  - [x] Prometheus, OpenTelemetry and SIEM correlation
   - [ ] Envoy AI Gateway single-provider flow
   - [ ] Envoy AI Gateway multi-provider routing and fallback
   - [ ] Envoy AI Gateway token quota/rate-limit preservation

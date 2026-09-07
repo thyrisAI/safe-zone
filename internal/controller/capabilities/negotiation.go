@@ -156,9 +156,6 @@ func requirementsForSpec(spec securityv1beta1.TSZGuardrailPolicySpec) (Requireme
 		required = appendActionRequirements(required, false, spec.Response.PII, spec.Response.Secret, spec.Response.UnsafeContent)
 	}
 	if spec.StreamingMode() == string(StreamingWindowed) {
-		if spec.Response != nil && containsAction(securityv1beta1.PolicyActionBlock, spec.Response.PII, spec.Response.Secret, spec.Response.UnsafeContent) {
-			return nil, fmt.Errorf("%w: windowed response streaming does not support BLOCK actions", ErrUnsupportedCapability)
-		}
 		required = append(required, CapabilityResponseStreamingWindowed)
 	}
 	return uniqueRequirements(required), nil

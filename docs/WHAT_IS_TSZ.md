@@ -125,6 +125,23 @@ Your application then decides how to proceed:
 - If `blocked = true` -> reject the operation or ask the user to revise content.
 - If `blocked = false` -> use `redacted_text` to call an LLM or external API.
 
+### Bring Your Gateway
+
+Organizations that already operate Envoy Gateway do not need to replace it
+with TSZ. Bring Your Gateway (BYG) attaches the TSZ external processor to the
+existing route. Envoy continues to own TLS, authentication, authorization,
+routing, retries, quotas, rate limiting, load balancing, provider credentials,
+and upstream selection. TSZ owns request/response content inspection, masking,
+blocking, audit events, and PII-safe security metadata.
+
+The portable profile uses a gateway-owned trusted policy header. The native
+profile uses `TSZGuardrailPolicy`, `tsz-controller`, and owned
+`EnvoyExtensionPolicy` resources. Client headers are never authoritative for a
+mandatory route policy. Envoy Gateway is the supported reference integration;
+Envoy AI Gateway remains deferred until its filter ordering, transformations,
+routing/fallback, quota metadata, and supported versions pass compatibility
+tests. See [Bring Your Gateway](concepts/BRING_YOUR_GATEWAY.md).
+
 ---
 
 ## 4. Who Uses TSZ?
@@ -153,5 +170,6 @@ If you are new to TSZ, we recommend the following path:
 2. **Explore the API** – import `TSZ_Postman_Collection.json` and call `/detect`.
 3. **Review the Architecture & Security Overview** – `ARCHITECTURE_SECURITY.md` for a deeper technical view.
 4. **Integrate with your stack** – follow `API_REFERENCE.md` for production integration details.
+5. **Keep an existing Envoy Gateway** – follow `integrations/ENVOY_GATEWAY.md` and run the local Kind examples.
 
 For a high‑level, executive‑oriented overview, see `../PRODUCT_OVERVIEW.md`.

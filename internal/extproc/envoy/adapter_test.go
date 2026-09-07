@@ -372,6 +372,18 @@ func TestSSEWindowRejectsBufferOverflow(t *testing.T) {
 	}
 }
 
+func TestAsyncAuditBufferIsBoundedAndDropsTheWholeObservation(t *testing.T) {
+	state := newEnvoyStreamState()
+	state.setStreamBufferLimit(10)
+	state.responseStreaming = true
+	state.enableAsyncAuditResponse()
+	state.completedSSEEvents = []OpenAISSEEvent{{Raw: make([]byte, 11)}}
+	events, ready, dropped := state.takeAsyncAudit(true)
+	if !ready || !dropped || len(events) != 0 {
+		t.Fatalf("takeAsyncAudit() = (%d events, ready=%t, dropped=%t), want 0/true/true", len(events), ready, dropped)
+	}
+}
+
 // The semantic helpers keep generated Envoy message details out of individual
 // test cases.
 func requestHeadersForAdapterTest(endOfStream bool) *extprocv3.ProcessingRequest {

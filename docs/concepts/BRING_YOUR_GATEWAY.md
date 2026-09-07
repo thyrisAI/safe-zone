@@ -3,7 +3,9 @@
 TSZ can protect traffic at an existing API gateway through Envoy's external
 processing (`ext_proc`) protocol. The application does not call a separate TSZ
 endpoint: Envoy sends the request to `tsz-ext-proc` before it reaches the
-upstream service.
+upstream service. The policy and processing contracts are gateway-neutral;
+each supported gateway adapter translates its native attachment model into
+those contracts.
 
 ## Supported integration levels
 

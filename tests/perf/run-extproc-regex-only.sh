@@ -14,6 +14,8 @@ readonly RESULTS_DIR="${TSZ_PERF_RESULTS_DIR:-test-reports/perf}"
 readonly K6_BIN="${K6_BIN:-k6}"
 readonly KUBECONFIG_PATH="${TSZ_BYG_KUBECONFIG:-${TMPDIR:-/tmp}/tsz-byg-tools/tsz-byg.kubeconfig}"
 readonly PERF_EXAMPLE="examples/bring-your-gateway/01-minimal-inspection"
+readonly EXTENSION_POLICY="deployments/envoy-gateway/tsz-ext-proc-envoy-extension-policy.yaml"
+readonly MAX_ADDED_P95_MS="${TSZ_PERF_MAX_ADDED_P95_MS:-20}"
 
 fail() {
   echo "perf: $*" >&2
@@ -45,6 +47,9 @@ cleanup() {
     kill "${port_forward_pid}" >/dev/null 2>&1 || true
     wait "${port_forward_pid}" >/dev/null 2>&1 || true
   fi
+  # Restore the protected route if the comparison exits after temporarily
+  # removing the attachment.
+  kubectl apply -f "${EXTENSION_POLICY}" >/dev/null 2>&1 || true
   rm -rf "${temp_dir}"
 }
 trap cleanup EXIT INT TERM
@@ -70,15 +75,38 @@ kill -0 "${port_forward_pid}" 2>/dev/null || {
 
 mkdir -p "${RESULTS_DIR}"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-summary_file="${RESULTS_DIR}/extproc-regex-only-${timestamp}.json"
+protected_summary="${RESULTS_DIR}/extproc-regex-only-protected-${timestamp}.json"
+baseline_summary="${RESULTS_DIR}/extproc-regex-only-baseline-${timestamp}.json"
 
 echo "perf: targeting http://127.0.0.1:${LOCAL_PORT} through ${GATEWAY_NAMESPACE}/${envoy_service}"
-echo "perf: writing k6 summary to ${summary_file}"
+echo "perf: writing protected k6 summary to ${protected_summary}"
 "${K6_BIN}" run \
-  --summary-export "${summary_file}" \
+  --summary-export "${protected_summary}" \
   --env "TSZ_PERF_BASE_URL=http://127.0.0.1:${LOCAL_PORT}" \
   --env "TSZ_PERF_RATE=${TSZ_PERF_RATE:-25}" \
   --env "TSZ_PERF_DURATION=${TSZ_PERF_DURATION:-2m}" \
   --env "TSZ_PERF_PRE_ALLOCATED_VUS=${TSZ_PERF_PRE_ALLOCATED_VUS:-10}" \
   --env "TSZ_PERF_MAX_VUS=${TSZ_PERF_MAX_VUS:-50}" \
   tests/perf/extproc-regex-only.js
+
+# Measure the same warm route without ext_proc. The mock, Envoy service,
+# request shape, rate, and duration stay identical; only the policy attachment
+# is removed. The cleanup trap restores protection on every exit path.
+kubectl -n "${DEMO_NAMESPACE}" delete envoyextensionpolicy tsz-request-guardrail --wait=true
+sleep "${TSZ_PERF_XDS_SETTLE_SECONDS:-5}"
+echo "perf: writing unprotected baseline k6 summary to ${baseline_summary}"
+"${K6_BIN}" run \
+  --summary-export "${baseline_summary}" \
+  --env "TSZ_PERF_BASE_URL=http://127.0.0.1:${LOCAL_PORT}" \
+  --env "TSZ_PERF_RATE=${TSZ_PERF_RATE:-25}" \
+  --env "TSZ_PERF_DURATION=${TSZ_PERF_DURATION:-2m}" \
+  --env "TSZ_PERF_PRE_ALLOCATED_VUS=${TSZ_PERF_PRE_ALLOCATED_VUS:-10}" \
+  --env "TSZ_PERF_MAX_VUS=${TSZ_PERF_MAX_VUS:-50}" \
+  tests/perf/extproc-regex-only.js
+
+protected_p95="$(jq -er '.metrics.tsz_perf_request_duration.values["p(95)"]' "${protected_summary}")"
+baseline_p95="$(jq -er '.metrics.tsz_perf_request_duration.values["p(95)"]' "${baseline_summary}")"
+added_p95="$(awk -v protected="${protected_p95}" -v baseline="${baseline_p95}" 'BEGIN { printf "%.3f", protected - baseline }')"
+echo "perf: protected p95=${protected_p95}ms baseline p95=${baseline_p95}ms added p95=${added_p95}ms"
+awk -v added="${added_p95}" -v maximum="${MAX_ADDED_P95_MS}" 'BEGIN { exit !(added <= maximum) }' ||
+  fail "regex-only added p95 ${added_p95}ms exceeds ${MAX_ADDED_P95_MS}ms"

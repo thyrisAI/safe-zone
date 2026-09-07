@@ -65,6 +65,10 @@ status in `expected-status`.
 | Response blocking | `16-response-blocking` | HTTP 403; safe TSZ error replaces the unsafe response |
 | Fail open | `05-fail-open` | HTTP 200; dependency failure does not alter the safe upstream body |
 | Fail closed | `06-fail-closed` | HTTP 400; dependency failure prevents upstream delivery |
+| Audit-only rollout | `09-audit-only` | HTTP 200; finding is recorded while the upstream body remains byte-identical |
+| Async SSE audit | `10-stream-async-audit` | HTTP 200; unsafe content is deliberately forwarded unchanged and inspected only after completion |
+| Windowed SSE masking | `11-stream-window` | HTTP 200; unsafe value is masked before its window is released |
+| Windowed SSE halt | `12-stream-halt` | Safe terminal 403; violation is absent and future SSE delivery stops |
 | Telemetry | `20-observability` | Masked upstream request plus bounded metric and PII-safe SIEM event |
 
 The suite also runs the additional numbered examples. Every numbered directory

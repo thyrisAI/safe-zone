@@ -55,12 +55,45 @@ type cancellationWindowProcessor struct{ *cancellationProcessor }
 
 type failingWindowProcessor struct{}
 
+type blockingWindowProcessor struct{}
+
+type asyncAuditWindowProcessor struct {
+	processed chan []OpenAISSEEvent
+}
+
 func (failingWindowProcessor) Process(context.Context, ProcessingRequest) (ProcessingResult, error) {
 	return ProcessingResult{Action: ActionAllow}, nil
 }
 
 func (failingWindowProcessor) ProcessSSEWindow(context.Context, ProcessingRequest, []OpenAISSEEvent) (ProcessingResult, []OpenAISSEEvent, error) {
 	return ProcessingResult{}, nil, errors.New("injected SSE window failure")
+}
+
+func (blockingWindowProcessor) Process(context.Context, ProcessingRequest) (ProcessingResult, error) {
+	return ProcessingResult{Action: ActionAllow}, nil
+}
+
+func (blockingWindowProcessor) ProcessSSEWindow(_ context.Context, request ProcessingRequest, _ []OpenAISSEEvent) (ProcessingResult, []OpenAISSEEvent, error) {
+	return ProcessingResult{
+		Action:          ActionBlock,
+		ImmediateStatus: 403,
+		DetectionCount:  1,
+		Metadata: SafeMetadata{
+			RequestID: request.EnvoyReqID,
+			RID:       request.RID, PolicyID: request.PolicyID, PolicyVersion: request.PolicyVersion,
+			Adapter: "openai_chat_completions", Stage: StageResponse, Action: ActionBlock,
+			Categories: []string{"SECRET"}, DetectionCount: 1,
+		},
+	}, nil, nil
+}
+
+func (processor asyncAuditWindowProcessor) Process(context.Context, ProcessingRequest) (ProcessingResult, error) {
+	return ProcessingResult{Action: ActionAllow}, nil
+}
+
+func (processor asyncAuditWindowProcessor) ProcessSSEWindow(_ context.Context, _ ProcessingRequest, events []OpenAISSEEvent) (ProcessingResult, []OpenAISSEEvent, error) {
+	processor.processed <- append([]OpenAISSEEvent(nil), events...)
+	return ProcessingResult{Action: ActionAuditOnly, DetectionCount: 1, Metadata: SafeMetadata{Categories: []string{"PII"}}}, nil, nil
 }
 
 type mockUpstream struct{ requests atomic.Int64 }
@@ -467,6 +500,68 @@ func TestServerParsesStreamedSSEBodiesWithoutInvokingResponseEnforcement(t *test
 	}
 }
 
+func TestServerForwardsAsyncAuditSSEWithoutMutationAndAuditsAfterCompletion(t *testing.T) {
+	processor := asyncAuditWindowProcessor{processed: make(chan []OpenAISSEEvent, 1)}
+	auditor := &recordingAuditor{}
+	cache := snapshotPolicyCache{snapshot: policy.CompiledSnapshot{PolicyID: "default", Version: 3, Definition: policy.PolicyDefinition{
+		Response:  policy.ResponsePolicy{Enabled: true, PII: policy.ActionAuditOnly, Secret: policy.ActionAuditOnly, UnsafeContent: policy.ActionAuditOnly},
+		Streaming: policy.StreamingSettings{Mode: policy.StreamingModeAsyncAudit},
+	}}}
+	server, err := NewServerWithSettings(processor, cache, auditor, ServerSettings{FailMode: policy.FailureModeClosed, MaxBodyBytes: 1024, MaxStreamBufferBytes: 1024, ProcessingTimeout: time.Second})
+	if err != nil {
+		t.Fatalf("NewServerWithSettings: %v", err)
+	}
+	stream, err := newExternalProcessorTestClientForServer(t, server).Process(context.Background())
+	if err != nil {
+		t.Fatalf("open stream: %v", err)
+	}
+	for _, message := range []*extprocv3.ProcessingRequest{requestHeadersMessageWithEndOfStream("ignored", "envoy-async", "default", true), responseHeadersForAdapterTest(false)} {
+		if message.GetResponseHeaders() != nil {
+			message.GetResponseHeaders().Headers.Headers[0].RawValue = []byte("text/event-stream")
+		}
+		if err := stream.Send(message); err != nil {
+			t.Fatalf("send setup: %v", err)
+		}
+		if _, err := stream.Recv(); err != nil {
+			t.Fatalf("receive setup: %v", err)
+		}
+	}
+	raw := []byte("data: {\"choices\":[{\"delta\":{\"content\":\"alice@example.com\"}}]}\n\ndata: [DONE]\n\n")
+	if err := stream.Send(responseBodyForAdapterTest(raw, true)); err != nil {
+		t.Fatalf("send SSE: %v", err)
+	}
+	response, err := stream.Recv()
+	if err != nil {
+		t.Fatalf("receive SSE: %v", err)
+	}
+	if response.GetImmediateResponse() != nil || response.GetResponseBody().GetResponse().GetBodyMutation() != nil {
+		t.Fatalf("AsyncAudit altered the delivered stream: %+v", response)
+	}
+	select {
+	case events := <-processor.processed:
+		if len(events) != 2 || !strings.Contains(string(events[0].Raw), "alice@example.com") {
+			t.Fatalf("async events = %+v", events)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("async stream inspection did not complete")
+	}
+	deadline := time.Now().Add(time.Second)
+	for {
+		events := auditor.eventsSnapshot()
+		if len(events) >= 3 {
+			event := events[len(events)-1]
+			if event.Stage != guardrails.AuditStageResponse || event.Action != guardrails.RuleActionAuditOnly || event.DetectionCount != 1 || strings.Join(event.Categories, ",") != "PII" {
+				t.Fatalf("async audit event = %+v", event)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("async audit events = %+v, want completed response decision", events)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 func TestServerResponseWithoutRequestStateUsesFailModeAndAudits(t *testing.T) {
 	for _, test := range []struct {
 		name        string
@@ -749,6 +844,48 @@ func TestServerAuditsSafeRequestMetadataAndPublishesDynamicMetadata(t *testing.T
 	}
 }
 
+func TestServerAuditsResponseDecisionsWithResponseStage(t *testing.T) {
+	auditor := &recordingAuditor{}
+	server, err := NewServerWithAuditor(processorFunc(func(_ context.Context, request ProcessingRequest) (ProcessingResult, error) {
+		result := ProcessingResult{Action: ActionAllow}
+		if request.Stage == StageResponse && request.Body != nil {
+			result.Action = ActionAuditOnly
+			result.DetectionCount = 1
+			result.Metadata.Categories = []string{"UNSAFE_CONTENT"}
+		}
+		return result, nil
+	}), newKeyedPolicyCache(map[string]int{"policy-a": 5}), auditor)
+	if err != nil {
+		t.Fatalf("NewServerWithAuditor() error = %v", err)
+	}
+	stream, err := newExternalProcessorTestClientForServer(t, server).Process(context.Background())
+	if err != nil {
+		t.Fatalf("open stream: %v", err)
+	}
+	for _, message := range []*extprocv3.ProcessingRequest{
+		requestHeadersMessageWithEndOfStream("ignored", "envoy-response-audit", "policy-a", true),
+		responseHeadersForAdapterTest(false),
+		responseBodyForAdapterTest([]byte(`{"choices":[]}`), true),
+	} {
+		if err := stream.Send(message); err != nil {
+			t.Fatalf("send message: %v", err)
+		}
+		if _, err := stream.Recv(); err != nil {
+			t.Fatalf("receive response: %v", err)
+		}
+	}
+	events := auditor.eventsSnapshot()
+	if len(events) != 3 {
+		t.Fatalf("audit event count = %d, want 3: %+v", len(events), events)
+	}
+	responseEvent := events[2]
+	if responseEvent.Stage != guardrails.AuditStageResponse || responseEvent.Action != guardrails.RuleActionAuditOnly ||
+		responseEvent.PolicyID != "policy-a" || responseEvent.PolicyVersion != 5 || responseEvent.RequestID != "envoy-response-audit" ||
+		responseEvent.DetectionCount != 1 || strings.Join(responseEvent.Categories, ",") != "UNSAFE_CONTENT" {
+		t.Fatalf("response audit event = %+v", responseEvent)
+	}
+}
+
 func TestServerAuditsPinnedPolicyVersionAfterCacheUpdate(t *testing.T) {
 	cache := &versionedPolicyCache{}
 	cache.version.Store(1)
@@ -880,6 +1017,54 @@ func TestServerAppliesRequestFailurePolicyWhenAuditSinkFails(t *testing.T) {
 			metadata := response.GetDynamicMetadata().GetFields()[safeMetadataNamespace].GetStructValue().GetFields()
 			if got := metadata["action"].GetStringValue(); test.wantBlock && got != string(ActionBlock) {
 				t.Fatalf("closed audit failure metadata action = %q, want BLOCK", got)
+			}
+		})
+	}
+}
+
+func TestServerAppliesResponseFailurePolicyWhenAuditSinkFails(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		failure   policy.FailureMode
+		wantBlock bool
+	}{
+		{name: "closed", failure: policy.FailureModeClosed, wantBlock: true},
+		{name: "open", failure: policy.FailureModeOpen, wantBlock: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cache := snapshotPolicyCache{snapshot: policy.CompiledSnapshot{
+				PolicyID: "default", Version: 1,
+				Definition: policy.PolicyDefinition{FailurePolicy: policy.FailurePolicy{
+					Request: policy.FailureModeOpen, Response: test.failure,
+				}},
+			}}
+			server, err := NewServerWithAuditor(NewAllowProcessor(), cache, failingAuditor{})
+			if err != nil {
+				t.Fatalf("NewServerWithAuditor() error = %v", err)
+			}
+			stream, err := newExternalProcessorTestClientForServer(t, server).Process(context.Background())
+			if err != nil {
+				t.Fatalf("open stream: %v", err)
+			}
+			if err := stream.Send(requestHeadersMessageWithEndOfStream("ignored", "envoy-response-audit-failure", "default", true)); err != nil {
+				t.Fatalf("send request headers: %v", err)
+			}
+			if _, err := stream.Recv(); err != nil {
+				t.Fatalf("receive request response: %v", err)
+			}
+			if err := stream.Send(responseHeadersForAdapterTest(true)); err != nil {
+				t.Fatalf("send response headers: %v", err)
+			}
+			response, err := stream.Recv()
+			if err != nil {
+				t.Fatalf("receive response result: %v", err)
+			}
+			if (response.GetImmediateResponse() != nil) != test.wantBlock {
+				t.Fatalf("response failure policy %q result = %+v", test.failure, response)
+			}
+			metadata := response.GetDynamicMetadata().GetFields()[safeMetadataNamespace].GetStructValue().GetFields()
+			if !metadata["degraded"].GetBoolValue() {
+				t.Fatalf("response audit failure metadata = %v, want degraded=true", metadata)
 			}
 		})
 	}
@@ -1399,6 +1584,61 @@ func TestServerFailsOpenForWindowedSSEProcessorError(t *testing.T) {
 	metadata := response.GetDynamicMetadata().GetFields()[safeMetadataNamespace].GetStructValue().GetFields()
 	if !metadata["degraded"].GetBoolValue() {
 		t.Fatalf("fail-open response metadata = %v, want degraded=true", metadata)
+	}
+}
+
+func TestServerHaltsWindowedSSEWithSafeImmediateResponse(t *testing.T) {
+	cache := snapshotPolicyCache{snapshot: policy.CompiledSnapshot{PolicyID: "default", Version: 7, Definition: policy.PolicyDefinition{
+		Response:  policy.ResponsePolicy{Enabled: true, Secret: policy.ActionBlock},
+		Streaming: policy.StreamingSettings{Mode: policy.StreamingModeWindowed, WindowBytes: 1},
+	}}}
+	auditor := &recordingAuditor{}
+	server, err := NewServerWithSettings(blockingWindowProcessor{}, cache, auditor, ServerSettings{FailMode: policy.FailureModeClosed, MaxBodyBytes: 1024, ProcessingTimeout: time.Second})
+	if err != nil {
+		t.Fatalf("NewServerWithSettings: %v", err)
+	}
+	stream, err := newExternalProcessorTestClientForServer(t, server).Process(context.Background())
+	if err != nil {
+		t.Fatalf("open stream: %v", err)
+	}
+	for _, message := range []*extprocv3.ProcessingRequest{requestHeadersMessageWithEndOfStream("ignored", "envoy-halt", "default", true), responseHeadersForAdapterTest(false)} {
+		if message.GetResponseHeaders() != nil {
+			message.GetResponseHeaders().Headers.Headers[0].RawValue = []byte("text/event-stream")
+		}
+		if err := stream.Send(message); err != nil {
+			t.Fatalf("send setup: %v", err)
+		}
+		if _, err := stream.Recv(); err != nil {
+			t.Fatalf("receive setup: %v", err)
+		}
+	}
+	unsafe := []byte("data: {\"choices\":[{\"delta\":{\"content\":\"unsafe streamed value\"}}]}\n\ndata: [DONE]\n\n")
+	if err := stream.Send(responseBodyForAdapterTest(unsafe, true)); err != nil {
+		t.Fatalf("send SSE: %v", err)
+	}
+	response, err := stream.Recv()
+	if err != nil {
+		t.Fatalf("receive SSE halt: %v", err)
+	}
+	immediate := response.GetImmediateResponse()
+	if immediate == nil || immediate.GetStatus().GetCode() != typev3.StatusCode_Forbidden {
+		t.Fatalf("halt response = %+v, want safe 403", response)
+	}
+	if strings.Contains(string(immediate.GetBody()), "unsafe streamed value") {
+		t.Fatalf("halt response leaked unsafe SSE content: %q", immediate.GetBody())
+	}
+	var payload blockErrorResponse
+	if err := json.Unmarshal(immediate.GetBody(), &payload); err != nil || payload.Error.Code != "TSZ_RESPONSE_GUARDRAIL_BLOCKED" || payload.TSZMeta.PolicyVersion != 7 {
+		t.Fatalf("halt payload = %+v, error = %v", payload, err)
+	}
+	events := auditor.eventsSnapshot()
+	if len(events) != 3 {
+		t.Fatalf("audit event count = %d, want 3: %+v", len(events), events)
+	}
+	streamEvent := events[2]
+	if streamEvent.Stage != guardrails.AuditStageResponse || streamEvent.Action != guardrails.RuleActionBlock ||
+		streamEvent.PolicyVersion != 7 || streamEvent.DetectionCount != 1 || strings.Join(streamEvent.Categories, ",") != "SECRET" {
+		t.Fatalf("stream halt audit event = %+v", streamEvent)
 	}
 }
 

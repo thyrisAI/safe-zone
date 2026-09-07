@@ -586,11 +586,28 @@ func ValidateDefinition(definition PolicyDefinition) error {
 	if strings.EqualFold(definition.Streaming.Mode, "strict") {
 		return fmt.Errorf("%w: strict streaming is unsupported; use buffered non-streaming response enforcement", ErrInvalidDefinition)
 	}
-	if definition.Streaming.Mode != "" && definition.Streaming.Mode != StreamingModeNone && definition.Streaming.Mode != StreamingModeWindowed {
-		return fmt.Errorf("%w: streaming mode must be None or Windowed, got %q", ErrInvalidDefinition, definition.Streaming.Mode)
+	if definition.Streaming.Mode != "" && definition.Streaming.Mode != StreamingModeNone && definition.Streaming.Mode != StreamingModeAsyncAudit && definition.Streaming.Mode != StreamingModeWindowed {
+		return fmt.Errorf("%w: streaming mode must be None, AsyncAudit or Windowed, got %q", ErrInvalidDefinition, definition.Streaming.Mode)
 	}
 	if definition.Streaming.WindowBytes < 0 {
 		return fmt.Errorf("%w: streaming window bytes must be positive", ErrInvalidDefinition)
+	}
+	if definition.Streaming.Mode == StreamingModeAsyncAudit {
+		if !definition.Response.Enabled {
+			return fmt.Errorf("%w: AsyncAudit streaming requires response guardrails", ErrInvalidDefinition)
+		}
+		for _, candidate := range []struct {
+			path   string
+			action Action
+		}{
+			{path: "response.pii", action: definition.Response.PII},
+			{path: "response.secret", action: definition.Response.Secret},
+			{path: "response.unsafe_content", action: definition.Response.UnsafeContent},
+		} {
+			if candidate.action == ActionMask || candidate.action == ActionBlock {
+				return fmt.Errorf("%w: %s cannot use %s with AsyncAudit streaming; use AUDIT_ONLY or ALLOW", ErrInvalidDefinition, candidate.path, candidate.action)
+			}
+		}
 	}
 	type actionCandidate struct {
 		path   string
@@ -623,10 +640,6 @@ func ValidateDefinition(definition PolicyDefinition) error {
 		if !candidate.action.Valid() {
 			return fmt.Errorf("%w: %s action must be ALLOW, MASK, BLOCK or AUDIT_ONLY, got %q", ErrInvalidDefinition, candidate.path, candidate.action)
 		}
-	}
-	if definition.Streaming.Mode == StreamingModeWindowed && definition.Response.Enabled &&
-		(definition.Response.PII == ActionBlock || definition.Response.Secret == ActionBlock || definition.Response.UnsafeContent == ActionBlock) {
-		return fmt.Errorf("%w: windowed streaming does not support response BLOCK actions", ErrInvalidDefinition)
 	}
 	for _, validators := range [][]ValidatorReference{definition.Request.CustomValidators, definition.Response.CustomValidators} {
 		for _, validator := range validators {

@@ -12,18 +12,41 @@ TSZ has two streaming integrations. They have different control planes and
 security contracts, and must not be treated as interchangeable.
 
 Historically this document described only the legacy `/v1/chat/completions`
-header-based model. The BYG / Envoy `ext_proc` Windowed model below is a
-separate architecture, added here as its own contract rather than as another
-legacy header mode.
+header-based model. The BYG / Envoy `ext_proc` modes below are a separate
+architecture, added here as their own contract rather than as legacy header
+modes.
 
 | Integration | Configuration | Modes covered here |
 | --- | --- | --- |
 | Legacy OpenAI-compatible gateway (`/v1/chat/completions`) | Request headers | `final-only`, `stream-sync`, `stream-async`, and its header-driven `halt` behaviour |
-| Bring Your Gateway (BYG), Envoy `ext_proc` | A stream-pinned `TSZGuardrailPolicy` | `Windowed` response enforcement |
+| Bring Your Gateway (BYG), Envoy `ext_proc` | A stream-pinned `TSZGuardrailPolicy` | `AsyncAudit` observation and `Windowed` response enforcement |
 
 The legacy gateway material begins in [Legacy gateway streaming](#3-legacy-openai-compatible-gateway). The BYG model is described separately below; it does **not** use the legacy streaming headers.
 
-## 2. BYG / Envoy `ext_proc`: Windowed enforcement
+## 2. BYG / Envoy `ext_proc`
+
+### AsyncAudit observation
+
+`Streaming.Mode: AsyncAudit` forwards each SSE body chunk immediately and
+unchanged. Completed, event-aligned OpenAI Chat Completions events are retained
+only in a bounded in-memory buffer and inspected by a bounded background worker
+after end-of-stream. The resulting response-stage decision is emitted as
+PII-safe `AUDIT_ONLY` metadata/audit output.
+
+The current preview exposes this mode through the portable compiled-policy
+profile used by the example runner. The frozen, storage-compatible
+`TSZGuardrailPolicy` v1alpha1/v1beta1 schema continues to admit `None` and
+`Windowed` only; adding the native field requires a future API version rather
+than silently changing the graduated schema.
+
+This is visibility, not enforcement: detected content has already reached the
+client. Policy validation rejects response `MASK` and `BLOCK` actions in this
+mode rather than implying that an asynchronous decision can recall bytes. A
+buffer or worker-queue overflow also preserves delivery and records a degraded
+aggregate failure without logging content. See the runnable
+[10-stream-async-audit example](../../examples/bring-your-gateway/10-stream-async-audit/README.md).
+
+### Windowed enforcement
 
 BYG Windowed enforcement operates on an Envoy external-processing response
 stream. Enable it with the policy's `Streaming.Mode: Windowed` and choose a
@@ -65,11 +88,12 @@ apply response `BLOCK`/`MASK` there.
 
 ### Block/halt and cancellation semantics
 
-`Windowed` currently supports response masking, not a BYG stream-halt
-contract: response `BLOCK` actions are rejected for a Windowed policy. Do not
-map this to the legacy gateway's header-driven `halt` behaviour. A separate
-`12-stream-halt` example/documentation path covers that behaviour when it is
-introduced.
+`Windowed` supports response masking and best-effort halt. A response `BLOCK`
+decision returns a safe terminal response and stops future SSE delivery. This
+does not retract events released from earlier safe windows and must not be
+described as zero-leakage or mapped to the legacy gateway's header-driven
+`halt` semantics. See the runnable
+[12-stream-halt example](../../examples/bring-your-gateway/12-stream-halt/README.md).
 
 If the downstream client disconnects and Envoy cancels the `ext_proc` RPC, TSZ
 stops inline work such as the window buffer and semantic validation and returns

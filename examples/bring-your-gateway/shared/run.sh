@@ -266,6 +266,24 @@ if [[ -f "${example_dir}/expect-sse-present" ]]; then
     grep -Fq "${present}" "${response_file}" || { echo "expected SSE value missing from client response" >&2; exit 1; }
   done <"${example_dir}/expect-sse-present"
 fi
+if [[ -f "${example_dir}/expect-async-audit" ]]; then
+  async_audit_observed=0
+  for _ in $(seq 1 30); do
+    while IFS= read -r processor_pod; do
+      [[ -z "${processor_pod}" ]] && continue
+      if kubectl -n "${namespace}" exec "${processor_pod}" -- wget -qO- http://127.0.0.1:8080/metrics 2>/dev/null |
+        grep -Eq '^tsz_extproc_actions_total\{action="AUDIT_ONLY",policy="default",stage="response"\} [1-9][0-9]*(\.[0-9]+)?$'; then
+        async_audit_observed=1
+        break
+      fi
+    done < <(kubectl -n "${namespace}" get pods -l app.kubernetes.io/name=tsz-ext-proc -o name)
+    [[ "${async_audit_observed}" == "1" ]] && break
+    sleep 1
+  done
+  [[ "${async_audit_observed}" == "1" ]] || {
+    echo "completed stream did not produce an AsyncAudit response decision" >&2; exit 1;
+  }
+fi
 if [[ -f "${example_dir}/rate-limit-requests" ]]; then
   rate_limit_requests="$(<"${example_dir}/rate-limit-requests")"
   [[ "${rate_limit_requests}" =~ ^[1-9][0-9]*$ ]] || {
@@ -319,6 +337,12 @@ if [[ "$(basename "${example_dir}")" == "05-fail-open" ]]; then
   expected_hash="$(sha256_file "${example_dir}/request.json")"
   [[ "$(jq -r '.sha256' <<<"${after}")" == "${expected_hash}" ]] || {
     echo "fail-open changed the upstream request body" >&2; exit 1;
+  }
+fi
+if [[ -f "${example_dir}/expect-unchanged" ]]; then
+  expected_hash="$(sha256_file "${example_dir}/request.json")"
+  [[ "$(jq -r '.sha256' <<<"${after}")" == "${expected_hash}" ]] || {
+    echo "audit-only/safe path changed the upstream request body" >&2; exit 1;
   }
 fi
 if [[ -f "${example_dir}/expect-shared-processor" ]]; then

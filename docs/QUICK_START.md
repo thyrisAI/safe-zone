@@ -7,6 +7,36 @@ TSZ is designed to run as a containerized microservice in your environment (Dock
 For Kubernetes deployments, use the Helm chart in `deployment/helm/thyris-sz`
 and follow `docs/DEPLOYMENT.md`.
 
+If you already operate Envoy Gateway and want TSZ as an external guardrail
+rather than an LLM proxy, use the BYG quick start below.
+
+### BYG quick start
+
+The repository includes a self-contained Kind environment with a pinned Envoy
+Gateway v1.8.3, a local mock OpenAI-compatible upstream, PostgreSQL, Redis, and
+TSZ. It uses no paid provider or real credential.
+
+```bash
+examples/bring-your-gateway/shared/run.sh \
+  examples/bring-your-gateway/01-minimal-inspection
+examples/bring-your-gateway/shared/run.sh \
+  examples/bring-your-gateway/02-request-masking
+examples/bring-your-gateway/shared/run.sh \
+  examples/bring-your-gateway/03-request-blocking
+```
+
+The runner verifies the HTTP outcome and the content-safe mock-upstream
+summary, including that masked PII is not forwarded and blocked requests never
+reach the upstream. Remove the environment when finished:
+
+```bash
+deployments/envoy-gateway/kind-bootstrap.sh down
+```
+
+Production configuration, native `TSZGuardrailPolicy` attachment, TLS/mTLS,
+failure policy, troubleshooting, and upgrade guidance are in
+`integrations/ENVOY_GATEWAY.md`.
+
 ---
 
 ## 1. Prerequisites

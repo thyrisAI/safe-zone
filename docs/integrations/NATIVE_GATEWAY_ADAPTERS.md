@@ -70,7 +70,9 @@ request inspection, requested masking and blocking, response inspection and
 mutation, and streaming capabilities. It also validates target kind and
 section support before compilation or native resource writes. For `PostgresRef`,
 it checks the resolved immutable snapshot so actions behind a reference cannot
-bypass capability validation. Existing Windowed/BLOCK restrictions remain.
+bypass capability validation. A Windowed `BLOCK` additionally requires the
+adapter's immediate-response capability; it halts future delivery but cannot
+retract bytes released from earlier windows.
 
 Capability selection is an in-process negotiation between policy requirements
 and the selected adapter's trusted, versioned descriptor. The controller first

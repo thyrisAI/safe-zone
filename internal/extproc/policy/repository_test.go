@@ -58,11 +58,37 @@ func TestValidateDefinitionAllowsDisabledEmptyResponse(t *testing.T) {
 	}
 }
 
-func TestValidateDefinitionRejectsBlockForWindowedStreaming(t *testing.T) {
+func TestValidateDefinitionAcceptsBlockForWindowedStreamingHalt(t *testing.T) {
 	definition := validPolicyDefinition()
 	definition.Streaming = StreamingSettings{Mode: StreamingModeWindowed, WindowBytes: 4096}
-	if err := ValidateDefinition(definition); !errors.Is(err, ErrInvalidDefinition) {
-		t.Fatalf("ValidateDefinition() error = %v, want ErrInvalidDefinition", err)
+	if err := ValidateDefinition(definition); err != nil {
+		t.Fatalf("ValidateDefinition() error = %v", err)
+	}
+}
+
+func TestValidateDefinitionAcceptsAsyncAuditOnlyStreaming(t *testing.T) {
+	definition := validPolicyDefinition()
+	definition.Response.PII = ActionAuditOnly
+	definition.Response.Secret = ActionAuditOnly
+	definition.Response.UnsafeContent = ActionAuditOnly
+	definition.Streaming = StreamingSettings{Mode: StreamingModeAsyncAudit}
+	if err := ValidateDefinition(definition); err != nil {
+		t.Fatalf("ValidateDefinition() error = %v", err)
+	}
+}
+
+func TestValidateDefinitionRejectsEnforcementActionsForAsyncAuditStreaming(t *testing.T) {
+	for _, action := range []Action{ActionMask, ActionBlock} {
+		t.Run(string(action), func(t *testing.T) {
+			definition := validPolicyDefinition()
+			definition.Response.PII = action
+			definition.Response.Secret = ActionAuditOnly
+			definition.Response.UnsafeContent = ActionAuditOnly
+			definition.Streaming = StreamingSettings{Mode: StreamingModeAsyncAudit}
+			if err := ValidateDefinition(definition); !errors.Is(err, ErrInvalidDefinition) {
+				t.Fatalf("ValidateDefinition() error = %v, want ErrInvalidDefinition", err)
+			}
+		})
 	}
 }
 

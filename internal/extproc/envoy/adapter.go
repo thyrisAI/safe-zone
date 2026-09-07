@@ -68,6 +68,10 @@ type envoyStreamState struct {
 	responseStreaming   bool
 	responseSSE         *OpenAISSEParser
 	windowedResponse    *sseWindow
+	asyncAuditResponse  bool
+	asyncAuditEvents    []OpenAISSEEvent
+	asyncAuditBytes     int
+	asyncAuditDropped   bool
 	completedSSEEvents  []OpenAISSEEvent
 	streamBufferLimit   int
 	rpcMethod           string
@@ -173,6 +177,41 @@ func (state *envoyStreamState) enableWindowedResponse(windowBytes int) {
 	}
 }
 
+func (state *envoyStreamState) enableAsyncAuditResponse() {
+	if state.responseStreaming {
+		state.asyncAuditResponse = true
+	}
+}
+
+func (state *envoyStreamState) takeAsyncAudit(endOfStream bool) ([]OpenAISSEEvent, bool, bool) {
+	if !state.asyncAuditResponse {
+		return nil, false, false
+	}
+	if state.asyncAuditDropped {
+		state.completedSSEEvents = nil
+		return nil, endOfStream, true
+	}
+	for _, event := range state.completedSSEEvents {
+		if state.streamBufferLimit > 0 && len(event.Raw) > state.streamBufferLimit-state.asyncAuditBytes {
+			state.asyncAuditEvents = nil
+			state.asyncAuditBytes = 0
+			state.asyncAuditDropped = true
+			break
+		}
+		state.asyncAuditEvents = append(state.asyncAuditEvents, event)
+		state.asyncAuditBytes += len(event.Raw)
+	}
+	state.completedSSEEvents = nil
+	if !endOfStream {
+		return nil, false, state.asyncAuditDropped
+	}
+	events := append([]OpenAISSEEvent(nil), state.asyncAuditEvents...)
+	dropped := state.asyncAuditDropped
+	state.asyncAuditEvents = nil
+	state.asyncAuditBytes = 0
+	return events, true, dropped
+}
+
 func (state *envoyStreamState) takeWindow(endOfStream bool) ([]OpenAISSEEvent, int, bool, error) {
 	if state.windowedResponse == nil {
 		return nil, 0, false, nil
@@ -193,6 +232,8 @@ func (state *envoyStreamState) close() {
 		state.windowedResponse.bytes = 0
 	}
 	state.completedSSEEvents = nil
+	state.asyncAuditEvents = nil
+	state.asyncAuditBytes = 0
 	state.responseSSE = nil
 }
 

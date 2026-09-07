@@ -17,14 +17,33 @@ func TestCheckCapabilitiesAcceptsWindowedStreaming(t *testing.T) {
 	}
 }
 
-func TestCheckCapabilitiesRejectsUnsupportedWindowedStreaming(t *testing.T) {
-	err := CheckCapabilities(securityv1beta1.TSZGuardrailPolicySpec{
+func TestCheckCapabilitiesAcceptsWindowedStreamingHalt(t *testing.T) {
+	spec := securityv1beta1.TSZGuardrailPolicySpec{
 		Streaming: &securityv1beta1.StreamingSpec{Enabled: true, Mode: "Windowed"},
 		Response:  &securityv1beta1.ResponsePolicySpec{Enabled: true, PII: securityv1beta1.PolicyActionMask, Secret: securityv1beta1.PolicyActionBlock, UnsafeContent: securityv1beta1.PolicyActionAuditOnly},
-	}, EnvoyGatewayCapabilities)
-	if !errors.Is(err, ErrUnsupportedCapability) {
-		t.Fatalf("CheckCapabilities() error = %v, want ErrUnsupportedCapability", err)
 	}
+	negotiation, err := NegotiateSpec(spec, EnvoyGatewayCapabilities)
+	if err != nil {
+		t.Fatalf("NegotiateSpec() error = %v", err)
+	}
+	if !containsRequirement(negotiation.Required, CapabilityResponseStreamingWindowed) || !containsRequirement(negotiation.Required, CapabilityImmediateResponse) {
+		t.Fatalf("windowed halt requirements = %v", negotiation.Required)
+	}
+
+	withoutImmediateResponse := EnvoyGatewayCapabilities
+	withoutImmediateResponse.ImmediateResponse = false
+	if _, err := NegotiateSpec(spec, withoutImmediateResponse); !errors.Is(err, ErrUnsupportedCapability) {
+		t.Fatalf("NegotiateSpec() error = %v, want missing immediateResponse", err)
+	}
+}
+
+func containsRequirement(requirements Requirements, want Capability) bool {
+	for _, requirement := range requirements {
+		if requirement == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestCapabilitiesRejectUnsupportedEnforcement(t *testing.T) {

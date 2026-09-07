@@ -722,9 +722,14 @@ extension boundary, compatibility and Phase 7 scope.
 For a strict no-leakage guarantee, use supported buffered, non-streaming OpenAI,
 Anthropic Messages, or Gemini GenerateContent traffic. The request must use
 `Content-Type: application/json`; unsupported content shapes are processing
-failures, not silently allowed content. The separate Envoy BYG `Windowed` SSE
-mode currently understands Chat Completions events only and is best-effort: it
-cannot retract content that Envoy has already sent.
+failures, not silently allowed content. The portable Envoy BYG `AsyncAudit`
+compiled-policy mode forwards SSE unchanged and performs bounded post-stream observation; it accepts only
+response `ALLOW`/`AUDIT_ONLY` actions and provides no confidentiality guarantee.
+The separate `Windowed` mode currently understands Chat Completions events
+only and is best-effort: it cannot retract content that Envoy has already sent. `MASK` rewrites the
+not-yet-released event window. `BLOCK` returns a safe terminal response and
+halts future delivery; use buffered response processing when any prior leakage
+is unacceptable.
 
 The supported non-streaming content fields are:
 

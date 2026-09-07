@@ -99,6 +99,35 @@ func TestOpenAIRequestProcessorMasksStreamingWindow(t *testing.T) {
 	}
 }
 
+func TestOpenAIRequestProcessorBlocksStreamingWindowWithoutReturningUnsafeEvents(t *testing.T) {
+	processor, err := NewOpenAIRequestProcessor(inspectFunc(func(_ context.Context, input guardrails.InspectInput) (guardrails.InspectResult, error) {
+		return guardrails.InspectResult{Action: guardrails.RuleActionBlock, DetectionCount: 1, Categories: []string{"SECRET"}}, nil
+	}))
+	if err != nil {
+		t.Fatalf("NewOpenAIRequestProcessor() error = %v", err)
+	}
+	parser := &OpenAISSEParser{}
+	events, err := parser.Feed([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"unsafe streamed value\"}}]}\n\ndata: [DONE]\n\n"))
+	if err != nil {
+		t.Fatalf("parse SSE: %v", err)
+	}
+	result, mutated, err := processor.ProcessSSEWindow(context.Background(), ProcessingRequest{
+		RID: "rid", EnvoyReqID: "envoy", Stage: StageResponse, PolicyID: "default", PolicyVersion: 1,
+		PolicySnapshot: &policy.CompiledSnapshot{PolicyID: "default", Version: 1, Definition: policy.PolicyDefinition{
+			Response: policy.ResponsePolicy{Enabled: true, PII: policy.ActionBlock, Secret: policy.ActionBlock, UnsafeContent: policy.ActionBlock},
+		}},
+	}, events)
+	if err != nil {
+		t.Fatalf("ProcessSSEWindow() error = %v", err)
+	}
+	if result.Action != ActionBlock || result.ImmediateStatus != 403 || result.DetectionCount != 1 {
+		t.Fatalf("window block result = %+v", result)
+	}
+	if len(mutated) != len(events) {
+		t.Fatalf("mutated events = %d, want %d for adapter-owned terminal handling", len(mutated), len(events))
+	}
+}
+
 func TestOpenAIRequestProcessorStreamingWindowUsesCrossEventContext(t *testing.T) {
 	processor, err := NewOpenAIRequestProcessor(inspectFunc(func(_ context.Context, input guardrails.InspectInput) (guardrails.InspectResult, error) {
 		if input.Text != "secret@example.test" {

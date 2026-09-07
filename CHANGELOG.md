@@ -5,7 +5,7 @@ released versions follow the GitHub release publication date. Component-only
 SDK and CLI tags are mentioned under the Safe Zone release that introduced
 them, rather than being treated as product releases.
 
-## [2.1.0] - 2026-09-07
+## 2.1.0 - 2026-09-07
 
 ### Bring Your Gateway
 
@@ -129,7 +129,6 @@ them, rather than being treated as product releases.
 - Added the open-source project foundation, contribution documentation, and
   automated release workflow.
 
-[2.1.0]: https://github.com/thyrisAI/safe-zone/releases/tag/thyris-sz-v2.1.0
 [2.0.0]: https://github.com/thyrisAI/safe-zone/releases/tag/thyris-sz-v2.0.0
 [1.0.0]: https://github.com/thyrisAI/safe-zone/releases/tag/thyris-sz-v1.0.0
 [0.2.0]: https://github.com/thyrisAI/safe-zone/releases/tag/thyris-sz-v0.2.0

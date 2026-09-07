@@ -7,10 +7,102 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
+  ci_scope:
+    name: Detect CI scope
+    runs-on: ubuntu-latest
+    outputs:
+      policy_api: ${{ steps.changes.outputs.policy_api }}
+      byg_kind: ${{ steps.changes.outputs.byg_kind }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed areas
+        id: changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "policy_api=true" >> "$GITHUB_OUTPUT"
+            echo "byg_kind=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base="$PR_BASE_SHA"
+            head="$PR_HEAD_SHA"
+          else
+            base="$PUSH_BEFORE_SHA"
+            head="$CURRENT_SHA"
+          fi
+
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            base="$(git rev-list --max-parents=0 "$head")"
+          fi
+
+          if git diff --quiet "$base" "$head" -- \
+            api/v1alpha1 \
+            api/v1beta1 \
+            cmd/tsz-controller \
+            config/crd \
+            config/rbac \
+            hack \
+            internal/controller \
+            internal/extproc/policy \
+            .github/workflows/ci-test.yml \
+            Makefile \
+            go.mod \
+            go.sum; then
+            echo "policy_api=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "policy_api=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          if git diff --quiet "$base" "$head" -- \
+            api/v1alpha1 \
+            api/v1beta1 \
+            cmd/byg-mock-openai \
+            cmd/byg-mock-siem \
+            cmd/tsz-controller \
+            cmd/tsz-ext-proc \
+            cmd/tsz-policy \
+            config/crd \
+            config/rbac \
+            deployments/envoy-gateway \
+            examples/bring-your-gateway \
+            internal/config/extproc.go \
+            internal/config/extproc_test.go \
+            internal/controller \
+            internal/extproc \
+            internal/guardrails/audit.go \
+            internal/guardrails/webhook_auditor.go \
+            tests/integration/byg_replica_convergence_test.go \
+            tests/integration/byg_replica_lifecycle_test.go \
+            tests/perf \
+            tests/release \
+            .github/workflows/ci-test.yml \
+            Dockerfile \
+            Makefile \
+            go.mod \
+            go.sum; then
+            echo "byg_kind=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "byg_kind=true" >> "$GITHUB_OUTPUT"
+          fi
+
   policy-api-compatibility:
     name: Policy API compatibility and storage upgrade
+    needs: ci_scope
+    if: needs.ci_scope.outputs.policy_api == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -231,7 +323,9 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version-file: pkg/tsz-cli/go.mod
+          # This job builds the root server first. The root module's Go version
+          # also satisfies the CLI submodule's lower minimum version.
+          go-version-file: go.mod
 
       - name: Install PostgreSQL client
         run: |
@@ -271,7 +365,9 @@ jobs:
     name: BYG example smoke tests (Kind)
     runs-on: ubuntu-latest
     needs:
+      - ci_scope
       - unit-tests
+    if: needs.ci_scope.outputs.byg_kind == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v7

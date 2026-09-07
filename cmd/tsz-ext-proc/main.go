@@ -23,12 +23,17 @@ import (
 )
 
 // exampleFaultAuditor exists exclusively so the checked-in BYG examples can
-// exercise failure_policy without taking a real dependency down. It is opt-in
-// and is never enabled by the deployment manifest.
+// exercise the request failure_policy without taking a real dependency down.
+// It is opt-in and is never enabled by the deployment manifest. Response
+// audits continue normally so the request fail-open example can reach and
+// return the mock upstream response.
 type exampleFaultAuditor struct{}
 
-func (exampleFaultAuditor) Audit(context.Context, guardrails.AuditEvent) error {
-	return errors.New("BYG example audit fault injection")
+func (exampleFaultAuditor) Audit(_ context.Context, event guardrails.AuditEvent) error {
+	if event.Stage == guardrails.AuditStageRequest {
+		return errors.New("BYG example request audit fault injection")
+	}
+	return nil
 }
 
 func main() {

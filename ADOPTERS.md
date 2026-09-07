@@ -1,8 +1,8 @@
 # Adopters of Safe Zone
 
 This file is the public reference list for organizations that have adopted
-Thyris Safe Zone (TSZ). To add or update an entry, follow the
-[adoption guide](docs/ADOPTION.md).
+Thyris Safe Zone (TSZ). To add or update an entry, submit a pull request that
+adds or updates the organization's row below.
 
 Entries must be authorized, accurate, and kept in alphabetical order. Inclusion
 is a factual statement of use and does not imply endorsement by either party.

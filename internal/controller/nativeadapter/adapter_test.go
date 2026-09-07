@@ -22,7 +22,9 @@ func TestRegistryRejectsInvalidRegistrationsAndUnknownSelection(t *testing.T) {
 	envoy := &envoyresource.EnvoyResourceReconciler{}
 	portable := envoy.Descriptor()
 	portable.Capabilities.NativePolicyAttachment = false
-	for _, adapters := range [][]nativeadapter.Adapter{{nil}, {envoy, envoy}, {descriptorAdapter{descriptor: portable}}, {descriptorAdapter{}}} {
+	invalid := envoy.Descriptor()
+	invalid.Capabilities.RequestBufferedBody = false
+	for _, adapters := range [][]nativeadapter.Adapter{{nil}, {envoy, envoy}, {descriptorAdapter{descriptor: portable}}, {descriptorAdapter{descriptor: invalid}}, {descriptorAdapter{}}} {
 		if _, err := nativeadapter.NewRegistry(adapters...); err == nil {
 			t.Fatal("invalid registration accepted")
 		}

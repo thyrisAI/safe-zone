@@ -302,11 +302,19 @@ jobs:
         run: deployments/envoy-gateway/kind-bootstrap.sh down
 
   documentation-link-checks:
-    name: Documentation link checks
+    name: Documentation and adapter release checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Check adapter release documentation and examples
+        run: go test ./tests/release
 
       - name: Check Markdown links
         uses: lycheeverse/lychee-action@v2

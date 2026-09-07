@@ -11,3 +11,18 @@ Kind, kubectl, curl and jq. The local mock provider confirms masking before
 upstream delivery. The mock sink is test-only; use an approved TLS-protected
 collector in production. Trace exporter configuration and trusted traceparent
 propagation are documented in `docs/operations/BYG_OBSERVABILITY.md`.
+These prerequisites and tested versions are shared with the complete set and
+are pinned by its bootstrap.
+
+The safe OpenAI-compatible request contains only the synthetic
+`synthetic@example.com` fixture. The expected result is HTTP 200: the upstream
+sees a mask rather than that value, `tsz_extproc_actions_total` is present, and
+the mock SIEM receives a correlated event with no raw fixture. Blocking is not
+part of this focused example; use `03-request-blocking` and
+`16-response-blocking` for request and response blocks.
+
+The [example-set guide](../README.md) documents architecture, tested Envoy and
+Gateway API versions, installation, log/metric/trace inspection, production
+limitations, and troubleshooting. The cleanup script removes the local SIEM
+resources and processor webhook setting; use the guide's cluster cleanup after
+the complete suite.

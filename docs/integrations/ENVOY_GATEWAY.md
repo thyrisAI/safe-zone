@@ -4,6 +4,30 @@ This guide covers Envoy Gateway v1.8.3 with Gateway API v1.5.1. The checked-in
 Kind example under `deployments/envoy-gateway/` is the reproducible reference
 environment.
 
+## Support status and integration level
+
+The Envoy Gateway adapter maturity is **preview** for the version pair above. TSZ supports
+both a Level 1 portable profile using a manually managed
+`EnvoyExtensionPolicy` and a Level 2 native profile using
+`TSZGuardrailPolicy`. Envoy AI Gateway and other Envoy-compatible products are
+not included in this claim; each needs its own compatibility evidence.
+
+Requests flow from the client to Envoy, through TSZ's `ext_proc` service for
+request enforcement, to the selected upstream. Supported buffered responses
+flow back through the same processor before reaching the client. Envoy remains
+responsible for routing, authentication, rate limiting, retries, and provider
+credentials. The adapter supports `ALLOW`, `AUDIT_ONLY`, `MASK`, and `BLOCK`,
+buffered request/response mutation, bounded streaming modes, safe dynamic
+metadata, metrics, and tracing. Ordering constraints and the different
+guarantees of streamed response modes are documented below and in the
+[streaming contract](../concepts/STREAMING.md).
+
+The gateway-owned route header in the portable profile and trusted route
+attribute in the native profile are policy-authority sources. Client headers
+are not authoritative. Request enforcement defaults closed. Limits are pinned
+in the active policy and deployment; TLS/mTLS and network isolation remain
+operator responsibilities described in this guide.
+
 ## Deployment package
 
 The supported Kubernetes packaging entry point is the Kustomize package in
@@ -425,3 +449,31 @@ controller and processor readiness checks recover.
 To move back to preview, reverse the order: restore the manual attachment and
 trusted header identity first, roll ext-proc to `header`, and only then delete
 the managed CRD.
+
+## Runnable verification and cleanup
+
+The complete local example set is indexed in the
+[Bring Your Gateway example guide](../../examples/bring-your-gateway/README.md).
+It includes safe, request-mask, request-block, response-mask, response-block,
+fail-open, fail-closed, and telemetry scenarios against a local mock provider.
+Run all of them with:
+
+```bash
+examples/bring-your-gateway/smoke.sh
+```
+
+For a failed installation, first inspect `EnvoyExtensionPolicy` acceptance,
+the Envoy and `tsz-ext-proc` pods, processor logs, and the policy conditions
+described above. The detailed incident paths are in
+[BYG troubleshooting](../operations/BYG_TROUBLESHOOTING.md).
+
+Remove the throwaway reference cluster after verification:
+
+```bash
+deployments/envoy-gateway/kind-bootstrap.sh down
+```
+
+This command is scoped to the configured example Kind cluster. Production
+cleanup must use the owning Helm/GitOps workflow, preserve audit evidence, and
+remove attachments before the processor while accounting for the configured
+failure mode.

@@ -9,8 +9,12 @@ The shipped binary registers **`envoy-gateway` only**, using the existing
 Envoy Gateway 1.8.3 resource implementation. This change enables additional
 native adapters to be registered in controller code; it does not implement or
 claim support for Kong, APISIX, NGINX, Traefik, Istio or managed cloud gateways.
-Selecting the next gateway, its data-plane transport, compatibility testing,
-conformance suite and runnable integration guide remain Phase 7 work.
+Kong Gateway + KIC is the [provisional next adapter candidate](NEXT_GATEWAY_DECISION.md).
+Its data-plane transport, compatibility testing, conformance suite and runnable
+integration guide remain Phase 7 work; the shipped binary still registers no
+Kong implementation.
+See the [gateway adapter evaluation](GATEWAY_ADAPTER_EVALUATION.md) for the
+candidate-specific transport, control-plane, capability, and risk assessment.
 
 ## Policy selection and compatibility
 
@@ -68,6 +72,21 @@ section support before compilation or native resource writes. For `PostgresRef`,
 it checks the resolved immutable snapshot so actions behind a reference cannot
 bypass capability validation. Existing Windowed/BLOCK restrictions remain.
 
+Capability selection is an in-process negotiation between policy requirements
+and the selected adapter's trusted, versioned descriptor. The controller first
+negotiates the visible attachment spec, then repeats negotiation against the
+fully resolved immutable policy definition before activation. The result names
+the adapter/version and the complete ordered requirement set; a rejection lists
+all missing capabilities so status is actionable. A successful result is passed
+to the native adapter with the validated effective attachment settings. Because
+adapters are compiled into the same controller and registry, there is no network
+discovery handshake or client-supplied capability advertisement.
+
+Adapter declarations are validated at registration. Unknown streaming modes and
+impossible combinations such as body mutation without body inspection prevent
+the controller from starting with that adapter. This keeps capability failures
+deterministic and prevents a malformed declaration from weakening admission.
+
 An unsupported name, target scope or enforcement requirement reports
 `Accepted=False` and `Programmed=False`, reason `UnsupportedCapability`, with
 the observed generation. Existing resources remain intact on this rejection;
@@ -115,3 +134,7 @@ conflict domains, owned resource lifecycle, capability rejection, and failed
 updates without changing the guardrail engine. This is a test fixture, not a
 shipping gateway. The API-server tests cover selector defaulting, immutability,
 and lossless alpha/beta upgrade behavior.
+
+For the normative data-plane boundary, capability declaration rules, native
+adapter lifecycle, testing obligations, and release checklist, see the
+[gateway adapter development contract](ADAPTER_DEVELOPMENT.md).

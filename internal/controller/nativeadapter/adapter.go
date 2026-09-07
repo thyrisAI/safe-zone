@@ -18,8 +18,9 @@ import (
 
 // EffectivePolicy contains validated data-plane attachment settings.
 type EffectivePolicy struct {
-	ProcessingTimeout time.Duration
-	FailOpen          bool
+	ProcessingTimeout      time.Duration
+	FailOpen               bool
+	NegotiatedCapabilities capabilities.Negotiation
 }
 
 // TargetCapability declares supported Gateway API targets and section attachment.
@@ -74,7 +75,10 @@ func NewRegistry(adapters ...Adapter) (*Registry, error) {
 			return nil, fmt.Errorf("native adapter is nil")
 		}
 		d := adapter.Descriptor()
-		if d.Capabilities.Name == "" || d.Capabilities.Version == "" || d.ResourceKind == "" || d.ProgrammedReason == "" || len(d.Targets) == 0 {
+		if err := capabilities.ValidateDeclaration(d.Capabilities); err != nil {
+			return nil, err
+		}
+		if d.ResourceKind == "" || d.ProgrammedReason == "" || len(d.Targets) == 0 {
 			return nil, fmt.Errorf("native adapter descriptor is incomplete")
 		}
 		if !d.Capabilities.NativePolicyAttachment {

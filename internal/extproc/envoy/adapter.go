@@ -269,10 +269,15 @@ func isSSEContentType(contentType string) bool {
 func contractRequest(stage ProcessingStage, headers map[string][]string, body []byte, attributes map[string]string) ProcessingRequest {
 	requestID := FirstHeader(headers, "x-request-id")
 	traceParent, traceID := trustedTraceContext(attributes)
+	var bodyCopy []byte
+	if body != nil {
+		bodyCopy = make([]byte, len(body))
+		copy(bodyCopy, body)
+	}
 	request := ProcessingRequest{
 		RequestPath: FirstHeader(headers, ":path"),
 		EnvoyReqID:  requestID, TraceID: traceID, TraceParent: traceParent, Stage: stage,
-		Headers: CloneHeaders(headers), Body: append([]byte(nil), body...),
+		Headers: CloneHeaders(headers), Body: bodyCopy,
 		ContentType: FirstHeader(headers, "content-type"),
 		Gateway:     FirstHeader(headers, "x-tsz-gateway"), Route: FirstHeader(headers, "x-tsz-route"),
 		Tenant:     FirstHeader(headers, "x-tsz-tenant"),

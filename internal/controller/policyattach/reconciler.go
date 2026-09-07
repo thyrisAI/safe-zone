@@ -112,7 +112,8 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return r.unsupportedAdapter(ctx, policy, err)
 	}
 	descriptor := adapter.Descriptor()
-	if err := capabilities.CheckCapabilities(policy.Spec, descriptor.Capabilities); err != nil {
+	negotiation, err := capabilities.NegotiateSpec(policy.Spec, descriptor.Capabilities)
+	if err != nil {
 		return r.unsupportedAdapter(ctx, policy, err)
 	}
 	for _, ref := range policy.Spec.TargetRefs {
@@ -129,7 +130,8 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			r.publishReferenceFailure(ctx, policy, result)
 			return ctrl.Result{}, result.Err
 		}
-		if err := capabilities.CheckDefinition(result.Snapshot.Definition, descriptor.Capabilities); err != nil {
+		negotiation, err = capabilities.NegotiateDefinition(result.Snapshot.Definition, descriptor.Capabilities)
+		if err != nil {
 			return r.unsupportedAdapter(ctx, policy, err)
 		}
 		if result.Snapshot.Version != nil {
@@ -165,7 +167,8 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			if err != nil {
 				return r.lastKnownGoodFailure(ctx, policy, descriptor, err)
 			}
-			if err := capabilities.CheckDefinition(definition, descriptor.Capabilities); err != nil {
+			negotiation, err = capabilities.NegotiateDefinition(definition, descriptor.Capabilities)
+			if err != nil {
 				return r.unsupportedAdapter(ctx, policy, err)
 			}
 			snapshot, changed, err := r.effectiveCompiler.EnsureCompiledAndActive(ctx, dbPolicyName, definition)
@@ -203,7 +206,7 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			}
 			securityv1beta1.SetStatusCondition(&policy.Status.Conditions, metav1.Condition{Type: securityv1beta1.ConditionPolicySynced, Status: metav1.ConditionTrue, Reason: securityv1beta1.ReasonSnapshotActive, Message: "activation published; per-replica confirmation not yet implemented", ObservedGeneration: policy.Generation})
 		}
-		_, err = adapter.Reconcile(ctx, policy, target.Ref, nativeadapter.EffectivePolicy{ProcessingTimeout: policy.Spec.ProcessingTimeoutOrDefault(), FailOpen: policy.Spec.FailOpen()})
+		_, err = adapter.Reconcile(ctx, policy, target.Ref, nativeadapter.EffectivePolicy{ProcessingTimeout: policy.Spec.ProcessingTimeoutOrDefault(), FailOpen: policy.Spec.FailOpen(), NegotiatedCapabilities: negotiation.Clone()})
 		if err != nil {
 			return ctrl.Result{}, err
 		}

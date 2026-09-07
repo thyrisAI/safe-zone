@@ -29,6 +29,7 @@ type configMapAdapter struct {
 	client          client.Client
 	scheme          *runtime.Scheme
 	caps            capabilities.AdapterCapabilities
+	negotiated      capabilities.Negotiation
 	calls, removals int
 	failure         error
 }
@@ -36,8 +37,9 @@ type configMapAdapter struct {
 func (a *configMapAdapter) Descriptor() nativeadapter.Descriptor {
 	return nativeadapter.Descriptor{Capabilities: a.caps, Targets: []nativeadapter.TargetCapability{{Group: gatewayAPIGroup, Kind: "HTTPRoute"}}, ResourceKind: "ConfigMap", ProgrammedReason: "NativePolicyConfigured"}
 }
-func (a *configMapAdapter) Reconcile(ctx context.Context, owner *security.TSZGuardrailPolicy, ref gateway.LocalPolicyTargetReferenceWithSectionName, _ nativeadapter.EffectivePolicy) (controllerutil.OperationResult, error) {
+func (a *configMapAdapter) Reconcile(ctx context.Context, owner *security.TSZGuardrailPolicy, ref gateway.LocalPolicyTargetReferenceWithSectionName, effective nativeadapter.EffectivePolicy) (controllerutil.OperationResult, error) {
 	a.calls++
+	a.negotiated = effective.NegotiatedCapabilities.Clone()
 	if a.failure != nil {
 		return controllerutil.OperationResultNone, a.failure
 	}
@@ -95,6 +97,9 @@ func TestSelectedAdapterOwnsResourcesAndConflictsAreAdapterScoped(t *testing.T) 
 	}
 	if native.calls != 2 || envoy.calls != 0 {
 		t.Fatalf("native/envoy calls = %d/%d", native.calls, envoy.calls)
+	}
+	if native.negotiated.AdapterName != "test-gateway" || native.negotiated.AdapterVersion != native.caps.Version || len(native.negotiated.Required) == 0 {
+		t.Fatalf("negotiated capabilities = %+v", native.negotiated)
 	}
 	resources := &corev1.ConfigMapList{}
 	if err := c.List(ctx, resources); err != nil {

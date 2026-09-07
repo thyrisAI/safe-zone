@@ -195,7 +195,8 @@ The roadmap is split into phases. Each bullet is a concrete, actionable item.
 - [ ] Keep Envoy/protobuf/Kubernetes-specific types outside the core guardrail engine so future gateway adapters do not require guardrail rewrites
 - [ ] Support request enforcement first, followed by buffered response enforcement and explicitly scoped streaming modes
 - [ ] Publish and maintain an Envoy Gateway and Envoy AI Gateway compatibility matrix
-- [ ] Add reusable adapter conformance tests for allow, mask, block, audit-only, failure modes, body limits, telemetry and streaming capabilities
+- [x] Add reusable data-plane adapter contract tests for normalized request/response mapping, ownership, mutations, safe blocking and metadata
+- [x] Add a cross-gateway conformance suite for request masking, blocking, response filtering, failure modes and telemetry
 - [ ] Build a native BYG control plane around the existing TSZ policy and audit capabilities:
   - [ ] Add immutable, versioned compiled-policy snapshots backed by PostgreSQL and distributed through Redis invalidation/version notifications
   - [ ] Reuse the existing detector, validators, templates, allowlist/blocklist and SIEM pipeline through a transport-neutral policy runtime
@@ -250,7 +251,9 @@ The roadmap is split into phases. Each bullet is a concrete, actionable item.
   - [ ] Multiple processor replicas receiving the same policy snapshot version
   - [ ] Envoy access logs consuming PII-safe `io.thyris.tsz` dynamic metadata
 - [ ] Require every example to be CI-verifiable, free of real credentials, version-pinned where necessary and accompanied by sample safe/unsafe requests
-- [ ] Select the next gateway adapter from Kong, APISIX, NGINX, Traefik, Istio or managed cloud gateways based on adopter demand
+- [x] Select Kong Gateway + KIC provisionally as the next non-Envoy adapter based on the documented demand proxy, subject to customer-validation and compatibility gates in `docs/integrations/NEXT_GATEWAY_DECISION.md`
+- [x] Evaluate Kong, APISIX, NGINX, Traefik, Istio and managed cloud adapter paths, limitations and required compatibility spikes (`docs/integrations/GATEWAY_ADAPTER_EVALUATION.md`)
+- [x] Require every new gateway adapter to register a complete integration guide and runnable safe/mask/block/response/failure/telemetry example set (`examples/bring-your-gateway/adapter-releases.json`, enforced by `go test ./tests/release`)
 
 ---
 

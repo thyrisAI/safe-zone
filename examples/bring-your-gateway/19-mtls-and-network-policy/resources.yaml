@@ -1,0 +1,52 @@
+# Envoy Gateway v1.8.3 accepts Backend references from ext_proc. The Backend
+# carries TLS settings only for TSZ; it does not alter the mock LLM upstream.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: tsz-ext-proc-mtls
+  namespace: tsz-byg-demo
+spec:
+  endpoints:
+    - fqdn:
+        hostname: tsz-ext-proc.tsz-byg-demo.svc.cluster.local
+        port: 9002
+  appProtocols:
+    - gateway.envoyproxy.io/h2c
+  tls:
+    sni: tsz-ext-proc.tsz-byg-demo.svc.cluster.local
+    caCertificateRefs:
+      - group: ""
+        kind: ConfigMap
+        name: tsz-ext-proc-server-ca
+    clientCertificateRef:
+      group: ""
+      kind: Secret
+      name: envoy-ext-proc-client-tls
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyExtensionPolicy
+metadata:
+  name: tsz-request-guardrail-mtls
+  namespace: tsz-byg-demo
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-openai
+  extProc:
+    - backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: tsz-ext-proc-mtls
+      messageTimeout: 2s
+      failOpen: false
+      processingMode:
+        request:
+          body: Buffered
+          attributes:
+            - xds.route_name
+        response:
+          body: Buffered
+      metadata:
+        writableNamespaces:
+          - io.thyris.tsz

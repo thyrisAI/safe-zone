@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tsz-byg-policy-health-dashboard
+  namespace: tsz-system
+  labels: {grafana_dashboard: "1"}
+data:
+  tsz-byg-policy-health.json: |-
+    {"title":"TSZ BYG Policy Health","schemaVersion":39,"panels":[{"type":"table","title":"Policy versions by replica","targets":[{"expr":"tsz_policy_cache_snapshot_info","format":"table"}]},{"type":"timeseries","title":"Policy cache reconciliation","targets":[{"expr":"rate(tsz_policy_cache_reconcile_duration_seconds_count[5m])","legendFormat":"{{result}}"}]},{"type":"timeseries","title":"Policy activation outcomes","targets":[{"expr":"rate(tsz_controller_policy_activations_total[5m])","legendFormat":"{{result}}"}]}]}

@@ -1,0 +1,98 @@
+# Network isolation for the checked-in Kind reference deployment.
+#
+# Topology assumption: the reference PostgreSQL and Redis workloads run in the
+# same namespace as TSZ (tsz-byg-demo). Production installations commonly
+# place them in a dedicated data namespace; in that case, replace each
+# dependency's podSelector-only peer with a combined namespaceSelector and
+# podSelector for that namespace. Do not broaden these rules to all pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tsz-ext-proc-default-deny
+  namespace: tsz-byg-demo
+  labels:
+    app.kubernetes.io/name: tsz-ext-proc
+    app.kubernetes.io/part-of: tsz
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tsz-ext-proc
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []
+---
+# Permit only the labeled Envoy Gateway data-plane pods to invoke ext_proc.
+# The HTTP health/metrics port (8080) is deliberately excluded: it is not an
+# external API and Kubernetes node-originated liveness/readiness probes remain
+# unaffected by NetworkPolicy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tsz-ext-proc-allow-envoy-ingress
+  namespace: tsz-byg-demo
+  labels:
+    app.kubernetes.io/name: tsz-ext-proc
+    app.kubernetes.io/part-of: tsz
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tsz-ext-proc
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              security.thyris.ai/tsz-peer: "true"
+      ports:
+        - protocol: TCP
+          port: 9002
+---
+# Permit only dependencies used by the processor. NetworkPolicies are
+# additive, so this policy augments the default-deny policy above.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tsz-ext-proc-allow-egress-dependencies
+  namespace: tsz-byg-demo
+  labels:
+    app.kubernetes.io/name: tsz-ext-proc
+    app.kubernetes.io/part-of: tsz
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tsz-ext-proc
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: redis
+      ports:
+        - protocol: TCP
+          port: 6379

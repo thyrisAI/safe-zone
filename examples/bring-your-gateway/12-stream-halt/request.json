@@ -1,0 +1,1 @@
+{"model":"local-mock","stream":true,"messages":[{"role":"user","content":"Return the local streaming fixture"}]}

@@ -32,6 +32,9 @@ Before working on larger features, we recommend reading:
 - `docs/SECURITY_ROADMAP.md` – **Must read for security hardening context**
 - `ROADMAP.md`
 
+Contributors implementing a Bring Your Gateway integration must follow the
+[gateway adapter development contract](docs/integrations/ADAPTER_DEVELOPMENT.md).
+
 ---
 
 ## Setting Up a Development Environment

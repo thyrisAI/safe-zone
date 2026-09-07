@@ -1,12 +1,14 @@
 package e2e
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func getCLIPath(t *testing.T) string {
@@ -79,7 +81,9 @@ func TestCLI_Patterns_List(t *testing.T) {
 }
 
 func TestCLI_Allowlist_Lifecycle(t *testing.T) {
-	val := "cli-allow-test"
+	// Allowlist uses soft deletion while value has a unique index. A unique
+	// fixture keeps repeated local and CI runs independent of earlier data.
+	val := fmt.Sprintf("cli-allow-test-%d", time.Now().UnixNano())
 	key := testAdminKey()
 
 	// 1. Add

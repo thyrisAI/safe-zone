@@ -2,6 +2,7 @@ package ai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -12,7 +13,7 @@ import (
 )
 
 // CheckWithAI sends a prompt to the configured AI model and expects a boolean-like response
-func CheckWithAI(text string, promptTemplate string, expectedResponse string) (bool, error) {
+func CheckWithAI(ctx context.Context, text string, promptTemplate string, expectedResponse string) (bool, error) {
 	// Replace placeholder in template with actual text
 	// We assume the template has {{TEXT}} placeholder or simply appends the text
 	finalPrompt := promptTemplate
@@ -40,7 +41,7 @@ func CheckWithAI(text string, promptTemplate string, expectedResponse string) (b
 	}
 
 	url := config.AppConfig.AIModelURL + "/chat/completions"
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBody))
 	if err != nil {
 		return false, err
 	}
@@ -48,7 +49,9 @@ func CheckWithAI(text string, promptTemplate string, expectedResponse string) (b
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+config.AppConfig.AIAPIKey)
 
-	client := &http.Client{}
+	// The context owns normal cancellation. This timeout is only a backstop
+	// should a transport fail to observe that cancellation.
+	client := &http.Client{Timeout: 2 * config.DefaultExtProcProcessingTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("AI Service connection error: %v", err)

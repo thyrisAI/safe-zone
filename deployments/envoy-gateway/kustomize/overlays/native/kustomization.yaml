@@ -1,0 +1,7 @@
+# Native/managed installation. The controller reconciles TSZGuardrailPolicy
+# objects into the EnvoyExtensionPolicy attachment and immutable snapshots.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  - controller.yaml

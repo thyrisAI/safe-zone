@@ -1,4 +1,4 @@
-FROM golang:1.23-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
 
@@ -10,7 +10,13 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o api main.go
+RUN mkdir -p /out \
+    && CGO_ENABLED=0 GOOS=linux go build -o /out/api main.go \
+    && CGO_ENABLED=0 GOOS=linux go build -o /out/tsz-ext-proc ./cmd/tsz-ext-proc \
+    && CGO_ENABLED=0 GOOS=linux go build -o /out/tsz-controller ./cmd/tsz-controller \
+    && CGO_ENABLED=0 GOOS=linux go build -o /out/tsz-policy ./cmd/tsz-policy \
+    && CGO_ENABLED=0 GOOS=linux go build -o /out/byg-mock-openai ./cmd/byg-mock-openai \
+    && CGO_ENABLED=0 GOOS=linux go build -o /out/byg-mock-siem ./cmd/byg-mock-siem
 
 FROM alpine:3.24.1
 
@@ -18,12 +24,18 @@ WORKDIR /app
 
 RUN addgroup -S tsz && adduser -S tsz -G tsz
 
-COPY --from=builder /app/api .
+COPY --from=builder /out/api ./api
+COPY --from=builder /out/tsz-ext-proc ./tsz-ext-proc
+COPY --from=builder /out/tsz-controller ./tsz-controller
+COPY --from=builder /out/tsz-policy ./tsz-policy
+COPY --from=builder /out/byg-mock-openai ./byg-mock-openai
+COPY --from=builder /out/byg-mock-siem ./byg-mock-siem
 
-RUN chown tsz:tsz /app/api
+RUN chown -R tsz:tsz /app
 
 USER tsz:tsz
 
 EXPOSE 8080
+EXPOSE 9002
 
 CMD ["./api"]

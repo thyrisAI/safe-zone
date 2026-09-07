@@ -1,0 +1,30 @@
+# Streaming variant of the manual BYG attachment. Examples select it with
+# examples/bring-your-gateway/shared/run.sh --response-mode streamed.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyExtensionPolicy
+metadata:
+  name: tsz-request-guardrail
+  namespace: tsz-byg-demo
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-openai
+  extProc:
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: tsz-ext-proc
+          port: 9002
+      messageTimeout: 2s
+      failOpen: false
+      processingMode:
+        request:
+          body: Buffered
+          attributes:
+            - xds.route_name
+        response:
+          body: Streamed
+      metadata:
+        writableNamespaces:
+          - io.thyris.tsz

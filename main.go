@@ -44,6 +44,10 @@ func main() {
 		config.AppConfig.AIProvider)
 
 	detector := guardrails.NewDetector()
+	guardrailService, err := guardrails.NewGuardrailService(detector)
+	if err != nil {
+		log.Fatalf("Failed to initialize guardrail service: %v", err)
+	}
 
 	mux := http.NewServeMux()
 
@@ -150,7 +154,11 @@ func main() {
 		}
 
 		startTime := time.Now()
-		result := detector.Detect(req)
+		result, err := guardrails.DetectLegacy(r.Context(), guardrailService, req)
+		if err != nil {
+			http.Error(w, "Guardrail inspection failed", http.StatusInternalServerError)
+			return
+		}
 
 		var breakdownParts []string
 		totalDetections := 0
@@ -183,7 +191,7 @@ func main() {
 	// OpenAI-compatible LLM gateway (chat completions)
 	mux.Handle(
 		"POST /v1/chat/completions",
-		auth.RequirePermission("gateway:use")(http.HandlerFunc(handlers.NewOpenAIChatGateway(detector))),
+		auth.RequirePermission("gateway:use")(http.HandlerFunc(handlers.NewOpenAIChatGateway(guardrailService))),
 	)
 
 	mux.Handle("POST /patterns", auth.RequirePermission("patterns:admin")(http.HandlerFunc(handlers.CreatePattern)))

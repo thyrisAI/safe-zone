@@ -91,6 +91,17 @@ Safely connect your applications to any supported LLM provider using TSZ as a **
 - **Flexible Deployment:** Runs as a Docker container in your VPC, on‑prem or in any cloud.
 - **Data Residency & Sovereignty:** All processing happens inside your perimeter; only redacted content needs to leave.
 
+### 7.1 Bring Your Gateway
+
+BYG lets platform teams keep their existing Envoy Gateway routing model,
+provider credentials, authentication, quotas, retries, and operations while
+adding TSZ as a dedicated content-security layer. The supported Envoy Gateway
+adapter processes requests and responses through `ext_proc`; the native
+control-plane profile attaches immutable TSZ policies to Gateway API targets.
+Other gateway names in the evaluation matrix are planned or validation
+candidates, not supported-product claims. See
+`concepts/BRING_YOUR_GATEWAY.md` and `integrations/README.md`.
+
 ### 8. CLI Tool
 
 Manage your Safe Zone instance directly from the command line.
@@ -116,6 +127,7 @@ Integration points:
 - Sits between your **frontend/backend** and **LLM providers**.
 - Can be called synchronously for low‑latency use cases or asynchronously in batch pipelines.
 - For LLMs, can act as the **only public endpoint**, with upstream providers completely hidden behind TSZ.
+- With BYG, can instead remain private behind an existing Envoy Gateway while Envoy retains all traffic-management responsibilities.
 
 For detailed architecture and security considerations, see `ARCHITECTURE_SECURITY.md`. For streaming specifics, see `concepts/STREAMING.md`.
 

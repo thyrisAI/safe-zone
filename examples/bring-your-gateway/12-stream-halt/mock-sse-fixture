@@ -1,0 +1,4 @@
+data: {"id":"chatcmpl-kind-stream","choices":[{"delta":{"content":"unsafe-stream@example.com"}}]}
+
+data: [DONE]
+

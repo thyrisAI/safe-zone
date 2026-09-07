@@ -32,6 +32,14 @@ Each product has its own version stream and tag prefix:
 
 Tags are **product-specific**; bumping a version for one product does not imply a change in the others.
 
+The Kubernetes `TSZGuardrailPolicy` API has its own version lifecycle. New native
+manifests use `security.thyris.ai/v1beta1`; deprecated `v1alpha1` remains served.
+The dual-version CRD must be installed before the beta controller. Release
+notes must include the [API upgrade guide](operations/TSZ_POLICY_API_UPGRADE.md),
+storage migration and rollback expectations. Do not remove an API version as
+part of an ordinary product version bump; alpha retirement requires a separate
+compatibility decision and migration notice.
+
 ### 1.2. Bump types
 
 The workflow exposes the classic semantic versioning bump types:

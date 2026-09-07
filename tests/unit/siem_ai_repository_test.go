@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -96,7 +97,7 @@ func TestCheckWithAI_PropagatesNon200Status(t *testing.T) {
 		AIModelName: "test-model",
 	}
 
-	ok, err := ai.CheckWithAI("text", "Respond YES if ok", "YES")
+	ok, err := ai.CheckWithAI(context.Background(), "text", "Respond YES if ok", "YES")
 	if err == nil || ok {
 		t.Fatalf("expected error and false for non-200 AI response, got ok=%v err=%v", ok, err)
 	}
@@ -117,13 +118,42 @@ func TestCheckWithAI_SuccessfulYESResponse(t *testing.T) {
 		AIModelName: "test-model",
 	}
 
-	ok, err := ai.CheckWithAI("some text", "Respond YES if ok", "YES")
+	ok, err := ai.CheckWithAI(context.Background(), "some text", "Respond YES if ok", "YES")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if !ok {
 		t.Fatalf("expected ok=true for YES response")
 	}
+}
+
+func TestCheckWithAI_CancelsInFlightHTTPRequest(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-release
+	}))
+	defer ts.Close()
+	config.AppConfig = &config.Config{AIModelURL: ts.URL, AIModelName: "test-model"}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan error, 1)
+	go func() {
+		_, err := ai.CheckWithAI(ctx, "text", "Respond YES if ok", "YES")
+		result <- err
+	}()
+	<-started
+	cancel()
+	select {
+	case err := <-result:
+		if err == nil {
+			t.Fatal("CheckWithAI() error = nil after context cancellation")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("CheckWithAI() did not return after context cancellation")
+	}
+	close(release)
 }
 
 // --- Repository + cache tests ---

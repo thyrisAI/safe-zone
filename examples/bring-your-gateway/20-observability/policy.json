@@ -1,0 +1,10 @@
+{
+  "scope": {"environment": "demo", "gateway": "echo-gateway", "route": "mock-openai"},
+  "request": {"pii": "MASK", "secret": "BLOCK", "prompt_injection": "BLOCK", "custom_pattern_ids": ["1"]},
+  "response": {"enabled": false},
+  "failure_policy": {"request": "closed", "response": "closed"},
+  "limits": {"max_body_bytes": 1048576, "processing_timeout_ms": 2000, "max_detections": 10},
+  "audit": {"enabled": true, "include_categories": true},
+  "telemetry": {"enabled": true, "metrics_enabled": true, "tracing_enabled": false, "sample_rate": 1}
+}
+

@@ -39,7 +39,9 @@ __pycache__/
 .venv/
 venv/
 /build
+/test-reports/perf/
 /tszclient_py.egg-info
 thyris-sz
+examples/bring-your-gateway/19-mtls-and-network-policy/certs/
 !deployment/helm/thyris-sz/
 !deployment/helm/thyris-sz/**

@@ -1,0 +1,174 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tsz-byg-demo
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: tsz-byg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: kind-cluster-ip
+  namespace: tsz-byg-demo
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      # The NetworkPolicy protecting TSZ selects this stable, TSZ-owned label
+      # rather than Envoy Gateway's implementation labels.
+      envoyDeployment:
+        pod:
+          labels:
+            security.thyris.ai/tsz-peer: "true"
+      envoyService:
+        type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mock-openai-nginx
+  namespace: tsz-byg-demo
+data:
+  default.conf: |
+    server {
+      listen 8080;
+
+      location = /v1/chat/completions {
+        default_type application/json;
+        return 200 '{"id":"chatcmpl-kind-mock","object":"chat.completion","choices":[]}';
+      }
+
+      location = /v1/responses {
+        default_type application/json;
+        return 200 '{"id":"resp-kind-mock","object":"response","output":[]}';
+      }
+
+      location / {
+        default_type application/json;
+        return 404 '{"error":"not found"}';
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-openai
+  namespace: tsz-byg-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mock-openai
+  template:
+    metadata:
+      labels:
+        app: mock-openai
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27.5-alpine
+          # Keep the bootstrap idempotent after an example temporarily swaps
+          # this Deployment to the local safety-preserving mock binary.
+          command: ["/docker-entrypoint.sh"]
+          args: ["nginx", "-g", "daemon off;"]
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /v1/chat/completions
+              port: http
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: mock-openai-nginx
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-openai
+  namespace: tsz-byg-demo
+spec:
+  selector:
+    app: mock-openai
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: echo-gateway
+  namespace: tsz-byg-demo
+spec:
+  gatewayClassName: tsz-byg
+  infrastructure:
+    parametersRef:
+      group: gateway.envoyproxy.io
+      kind: EnvoyProxy
+      name: kind-cluster-ip
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mock-openai
+  namespace: tsz-byg-demo
+spec:
+  parentRefs:
+    - name: echo-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/chat/completions
+        - path:
+            type: PathPrefix
+            value: /v1/responses
+      # The early ClientTrafficPolicy establishes the fixed value before
+      # ext-proc. This late route filter removes it before upstream forwarding.
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            remove:
+              - X-TSZ-Policy
+      backendRefs:
+        - name: mock-openai
+          port: 8080
+---
+# HTTPRoute header modifiers run only before upstream forwarding, after
+# ext-proc. ClientTrafficPolicy's early header phase is the Envoy Gateway
+# mechanism that runs before processing, routing, and tracing. `set` replaces
+# any untrusted downstream value before ext-proc resolves the policy.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: tsz-route-policy-identity
+  namespace: tsz-byg-demo
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: echo-gateway
+  headers:
+    earlyRequestHeaders:
+      set:
+        - name: X-TSZ-Policy
+          value: default

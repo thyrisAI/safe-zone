@@ -8,6 +8,7 @@ import (
 	"thyris-sz/internal/models"
 	"time"
 
+	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -28,6 +29,12 @@ func InitRedis() {
 	}
 
 	RDB = redis.NewClient(opt)
+	// Redis command arguments may contain policy data. Span names retain the
+	// operation while WithDBStatement(false) prevents command text/arguments
+	// from becoming telemetry attributes.
+	if err := redisotel.InstrumentTracing(RDB, redisotel.WithDBStatement(false)); err != nil {
+		log.Printf("Warning: failed to instrument Redis tracing: %v", err)
+	}
 
 	if err := RDB.Ping(ctx).Err(); err != nil {
 		log.Printf("Failed to connect to Redis: %v", err)

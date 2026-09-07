@@ -1,31 +1,117 @@
 # TSZ Streaming & Guardrails Concepts
 
-This document explains how TSZ (Thyris Safe Zone) handles **streaming LLM responses** via the OpenAI-compatible gateway, and how guardrails interact with streaming in different modes.
+This document explains how TSZ (Thyris Safe Zone) handles **streaming LLM responses** and how guardrails interact with each supported architecture.
 
 It is intended for architects and engineers designing **enterprise-grade LLM integrations** that require real-time protection against PII leakage, toxic language, and other unsafe content.
 
 ---
 
-## 1. Overview
+## 1. Two distinct streaming architectures
 
-TSZ exposes an OpenAI-compatible `/v1/chat/completions` endpoint that supports both:
+TSZ has two streaming integrations. They have different control planes and
+security contracts, and must not be treated as interchangeable.
 
-- **Non-streaming responses** (`stream=false`)
-- **Streaming responses** (`stream=true`, Server-Sent Events / SSE)
+Historically this document described only the legacy `/v1/chat/completions`
+header-based model. The BYG / Envoy `ext_proc` modes below are a separate
+architecture, added here as their own contract rather than as legacy header
+modes.
 
-For streaming responses, TSZ can:
+| Integration | Configuration | Modes covered here |
+| --- | --- | --- |
+| Legacy OpenAI-compatible gateway (`/v1/chat/completions`) | Request headers | `final-only`, `stream-sync`, `stream-async`, and its header-driven `halt` behaviour |
+| Bring Your Gateway (BYG), Envoy `ext_proc` | A stream-pinned `TSZGuardrailPolicy` | `AsyncAudit` observation and `Windowed` response enforcement |
 
-1. **Pass through** the upstream stream as-is (`final-only` mode)
-2. **Synchronously validate and sanitize** output while streaming (`stream-sync` mode)
-3. **Asynchronously validate** the full streamed output for audit/SIEM (`stream-async` mode)
+The legacy gateway material begins in [Legacy gateway streaming](#3-legacy-openai-compatible-gateway). The BYG model is described separately below; it does **not** use the legacy streaming headers.
 
-These behaviours are controlled via HTTP headers and do not require additional environment variables.
+## 2. BYG / Envoy `ext_proc`
+
+### AsyncAudit observation
+
+`Streaming.Mode: AsyncAudit` forwards each SSE body chunk immediately and
+unchanged. Completed, event-aligned OpenAI Chat Completions events are retained
+only in a bounded in-memory buffer and inspected by a bounded background worker
+after end-of-stream. The resulting response-stage decision is emitted as
+PII-safe `AUDIT_ONLY` metadata/audit output.
+
+The current preview exposes this mode through the portable compiled-policy
+profile used by the example runner. The frozen, storage-compatible
+`TSZGuardrailPolicy` v1alpha1/v1beta1 schema continues to admit `None` and
+`Windowed` only; adding the native field requires a future API version rather
+than silently changing the graduated schema.
+
+This is visibility, not enforcement: detected content has already reached the
+client. Policy validation rejects response `MASK` and `BLOCK` actions in this
+mode rather than implying that an asynchronous decision can recall bytes. A
+buffer or worker-queue overflow also preserves delivery and records a degraded
+aggregate failure without logging content. See the runnable
+[10-stream-async-audit example](../../examples/bring-your-gateway/10-stream-async-audit/README.md).
+
+### Windowed enforcement
+
+BYG Windowed enforcement operates on an Envoy external-processing response
+stream. Enable it with the policy's `Streaming.Mode: Windowed` and choose a
+bounded target size with `window_bytes` (the Kubernetes API field is
+`windowBytes`). For example:
+
+```json
+"streaming": {
+  "mode": "Windowed",
+  "window_bytes": 4096
+}
+```
+
+TSZ parses the upstream OpenAI `text/event-stream` response into **complete SSE
+events**. It accumulates event-aligned assistant deltas into the configured
+window, retaining a small trailing overlap for matches that span event/window
+boundaries. The semantic validator processes that complete window before TSZ
+releases its safe, event-aligned prefix to Envoy. This adds bounded latency and
+per-stream memory use in exchange for detecting data split across deltas.
+
+See the runnable [11-stream-window example](../../examples/bring-your-gateway/11-stream-window/README.md) for its fixture, policy, command, and assertions.
+
+### Delivery boundary and strict-streaming decision
+
+**Windowed enforcement is not strict streaming and makes no zero-leakage
+guarantee.** An SSE delta already emitted by Envoy to the downstream client
+cannot be recalled. Enforcement protects the window that has not yet been
+released; it cannot repair a violation detected only after earlier content has
+been delivered.
+
+**Decision: strict (zero-leakage) streaming is not feasible for this BYG MVP.**
+A genuine strict guarantee would require holding every response byte until the
+complete response has been inspected. That is buffered, non-streaming response
+enforcement, even if another component later replays the validated body as SSE.
+Policies requesting `Strict` are therefore rejected at admission/policy
+validation; TSZ never silently downgrades them to `Windowed` or audit-only.
+Routes that require no leakage must use the buffered, non-streaming profile and
+apply response `BLOCK`/`MASK` there.
+
+### Block/halt and cancellation semantics
+
+`Windowed` supports response masking and best-effort halt. A response `BLOCK`
+decision returns a safe terminal response and stops future SSE delivery. This
+does not retract events released from earlier safe windows and must not be
+described as zero-leakage or mapped to the legacy gateway's header-driven
+`halt` semantics. See the runnable
+[12-stream-halt example](../../examples/bring-your-gateway/12-stream-halt/README.md).
+
+If the downstream client disconnects and Envoy cancels the `ext_proc` RPC, TSZ
+stops inline work such as the window buffer and semantic validation and returns
+gRPC `CANCELED`. If its deadline expires, it returns `DEADLINE_EXCEEDED`.
+Neither condition is a guardrail-engine error, so neither participates in the
+fail-open/fail-closed enforcement decision. A cancellation audit event is
+attempted detached and best-effort; audit delivery never blocks the stream.
 
 ---
 
-## 2. Streaming Modes
+## 3. Legacy OpenAI-compatible gateway
 
-### 2.1 Mode Selection
+TSZ exposes an OpenAI-compatible `/v1/chat/completions` endpoint that supports
+both non-streaming responses (`stream=false`) and streaming responses
+(`stream=true`, Server-Sent Events / SSE). The remaining sections describe
+this legacy, header-controlled gateway only.
+
+### 3.1 Streaming modes
 
 The following header controls how TSZ applies guardrails to streaming responses:
 
@@ -41,7 +127,7 @@ Internally, the gateway interprets this as:
 - `stream-sync` -> input guardrails + **incremental output guardrails** while streaming
 - `stream-async` -> input guardrails + **async output guardrails** after stream completion
 
-### 2.2 On-fail Behaviour (Streaming Only)
+### 3.2 On-fail behaviour (streaming only)
 
 When using `stream-sync`, TSZ needs to know what to do when a violation is detected on the **output**.
 
@@ -68,18 +154,18 @@ Semantics:
 
 ---
 
-## 3. Guardrails Pipeline
+## 4. Legacy gateway guardrails pipeline
 
 TSZ guardrails are applied at two main stages for the LLM gateway:
 
-1. **Input guardrails** (user messages) – always active when `X-TSZ-Guardrails` is set
+1. **Input guardrails** (developer, system, user, assistant, and tool messages) – always active when `X-TSZ-Guardrails` is set
 2. **Output guardrails** (assistant messages) – behaviour depends on streaming mode
 
-### 3.1 Input Guardrails (User Messages)
+### 4.1 Input guardrails (messages and tool payloads)
 
 Before calling the upstream LLM, TSZ:
 
-1. Extracts all `messages` with `role == "user"`.
+1. Extracts string content from `developer`, `system`, `user`, `assistant`, and `tool` messages, plus assistant refusal content and `tool_calls[].function.arguments`.
 2. Runs `/detect` with the configured guardrails (e.g. `TOXIC_LANGUAGE`):
 
    ```go
@@ -98,7 +184,7 @@ Before calling the upstream LLM, TSZ:
 
 This stage is identical for streaming and non-streaming requests.
 
-### 3.2 Output Guardrails (Assistant Messages)
+### 4.2 Output guardrails (assistant messages)
 
 **Non-streaming (`stream=false`)**
 
@@ -141,9 +227,9 @@ Behaviour depends on `X-TSZ-Guardrails-Mode`:
 
 ---
 
-## 4. Typical Streaming Scenarios
+## 5. Legacy gateway streaming scenarios
 
-### 4.1 Baseline Streaming (No Guardrails)
+### 5.1 Baseline streaming (no guardrails)
 
 Use when you only need TSZ as a **transparent LLM gateway**:
 
@@ -163,7 +249,7 @@ Content-Type: application/json
 - No `X-TSZ-Guardrails` header.
 - Output is proxied as-is from the upstream LLM.
 
-### 4.2 Streaming With Synchronous Guardrails (Filter)
+### 5.2 Streaming with synchronous guardrails (filter)
 
 Real-time protection while still returning a full answer:
 
@@ -176,7 +262,7 @@ X-TSZ-Guardrails-OnFail: filter
 - TSZ redacts unsafe segments on-the-fly.
 - The user only sees sanitized output.
 
-### 4.3 Streaming With Synchronous Guardrails (Halt)
+### 5.3 Streaming with synchronous guardrails (halt)
 
 For stricter policies where unsafe output must not be delivered:
 
@@ -189,7 +275,7 @@ X-TSZ-Guardrails-OnFail: halt
 - On severe violation, TSZ sends an SSE error event and `[DONE]`.
 - Client-side SDKs should handle this as an error case.
 
-### 4.4 Streaming With Asynchronous Validation
+### 5.4 Streaming with asynchronous validation
 
 When you cannot afford any latency overhead but still need compliance/audit:
 
@@ -203,30 +289,30 @@ X-TSZ-Guardrails-Mode: stream-async
 
 ---
 
-## 5. Design Considerations for Enterprise
+## 6. Legacy gateway design considerations
 
-### 5.1 Performance & Latency
+### 6.1 Performance and latency
 
 - `stream-sync` adds overhead proportional to the number of chunks and validator complexity.
 - To keep latency low:
   - Prefer simple validators for streaming (e.g. TOXIC_LANGUAGE instead of heavy multi-stage chains).
   - Consider using `stream-async` for very long responses.
 
-### 5.2 Memory & Windowing
+### 6.2 Memory and windowing
 
 - TSZ accumulates assistant output in an in-memory buffer for `stream-sync`.
 - In high-volume scenarios, it is recommended to:
   - Limit maximum buffer size.
   - Use a sliding window strategy (validate on the last N characters/tokens rather than the entire history).
 
-### 5.3 Fail-Open vs Fail-Closed
+### 6.3 Fail-open vs fail-closed
 
 - If SSE JSON parsing fails, TSZ logs the error and, by default, **forwards the raw line** (fail-open).
 - For highly regulated environments, you may choose to enforce stricter behaviour:
   - Treat parsing failures as violations.
   - Immediately halt the stream.
 
-### 5.4 Guardrail Configuration
+### 6.4 Guardrail configuration
 
 - Streaming guardrails rely on the same underlying validators as `/detect`.
 - You can reuse existing validators (e.g. `TOXIC_LANGUAGE`) or define new ones specifically for streaming scenarios.
@@ -234,7 +320,7 @@ X-TSZ-Guardrails-Mode: stream-async
 
 ---
 
-## 6. Summary
+## 7. Summary
 
 - TSZ extends the OpenAI-compatible gateway with **enterprise-grade streaming guardrails**.
 - With a small set of headers, you can choose between pass-through, synchronous protection, and asynchronous audit modes.

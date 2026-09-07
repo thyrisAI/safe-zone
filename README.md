@@ -17,6 +17,7 @@ TSZ provides real‑time scanning, redaction, and blocking capabilities so that 
 - **Native AWS Bedrock integration** – Use Anthropic Claude, Amazon Titan, Meta Llama, Mistral, and Cohere models directly
 - **Multi-provider AI support** – OpenAI-compatible endpoints (OpenAI, Azure OpenAI, Ollama) and AWS Bedrock
 - **OpenAI-compatible LLM gateway** – Drop-in replacement for OpenAI API with built-in guardrails
+- **Bring Your Gateway (BYG)** – Attach TSZ request and response guardrails to Envoy Gateway without moving routing, credentials, authentication, quotas, or retries into TSZ
 - **CLI Tool** – Full management and scanning from the command line (`pkg/tsz-cli`)
 
 ---
@@ -41,6 +42,8 @@ For all user and customer‑facing documentation, see the `docs/` directory:
   `docs/SECURITY_ROADMAP.md`
 - **Postman Collection** – Ready‑to‑use collection  
   `docs/TSZ_Postman_Collection.json`
+- **Bring Your Gateway** – Envoy Gateway support matrix, installation profiles and runnable Kind examples
+  `docs/integrations/README.md`
 
 If you are evaluating TSZ for the first time, we recommend the following order:
 
@@ -49,6 +52,11 @@ If you are evaluating TSZ for the first time, we recommend the following order:
 3. `docs/QUICK_START.md`
 4. `docs/DEPLOYMENT.md`
 5. `docs/API_REFERENCE.md`
+
+Existing Envoy Gateway users can start with
+`docs/concepts/BRING_YOUR_GATEWAY.md`, then follow
+`docs/integrations/ENVOY_GATEWAY.md`. The reference integration keeps Envoy in
+control of traffic management and uses TSZ only for content-security policy.
 
 For a more detailed map of the documentation set, see `docs/README.md`.
 

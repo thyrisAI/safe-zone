@@ -1,0 +1,7 @@
+{
+  "scope": {"gateway": "envoy-gateway", "route": "mock-openai"},
+  "request": {"pii": "MASK", "secret": "BLOCK", "prompt_injection": "BLOCK"},
+  "response": {"enabled": true, "pii": "MASK", "secret": "BLOCK", "unsafe_content": "BLOCK"},
+  "failure_policy": {"request": "closed", "response": "closed"},
+  "limits": {"max_body_bytes": 1048576, "processing_timeout_ms": 2000, "max_detections": 20}
+}

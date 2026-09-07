@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "adapters": [
+    {
+      "name": "envoy-gateway",
+      "maturity": "preview",
+      "source_dir": "internal/extproc/envoy",
+      "integration_guide": "docs/integrations/ENVOY_GATEWAY.md",
+      "example_guide": "examples/bring-your-gateway/README.md",
+      "smoke_test": "examples/bring-your-gateway/smoke.sh",
+      "examples": {
+        "safe_request": "examples/bring-your-gateway/01-minimal-inspection",
+        "request_masking": "examples/bring-your-gateway/02-request-masking",
+        "request_blocking": "examples/bring-your-gateway/03-request-blocking",
+        "audit_only": "examples/bring-your-gateway/09-audit-only",
+        "stream_async_audit": "examples/bring-your-gateway/10-stream-async-audit",
+        "stream_window": "examples/bring-your-gateway/11-stream-window",
+        "stream_halt": "examples/bring-your-gateway/12-stream-halt",
+        "response_masking": "examples/bring-your-gateway/15-response-masking",
+        "response_blocking": "examples/bring-your-gateway/16-response-blocking",
+        "fail_open": "examples/bring-your-gateway/05-fail-open",
+        "fail_closed": "examples/bring-your-gateway/06-fail-closed",
+        "telemetry": "examples/bring-your-gateway/20-observability"
+      }
+    }
+  ]
+}

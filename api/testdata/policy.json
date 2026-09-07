@@ -1,0 +1,41 @@
+{
+  "apiVersion": "security.thyris.ai/v1alpha1",
+  "kind": "TSZGuardrailPolicy",
+  "metadata": {
+    "name": "compatibility-policy",
+    "namespace": "default",
+    "labels": {"test": "compatibility"},
+    "annotations": {"test.thyris.ai/note": "preserve"},
+    "finalizers": ["test.thyris.ai/retain"]
+  },
+  "spec": {
+    "targetRefs": [{"group": "gateway.networking.k8s.io", "kind": "HTTPRoute", "name": "orders", "sectionName": "protected"}],
+    "policySource": "Inline",
+    "policyRef": {"name": "banking", "version": 12},
+    "templateRefs": [{"name": "banking", "version": 3}],
+    "request": {
+      "pii": "Mask", "secret": "Block", "promptInjection": "AuditOnly",
+      "customPatternIDs": ["account-number"], "allowlistIDs": ["safe-demo"], "blocklistIDs": ["forbidden"],
+      "customValidators": [{"id": "injection", "version": 2}]
+    },
+    "response": {
+      "enabled": true, "pii": "Mask", "secret": "Block", "unsafeContent": "AuditOnly",
+      "customPatternIDs": ["private-key"], "customValidators": [{"id": "output", "version": 4}]
+    },
+    "failurePolicy": {"request": "FailClosed", "response": "FailOpen"},
+    "processingTimeout": "3s",
+    "streaming": {"enabled": true, "mode": "Windowed", "windowBytes": 2048},
+    "clientOverrides": {"allowPolicyHeader": true},
+    "telemetry": {"enabled": true, "metricsEnabled": true, "tracingEnabled": true, "sampleRate": 0.25}
+  },
+  "status": {
+    "observedGeneration": 1,
+    "policyVersion": 12,
+    "effectivePolicyID": "banking",
+    "conditions": [{"type": "Accepted", "status": "True", "reason": "Valid", "message": "fixture", "observedGeneration": 1, "lastTransitionTime": "2026-09-07T00:00:00Z"}],
+    "targetRefStatuses": [{
+      "targetRef": {"group": "gateway.networking.k8s.io", "kind": "HTTPRoute", "name": "orders", "sectionName": "protected"},
+      "conditions": [{"type": "Programmed", "status": "True", "reason": "ExtProcConfigured", "message": "fixture", "observedGeneration": 1, "lastTransitionTime": "2026-09-07T00:00:00Z"}]
+    }]
+  }
+}

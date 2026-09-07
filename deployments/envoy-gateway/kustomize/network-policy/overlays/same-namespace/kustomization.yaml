@@ -1,0 +1,5 @@
+# Reference Kind topology: TSZ, PostgreSQL, and Redis share tsz-byg-demo.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base

@@ -1,0 +1,173 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tsz-ext-proc
+  namespace: tsz-byg-demo
+  labels:
+    app.kubernetes.io/name: tsz-ext-proc
+    app.kubernetes.io/part-of: tsz
+spec:
+  # Phase 2 cache/version convergence validation runs with two independent
+  # ext-proc processes; neither replica owns mutable request state.
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tsz-ext-proc
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tsz-ext-proc
+        app.kubernetes.io/part-of: tsz
+    spec:
+      containers:
+        - name: tsz-ext-proc
+          # Build and load this pinned local development image into Kind as
+          # documented in README.md before applying this manifest.
+          image: thyris-sz:local
+          imagePullPolicy: IfNotPresent
+          command: ["/app/tsz-ext-proc"]
+          ports:
+            - name: grpc
+              containerPort: 9002
+              protocol: TCP
+            - name: health
+              containerPort: 8080
+              protocol: TCP
+          env:
+            # These names resolve only inside the Kubernetes cluster. The
+            # referenced PostgreSQL and Redis Services must be deployed in the
+            # same namespace (or use their fully qualified Service DNS names).
+            - name: DB_DSN
+              value: postgres://postgres:postgres@postgres.tsz-byg-demo.svc.cluster.local:5432/thyris?sslmode=disable&TimeZone=Europe/Istanbul
+            - name: REDIS_URL
+              value: redis://:thyrisredis@redis.tsz-byg-demo.svc.cluster.local:6379/0
+            - name: TSZ_HTTP_PORT
+              value: "8080"
+            - name: TSZ_GRPC_PORT
+              value: "9002"
+            - name: TSZ_FAIL_MODE
+              value: closed
+            - name: TSZ_MAX_CONCURRENT_STREAMS
+              value: "100"
+            - name: TSZ_MAX_GRPC_MESSAGE_BYTES
+              value: "4194304"
+            - name: TSZ_MAX_BODY_BYTES
+              value: "1048576"
+            - name: TSZ_MAX_STREAM_BUFFER_BYTES
+              value: "262144"
+            - name: TSZ_PROCESSING_TIMEOUT_MS
+              value: "2000"
+            - name: TSZ_POLICY_RECONCILE_INTERVAL
+              value: 30s
+            - name: TSZ_POLICY_MAX_STALENESS
+              value: 5m
+            - name: TSZ_POLICY_RECONCILE_FAILURE_THRESHOLD
+              value: "3"
+            - name: TSZ_POLICY_RESOLUTION_MODE
+              value: attribute
+            - name: TSZ_GRACEFUL_SHUTDOWN_TIMEOUT
+              value: 10s
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tsz-ext-proc
+  namespace: tsz-byg-demo
+  labels:
+    app.kubernetes.io/name: tsz-ext-proc
+    app.kubernetes.io/part-of: tsz
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: tsz-ext-proc
+  ports:
+    - name: grpc
+      port: 9002
+      targetPort: grpc
+      protocol: TCP
+      appProtocol: kubernetes.io/h2c
+    - name: health
+      port: 8080
+      targetPort: health
+      protocol: TCP
+---
+# Initial production scaling profile. Tune these values with observed request
+# rate, processor latency, CPU, memory, and concurrent-stream metrics.
+# CPU utilization is calculated against the Deployment's CPU request above.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: tsz-ext-proc
+  namespace: tsz-byg-demo
+  labels:
+    app.kubernetes.io/name: tsz-ext-proc
+    app.kubernetes.io/part-of: tsz
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: tsz-ext-proc
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 25
+          periodSeconds: 60
+---
+# Permit a single voluntary eviction during node drains or cluster upgrades.
+# This works with minReplicas: 2 to retain one available processor replica.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: tsz-ext-proc
+  namespace: tsz-byg-demo
+  labels:
+    app.kubernetes.io/name: tsz-ext-proc
+    app.kubernetes.io/part-of: tsz
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tsz-ext-proc
+

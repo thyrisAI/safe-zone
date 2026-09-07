@@ -36,6 +36,51 @@ The documentation set is organized as follows:
 - **Architecture & Security Overview** – Technical architecture, data flows and security controls  
   `ARCHITECTURE_SECURITY.md`
 
+- **Bring Your Gateway** – Supported gateway integration levels and policy identity model
+  `concepts/BRING_YOUR_GATEWAY.md`
+
+- **Envoy Gateway Integration** – Preview/manual and native/managed installation profiles
+  `integrations/ENVOY_GATEWAY.md`
+
+- **Gateway Integration Matrix** – Supported, deferred, validation-candidate and planned adapters
+  `integrations/README.md`
+
+- **Envoy AI Gateway Compatibility Track** – Deferred status, validation matrix and promotion gates
+  `integrations/ENVOY_AI_GATEWAY.md`
+
+- **Envoy Gateway Runnable Examples** – Local mock-provider verification for safe, masking, blocking, failure and telemetry paths
+  [examples/bring-your-gateway/README.md](../examples/bring-your-gateway/README.md)
+
+- **Native Gateway Adapters** – Adapter selection, capabilities and controller extension scope
+  [integrations/NATIVE_GATEWAY_ADAPTERS.md](integrations/NATIVE_GATEWAY_ADAPTERS.md)
+
+- **Gateway Adapter Development Contract** – Normative data-plane and optional native control-plane extension rules
+  [integrations/ADAPTER_DEVELOPMENT.md](integrations/ADAPTER_DEVELOPMENT.md)
+
+- **Next Gateway Decision** – Demand evidence, provisional Kong selection and validation gates
+  [integrations/NEXT_GATEWAY_DECISION.md](integrations/NEXT_GATEWAY_DECISION.md)
+
+- **Gateway Adapter Evaluation** – Technical feasibility and disposition for self-managed and managed gateway candidates
+  [integrations/GATEWAY_ADAPTER_EVALUATION.md](integrations/GATEWAY_ADAPTER_EVALUATION.md)
+
+- **TSZ Policy API Upgrade** – Beta API compatibility, alpha migration, storage rewrite and adopter-feedback gates
+  [operations/TSZ_POLICY_API_UPGRADE.md](operations/TSZ_POLICY_API_UPGRADE.md)
+
+- **BYG Deployment Operations** – Deployment topology, operational verification and change management
+  `operations/BYG_DEPLOYMENT.md`
+
+- **BYG Observability Operations** – Metrics, tracing, audit/SIEM correlation and telemetry safety
+  `operations/BYG_OBSERVABILITY.md`
+
+- **BYG Troubleshooting** – Policy, connectivity, timeout, mutation and streaming incident triage
+  `operations/BYG_TROUBLESHOOTING.md`
+
+- **BYG Extension Server Security Evaluation** – Experimental-control-plane decision and promotion criteria
+  `security/BYG_EXTENSION_SERVER_EVALUATION.md`
+
+- **BYG Threat Model** – Assets, trust boundaries, bypass and leakage threats, mitigations and residual risks
+  `security/BYG_THREAT_MODEL.md`
+
 - **Security Roadmap** – Detailed hardening milestones and implementation status  
   `SECURITY_ROADMAP.md`
 

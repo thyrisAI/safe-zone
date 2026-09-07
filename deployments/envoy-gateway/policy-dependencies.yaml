@@ -1,0 +1,161 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: tsz-byg-demo
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: tsz-byg
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/part-of: tsz-byg
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16.14-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_DB
+              value: thyris
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: postgres
+          ports:
+            - name: postgres
+              containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: bootstrap-sql
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          readinessProbe:
+            exec:
+              command: ["sh", "-ec", "pg_isready -U postgres -d thyris"]
+            initialDelaySeconds: 2
+            periodSeconds: 3
+          livenessProbe:
+            exec:
+              command: ["sh", "-ec", "pg_isready -U postgres -d thyris"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        # This is intentionally ephemeral: a clean Kind bootstrap always
+        # starts at init.sql, while the SQL is itself safe to apply repeatedly.
+        - name: data
+          emptyDir: {}
+        - name: bootstrap-sql
+          configMap:
+            name: tsz-byg-postgres-init
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: tsz-byg-demo
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: tsz-byg-demo
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: tsz-byg
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: redis
+        app.kubernetes.io/part-of: tsz-byg
+    spec:
+      containers:
+        - name: redis
+          image: redis:7.4.9-alpine
+          imagePullPolicy: IfNotPresent
+          command: ["redis-server", "--requirepass", "thyrisredis"]
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["sh", "-ec", "redis-cli --no-auth-warning -a thyrisredis ping"]
+            initialDelaySeconds: 2
+            periodSeconds: 3
+          livenessProbe:
+            exec:
+              command: ["sh", "-ec", "redis-cli --no-auth-warning -a thyrisredis ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: tsz-byg-demo
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tsz-policy-migrations
+  namespace: tsz-byg-demo
+  labels:
+    app.kubernetes.io/name: tsz-policy-migrations
+    app.kubernetes.io/part-of: tsz-byg
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tsz-policy-migrations
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: postgres:16.14-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PGPASSWORD
+              value: postgres
+          command: ["sh", "-ec"]
+          args:
+            - |
+              psql -v ON_ERROR_STOP=1 -h postgres.tsz-byg-demo.svc.cluster.local -U postgres -d thyris -f /migrations/000001_create_policy_snapshots.up.sql
+              psql -v ON_ERROR_STOP=1 -h postgres.tsz-byg-demo.svc.cluster.local -U postgres -d thyris -f /migrations/000002_create_route_policy_bindings.up.sql
+              psql -v ON_ERROR_STOP=1 -h postgres.tsz-byg-demo.svc.cluster.local -U postgres -d thyris -f /migrations/000003_create_owner_crd_refs.up.sql
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+      volumes:
+        - name: migrations
+          configMap:
+            name: tsz-byg-policy-migrations

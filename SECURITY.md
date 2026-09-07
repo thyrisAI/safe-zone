@@ -58,6 +58,15 @@ Please focus your testing on:
 - TSZ’s HTTP APIs and configuration
 - The way TSZ handles and stores data
 - Authentication, authorization and isolation boundaries around TSZ
+- BYG adapter protocol handling, policy attachment and route-policy authority
+- Fail-open bypasses, streaming leakage, unsafe metadata and processor exposure
+
+For the BYG threat model covering assets, actors, trust boundaries, threats,
+mitigations, and residual risks, see
+[docs/security/BYG_THREAT_MODEL.md](docs/security/BYG_THREAT_MODEL.md).
+Adapter or policy-bypass vulnerabilities must be reported privately using the
+same process above; do not include real prompts, credentials, or detected data
+in a report.
 
 Out of scope:
 
@@ -85,7 +94,7 @@ Thank you for helping us keep TSZ and its users safe.
 
 TSZ is actively implementing a comprehensive security hardening roadmap to achieve production-ready status. For details, see:
 
-- **[docs/SECURITY_ROADMAP.md](docs/SECURITY_ROADMAP.md)** – Detailed 10-week plan for security enhancements (authentication, authorization, rate limiting, TLS, audit logging, vulnerability scanning)
+- **[SECURITY_ROADMAP.md](SECURITY_ROADMAP.md)** – Detailed security-hardening plan (authentication, authorization, rate limiting, TLS, audit logging, vulnerability scanning)
 - **[ROADMAP.md](ROADMAP.md)** – Phase 1 Subsection 1b includes security milestones and timeline
 
 ### Current Limitations (Being Addressed)
@@ -113,7 +122,7 @@ Until these are implemented, TSZ should be deployed **only in secure, trusted en
 
 ### Timeline to Production Ready
 
-See [docs/SECURITY_ROADMAP.md](docs/SECURITY_ROADMAP.md) for the complete timeline:
+See [SECURITY_ROADMAP.md](SECURITY_ROADMAP.md) for the complete timeline:
 
 - **Weeks 1-2**: HTTP security (headers, size limits, timeouts)
 - **Weeks 2-3**: Authentication & authorization

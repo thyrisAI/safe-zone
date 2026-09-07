@@ -1,0 +1,8 @@
+# Shared BYG runtime resources. This base deliberately excludes a Gateway,
+# HTTPRoute, policy attachment, PostgreSQL, and Redis: those are owned by the
+# adopting platform, not by the processor deployment package.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - tsz-ext-proc.yaml
+  - network-policy.yaml

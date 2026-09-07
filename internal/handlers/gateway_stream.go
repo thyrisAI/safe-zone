@@ -3,6 +3,7 @@ package handlers
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"log"
@@ -52,7 +53,7 @@ func proxyStreamResponse(w http.ResponseWriter, resp *http.Response) {
 // streamWithOutputGuardrails proxies a streaming response while applying output guardrails
 // on the accumulated assistant content and streaming only the sanitized output.
 func streamWithOutputGuardrails(
-	detector *guardrails.Detector,
+	service guardrails.GuardrailService,
 	rid string,
 	guardrailsList []string,
 	upstreamResp *http.Response,
@@ -161,7 +162,7 @@ func streamWithOutputGuardrails(
 					}
 				}
 
-				blocked, sanitized, errMsg := runOutputGuardrails(detector, rid, guardrailsList, rawBuffer.String(), onFail)
+				blocked, sanitized, errMsg := runOutputGuardrails(service, rid, guardrailsList, rawBuffer.String(), onFail)
 				if blocked {
 					log.Printf("[gateway-stream] RID=%s output blocked by guardrails: %s", rid, errMsg)
 					writeStreamErrorEvent(w, flusher, errMsg)
@@ -228,7 +229,7 @@ func streamWithOutputGuardrails(
 // proxyStreamWithAsyncValidation proxies the upstream streaming response as-is to the client,
 // while also capturing the full stream and running guardrails asynchronously for logging/SIEM.
 func proxyStreamWithAsyncValidation(
-	detector *guardrails.Detector,
+	service guardrails.GuardrailService,
 	rid string,
 	guardrailsList []string,
 	upstreamResp *http.Response,
@@ -285,7 +286,7 @@ func proxyStreamWithAsyncValidation(
 
 		text := string(all)
 		log.Printf("[gateway-stream] RID=%s starting async output validation (bytes=%d, guardrails=%v)", rid, len(all), guards)
-		_ = detector.Detect(models.DetectRequest{
+		_, _ = guardrails.DetectLegacy(context.Background(), service, models.DetectRequest{
 			Text:       text,
 			RID:        rid + "-OUT-ASYNC",
 			Guardrails: guards,
@@ -296,7 +297,7 @@ func proxyStreamWithAsyncValidation(
 // runOutputGuardrails applies guardrails to the full assistant text and returns a sanitized version.
 // Depending on onFail, it may instruct the caller to halt streaming.
 func runOutputGuardrails(
-	detector *guardrails.Detector,
+	service guardrails.GuardrailService,
 	rid string,
 	guardrailsList []string,
 	text string,
@@ -307,11 +308,14 @@ func runOutputGuardrails(
 		return false, text, ""
 	}
 
-	resp := detector.Detect(models.DetectRequest{
+	resp, err := guardrails.DetectLegacy(context.Background(), service, models.DetectRequest{
 		Text:       text,
 		RID:        rid + "-OUT-STREAM",
 		Guardrails: guardrailsList,
 	})
+	if err != nil {
+		return true, "", "Guardrail inspection failed"
+	}
 
 	if resp.Blocked && onFail == "halt" {
 		msg = resp.Message

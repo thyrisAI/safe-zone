@@ -1,0 +1,25 @@
+# Production topology: the processor runs in tsz-system and its stateful
+# dependencies run in tsz-data. Change these two namespace values together
+# when adopting the overlay for another topology.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: tsz-system
+resources:
+  - ../../base
+patches:
+  - target:
+      group: networking.k8s.io
+      version: v1
+      kind: NetworkPolicy
+      name: tsz-ext-proc-allow-egress-dependencies
+    patch: |-
+      - op: add
+        path: /spec/egress/1/to/0/namespaceSelector
+        value:
+          matchLabels:
+            kubernetes.io/metadata.name: tsz-data
+      - op: add
+        path: /spec/egress/2/to/0/namespaceSelector
+        value:
+          matchLabels:
+            kubernetes.io/metadata.name: tsz-data

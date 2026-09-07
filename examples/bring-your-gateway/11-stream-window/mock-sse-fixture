@@ -1,0 +1,14 @@
+data: {"id":"chatcmpl-kind-mock","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"Contact alice@"}}]}
+
+data: {"id":"chatcmpl-kind-mock","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"example.com for support. "}}]}
+
+data: {"id":"chatcmpl-kind-mock","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"This is additional safe streaming text one. "}}]}
+
+data: {"id":"chatcmpl-kind-mock","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"This is additional safe streaming text two. "}}]}
+
+data: {"id":"chatcmpl-kind-mock","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"This is additional safe streaming text three. "}}]}
+
+data: {"id":"chatcmpl-kind-mock","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"This is additional safe streaming text four. "}}]}
+
+data: [DONE]
+

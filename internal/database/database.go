@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	otelgorm "gorm.io/plugin/opentelemetry/tracing"
 )
 
 var DB *gorm.DB
@@ -18,6 +19,12 @@ func InitDB() {
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	// Keep query variables out of spans: database parameters can contain policy
+	// material or user-supplied values. The plugin follows the configured global
+	// OpenTelemetry provider and is a no-op when tracing is disabled.
+	if err := DB.Use(otelgorm.NewPlugin(otelgorm.WithoutQueryVariables(), otelgorm.WithoutMetrics())); err != nil {
+		log.Printf("Warning: failed to instrument database tracing: %v", err)
 	}
 
 	log.Println("Database connection established")

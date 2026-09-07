@@ -1,0 +1,114 @@
+# Apply config/rbac/role.yaml before this manifest. The generated ClusterRole
+# is deliberately kept separate so controller-gen remains the source of truth
+# for permissions.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tsz-controller
+  namespace: tsz-byg-demo
+  labels:
+    app.kubernetes.io/name: tsz-controller
+    app.kubernetes.io/part-of: tsz
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tsz-controller
+  labels:
+    app.kubernetes.io/name: tsz-controller
+    app.kubernetes.io/part-of: tsz
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tsz-controller
+subjects:
+  - kind: ServiceAccount
+    name: tsz-controller
+    namespace: tsz-byg-demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tsz-controller
+  namespace: tsz-byg-demo
+  labels:
+    app.kubernetes.io/name: tsz-controller
+    app.kubernetes.io/part-of: tsz
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tsz-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tsz-controller
+        app.kubernetes.io/part-of: tsz
+    spec:
+      serviceAccountName: tsz-controller
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: tsz-controller
+          image: thyris-sz:local
+          imagePullPolicy: IfNotPresent
+          command: ["/app/tsz-controller"]
+          ports:
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+          env:
+            - name: DB_DSN
+              value: postgres://postgres:postgres@postgres.tsz-byg-demo.svc.cluster.local:5432/thyris?sslmode=disable&TimeZone=Europe/Istanbul
+            - name: REDIS_URL
+              value: redis://:thyrisredis@redis.tsz-byg-demo.svc.cluster.local:6379/0
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tsz-controller-metrics
+  namespace: tsz-byg-demo
+  labels:
+    app.kubernetes.io/name: tsz-controller
+    app.kubernetes.io/part-of: tsz
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: tsz-controller
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: metrics
+
+

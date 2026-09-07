@@ -1,6 +1,7 @@
 package guardrails
 
 import (
+	"context"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
@@ -48,6 +49,8 @@ func isValidSchema(jsonContent string, schemaContent string) (bool, error) {
 
 // ValidateFormat validates the text against a named format rule
 func ValidateFormat(text string, formatName string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), config.DefaultExtProcProcessingTimeout)
+	defer cancel()
 	validator, err := repository.GetValidatorByName(formatName)
 	if err != nil {
 		return false, errors.New("validator not found: " + formatName)
@@ -84,7 +87,7 @@ func ValidateFormat(text string, formatName string) (bool, error) {
 			return false, errors.New("AI validation is disabled by feature flag")
 		}
 		// Use AI Client to validate
-		return ai.CheckWithAI(text, validator.Rule, validator.ExpectedResponse)
+		return ai.CheckWithAI(ctx, text, validator.Rule, validator.ExpectedResponse)
 	default:
 		return false, errors.New("unknown validator type: " + validator.Type)
 	}

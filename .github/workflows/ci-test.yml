@@ -7,8 +7,89 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
+  ci_scope:
+    name: Detect CI scope
+    runs-on: ubuntu-latest
+    outputs:
+      policy_api: ${{ steps.changes.outputs.policy_api }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed areas
+        id: changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "policy_api=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base="$PR_BASE_SHA"
+            head="$PR_HEAD_SHA"
+          else
+            base="$PUSH_BEFORE_SHA"
+            head="$CURRENT_SHA"
+          fi
+
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            base="$(git rev-list --max-parents=0 "$head")"
+          fi
+
+          if git diff --quiet "$base" "$head" -- \
+            api/v1alpha1 \
+            api/v1beta1 \
+            cmd/tsz-controller \
+            config/crd \
+            config/rbac \
+            hack \
+            internal/controller \
+            internal/extproc/policy \
+            .github/workflows/ci-test.yml \
+            Makefile \
+            go.mod \
+            go.sum; then
+            echo "policy_api=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "policy_api=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  policy-api-compatibility:
+    name: Policy API compatibility and storage upgrade
+    needs: ci_scope
+    if: needs.ci_scope.outputs.policy_api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Verify generated API assets
+        run: |
+          make generate manifests
+          git diff --exit-code -- api config/crd config/rbac
+
+      - name: Test API schema and controller behavior
+        run: go test ./api/... ./internal/controller/...
+
+      - name: Test alpha-to-beta CRD upgrade with Kubernetes API server
+        run: make test-envtest
+
   unit-tests:
     name: Unit tests (fast)
     runs-on: ubuntu-latest
@@ -39,7 +120,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16.14-alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -50,7 +131,7 @@ jobs:
           --health-cmd="pg_isready -U postgres" --health-interval=10s --health-timeout=5s --health-retries=5
 
       redis:
-        image: redis:7
+        image: redis:7.4.9-alpine
         ports:
           - 6379:6379
         options: >-
@@ -99,12 +180,18 @@ jobs:
           TSZ_BASE_URL: http://localhost:8080
         run: go test ./tests/integration/...
 
+      - name: Run policy migration and Redis integration tests
+        env:
+          TSZ_POLICY_TEST_DSN: postgres://postgres:postgres@localhost:5432/thyris?sslmode=disable
+          TSZ_POLICY_TEST_REDIS_URL: redis://localhost:6379/0
+        run: go test ./internal/extproc/policy/...
+
   integration-tests-auth:
     name: Integration tests (auth enabled)
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16.14-alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -115,7 +202,7 @@ jobs:
           --health-cmd="pg_isready -U postgres" --health-interval=10s --health-timeout=5s --health-retries=5
 
       redis:
-        image: redis:7
+        image: redis:7.4.9-alpine
         ports:
           - 6379:6379
         options: >-
@@ -178,7 +265,7 @@ jobs:
       - integration-tests-auth
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16.14-alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -189,7 +276,7 @@ jobs:
           --health-cmd="pg_isready -U postgres" --health-interval=10s --health-timeout=5s --health-retries=5
 
       redis:
-        image: redis:7
+        image: redis:7.4.9-alpine
         ports:
           - 6379:6379
         options: >-
@@ -202,7 +289,9 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version-file: pkg/tsz-cli/go.mod
+          # This job builds the root server first. The root module's Go version
+          # also satisfies the CLI submodule's lower minimum version.
+          go-version-file: go.mod
 
       - name: Install PostgreSQL client
         run: |
@@ -237,3 +326,24 @@ jobs:
         env:
           TSZ_BASE_URL: http://localhost:8080
         run: go test ./tests/e2e/...
+
+  documentation-link-checks:
+    name: Documentation and adapter release checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Check adapter release documentation and examples
+        run: go test ./tests/release
+
+      - name: Check Markdown links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --root-dir "$(pwd)" --verbose --no-progress --max-retries 3 --timeout 20 './**/*.md'
+          token: ${{ secrets.GITHUB_TOKEN }}

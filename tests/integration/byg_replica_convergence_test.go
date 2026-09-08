@@ -31,7 +31,7 @@ func TestBYGReplicaConvergenceKind(t *testing.T) {
 	if os.Getenv("TSZ_BYG_KIND_E2E") != "1" {
 		t.Skip("set TSZ_BYG_KIND_E2E=1 to run against the pinned Kind cluster")
 	}
-	runRepo(t, "./deployments/envoy-gateway/kind-bootstrap.sh", "verify-replica-lifecycle")
+	runRepo(t, "./examples/bring-your-gateway/cluster/kind-bootstrap.sh", "verify-replica-lifecycle")
 	kubectl := filepath.Join(os.TempDir(), "tsz-byg-tools", "kubectl-v1.35.5")
 	kubeconfig := filepath.Join(os.TempDir(), "tsz-byg-tools", "tsz-byg.kubeconfig")
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)

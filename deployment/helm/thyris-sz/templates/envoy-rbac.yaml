@@ -1,0 +1,42 @@
+{{- if and .Values.envoyGateway.enabled (eq .Values.envoyGateway.mode "native") .Values.envoyGateway.controller.enabled .Values.envoyGateway.controller.rbac.create }}
+{{- $name := include "thyris-sz.envoyGateway.controllerName" . -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "thyris-sz.labels" . | nindent 4 }}
+    app.kubernetes.io/component: envoy-controller
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["gateway.envoyproxy.io"]
+    resources: ["envoyextensionpolicies"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["gateways", "grpcroutes", "httproutes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["security.thyris.ai"]
+    resources: ["tszguardrailpolicies"]
+    verbs: ["get", "list", "patch", "update", "watch"]
+  - apiGroups: ["security.thyris.ai"]
+    resources: ["tszguardrailpolicies/status"]
+    verbs: ["get", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "thyris-sz.labels" . | nindent 4 }}
+    app.kubernetes.io/component: envoy-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $name }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "thyris-sz.envoyGateway.controllerServiceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

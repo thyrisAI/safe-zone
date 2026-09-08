@@ -44,7 +44,7 @@ jobs:
         if: ${{ github.event.inputs.product == 'thyris-sz' || github.event.inputs.product == 'tszclient-go' || github.event.inputs.product == 'tsz-cli' }}
         uses: actions/setup-go@v7
         with:
-          go-version: '1.23'
+          go-version-file: go.mod
 
       - name: Setup Python
         if: ${{ github.event.inputs.product == 'tszclient-py' }}
@@ -60,8 +60,8 @@ jobs:
 
       - name: Run product specific release script
         run: |
-          chmod +x ci/release_${{ github.event.inputs.product }}.sh
-          ci/release_${{ github.event.inputs.product }}.sh --bump ${{ github.event.inputs.bump }}
+          chmod +x scripts/release/release_${{ github.event.inputs.product }}.sh
+          scripts/release/release_${{ github.event.inputs.product }}.sh --bump ${{ github.event.inputs.bump }}
 
       # thyris-sz: create release (auto or manual notes depending on input) with a core artifact zip
       - name: Determine last thyris-sz tag
@@ -76,7 +76,7 @@ jobs:
           VERSION=${LAST_TAG#thyris-sz-v}
           ZIP_NAME="thyris-sz-${VERSION}.zip"
           echo "Packaging thyris-sz core into $ZIP_NAME"
-          zip -r "$ZIP_NAME" internal .env.example Dockerfile LICENSE docker-compose.yml go.mod go.sum init.sql main.go -x '**/__pycache__/*' '*.pyc' '*.pyo'
+          zip -r "$ZIP_NAME" api cmd config deployment internal pkg/tszclient-go scripts/database .env.example LICENSE go.mod go.sum main.go -x '**/__pycache__/*' '*.pyc' '*.pyo'
 
       - name: Create GitHub Release for thyris-sz (manual notes)
         if: ${{ github.event.inputs.product == 'thyris-sz' && github.event.inputs.release_notes != '' }}

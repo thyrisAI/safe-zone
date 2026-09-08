@@ -4,7 +4,7 @@ dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "${dir}/../../.." && pwd)"
 ns=tsz-byg-demo
 kc="${TSZ_BYG_KUBECONFIG:-${TMPDIR:-/tmp}/tsz-byg-tools/tsz-byg.kubeconfig}"
-TSZ_BYG_KUBECONFIG="$kc" "${root}/deployments/envoy-gateway/kind-bootstrap.sh" up
+TSZ_BYG_KUBECONFIG="$kc" "${root}/examples/bring-your-gateway/cluster/kind-bootstrap.sh" up
 export KUBECONFIG="$kc"
 kubectl apply -f "${dir}/resources.yaml"
 kubectl -n "$ns" rollout status deployment/byg-mock-siem --timeout=90s

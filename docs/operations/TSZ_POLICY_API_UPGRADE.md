@@ -46,7 +46,7 @@ Evidence recorded for the beta implementation on 2026-09-07:
 | Kubernetes API server + etcd, envtest `1.35.0` | Automated in-place upgrade from the frozen CRD; alpha/beta reads, writes, status, defaults, invalid inputs, controller reference-failure reporting and storage rewrite/alpha client rollback are tested. |
 | Existing controller behavior | Beta controller runs the existing policy resolution, precedence, conflict, compilation and last-known-good unit tests. An alpha-owned Envoy attachment keeps its UID and deterministic name when reconciled by beta. |
 | Reference deployment | Kubernetes `1.35.5`, Envoy Gateway `1.8.3`, Gateway API `1.5.1` are pinned by the repository. The API-server tests above do not substitute for an end-to-end rollout through this complete stack. |
-| Public adopter record | `ADOPTERS.md` lists Thyris.AI using TSZ in production. It does not establish adoption of this CRD version. |
+| Public adopter record | `docs/ADOPTERS.md` lists Thyris.AI using TSZ in production. It does not establish adoption of this CRD version. |
 | API-specific feedback | The issue comments record Phase 1–5 implementation progress, but contain no CRD-specific adopter review or beta sign-off. No independent adopter compatibility feedback is claimed. |
 
 The available evidence supports a schema-preserving beta implementation and a

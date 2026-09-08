@@ -159,7 +159,7 @@ jobs:
             -h localhost \
             -U postgres \
             -d thyris \
-            -f init.sql
+            -f scripts/database/init.sql
 
       - name: Run TSZ server
         env:
@@ -230,7 +230,7 @@ jobs:
             -h localhost \
             -U postgres \
             -d thyris \
-            -f init.sql
+            -f scripts/database/init.sql
 
       - name: Run TSZ server (auth mode)
         env:
@@ -306,7 +306,7 @@ jobs:
             -h localhost \
             -U postgres \
             -d thyris \
-            -f init.sql
+            -f scripts/database/init.sql
 
       - name: Run TSZ server
         env:

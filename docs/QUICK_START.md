@@ -30,7 +30,7 @@ summary, including that masked PII is not forwarded and blocked requests never
 reach the upstream. Remove the environment when finished:
 
 ```bash
-deployments/envoy-gateway/kind-bootstrap.sh down
+examples/bring-your-gateway/cluster/kind-bootstrap.sh down
 ```
 
 Production configuration, native `TSZGuardrailPolicy` attachment, TLS/mTLS,
@@ -59,7 +59,9 @@ cd safe-zone
 
 ## 3. Configure Environment (Optional)
 
-A default configuration is already provided in `docker-compose.yml` and `.env.example`.
+A default configuration is already provided in `deployment/docker/docker-compose.yml`
+and `.env.example`;
+the PostgreSQL bootstrap schema lives in `scripts/database/init.sql`.
 If you want to override settings, copy the example file to `.env` (Docker Compose loads it automatically):
 
 ```bash
@@ -121,13 +123,13 @@ For a local test run, the defaults are usually sufficient. For production, you s
 From the repository root:
 
 ```bash
-docker-compose up --build -d
+docker compose -f deployment/docker/docker-compose.yml up --build -d
 ```
 
 If you are using Docker Compose v2, you can run:
 
 ```bash
-docker compose up --build -d
+docker compose -f deployment/docker/docker-compose.yml up --build -d
 ```
 
 This will start:

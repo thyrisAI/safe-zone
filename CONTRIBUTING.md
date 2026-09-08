@@ -30,7 +30,7 @@ Before working on larger features, we recommend reading:
 - `docs/ARCHITECTURE_SECURITY.md`
 - `docs/API_REFERENCE.md`
 - `docs/SECURITY_ROADMAP.md` – **Must read for security hardening context**
-- `ROADMAP.md`
+- `docs/ROADMAP.md`
 
 Contributors implementing a Bring Your Gateway integration must follow the
 [gateway adapter development contract](docs/integrations/ADAPTER_DEVELOPMENT.md).
@@ -49,13 +49,13 @@ Contributors implementing a Bring Your Gateway integration must follow the
 You can start the full stack (PostgreSQL + Redis + TSZ) using Docker Compose:
 
 ```bash
-docker-compose up --build
+docker compose -f deployment/docker/docker-compose.yml up --build
 ```
 
 This will:
-- Build the TSZ binary using the Dockerfile
-- Start PostgreSQL and Redis using the configuration in `docker-compose.yml`
-- Apply the initial schema from `init.sql`
+- Build the TSZ binary using `deployment/docker/Dockerfile`
+- Start PostgreSQL and Redis using `deployment/docker/docker-compose.yml`
+- Apply the initial schema from `scripts/database/init.sql`
 
 Once started, the TSZ HTTP API will be available on the port configured in the Dockerfile / environment (see `docs/QUICK_START.md` for details).
 
@@ -96,7 +96,7 @@ This should run quickly and is expected to pass before opening a pull request.
   - Command:
     ```bash
     # Make sure PostgreSQL and Redis are running, e.g. via docker-compose
-    docker-compose up -d
+    docker compose -f deployment/docker/docker-compose.yml up -d
     go test ./tests/integration/...
     ```
 
@@ -104,7 +104,7 @@ This should run quickly and is expected to pass before opening a pull request.
   - Location: `tests/e2e/`
   - Command:
     ```bash
-    docker-compose up -d
+    docker compose -f deployment/docker/docker-compose.yml up -d
     go test ./tests/e2e/...
     ```
 

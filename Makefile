@@ -7,7 +7,7 @@ manifests:
 	$(CONTROLLER_GEN) rbac:roleName=tsz-controller crd:allowDangerousTypes=true webhook paths="./api/...;./internal/controller/..." output:crd:artifacts:config=config/crd/bases output:rbac:artifacts:config=config/rbac
 
 generate:
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./api/..."
+	$(CONTROLLER_GEN) object:headerFile="scripts/codegen/boilerplate.go.txt" paths="./api/..."
 
 test-envtest: ## Run API-server-backed controller tests with pinned envtest assets.
 	@set -eu; \

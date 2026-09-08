@@ -156,14 +156,14 @@ The workflow will:
 
 - Checkout the repository with full history (`fetch-depth: 0`).
 - Set up Go and/or Python depending on the product.
-- Run the corresponding `ci/release_<product>.sh` script.
+- Run the corresponding `scripts/release/release_<product>.sh` script.
 - For SDKs, package SDK-only zip archives and attach them to a GitHub Release.
 
 ### 3.2. Product-specific behaviors
 
 #### thyris-sz
 
-Release script: `ci/release_thyris-sz.sh`
+Release script: `scripts/release/release_thyris-sz.sh`
 
 Steps:
 
@@ -188,7 +188,7 @@ Steps:
 
 #### tszclient-go (Go SDK)
 
-Release script: `ci/release_tszclient-go.sh`
+Release script: `scripts/release/release_tszclient-go.sh`
 
 Steps:
 
@@ -219,7 +219,7 @@ Then the workflow:
 
 #### tszclient-py (Python SDK)
 
-Release script: `ci/release_tszclient-py.sh`
+Release script: `scripts/release/release_tszclient-py.sh`
 
 Steps:
 
@@ -260,9 +260,9 @@ Then the workflow:
 You can run the release scripts locally for dry runs:
 
 ```bash
-bash ci/release_thyris-sz.sh --bump patch
-bash ci/release_tszclient-go.sh --bump patch
-bash ci/release_tszclient-py.sh --bump patch
+bash scripts/release/release_thyris-sz.sh --bump patch
+bash scripts/release/release_tszclient-go.sh --bump patch
+bash scripts/release/release_tszclient-py.sh --bump patch
 ```
 
 **Warning:**

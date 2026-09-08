@@ -113,5 +113,5 @@ examples/bring-your-gateway/shared/cleanup.sh examples/bring-your-gateway/01-min
 Remove the complete local environment with:
 
 ```bash
-deployments/envoy-gateway/kind-bootstrap.sh down
+examples/bring-your-gateway/cluster/kind-bootstrap.sh down
 ```

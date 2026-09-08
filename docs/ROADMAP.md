@@ -119,7 +119,7 @@ The roadmap is split into phases. Each bullet is a concrete, actionable item.
   - [ ] Define security SLA for vulnerability fixes (CRITICAL: 24h, HIGH: 7d, MEDIUM: 30d)
 
 - [ ] **Milestone 7: Production Hardening & Deployment** (5-18 October 2026; Weeks 8-9)
-  - [ ] Remove default credentials from `docker-compose.yml` and `init.sql`
+  - [ ] Remove default credentials from `deployment/docker/docker-compose.yml` and `scripts/database/init.sql`
   - [ ] Document recommended network topology (reverse proxy, TLS termination, private subnets)
   - [ ] Run containers as non-root user
   - [ ] Set resource limits in Docker/Kubernetes (memory, CPU)

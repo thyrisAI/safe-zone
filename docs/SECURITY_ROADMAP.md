@@ -409,7 +409,7 @@ Make deployment and operations secure.
 ### Tasks
 
 #### 7.1 Configuration Hardening
-- [ ] Remove default credentials from `docker-compose.yml` and `init.sql`
+- [ ] Remove default credentials from `deployment/docker/docker-compose.yml` and `scripts/database/init.sql`
 - [ ] Generate strong random passwords during deployment
 - [ ] Support .env file variable rotation
 

@@ -222,7 +222,7 @@ A typical implementation uses packages such as:
 internal/extproc/<gateway>/             # native transport translation
 internal/controller/<gateway>resource/ # optional declarative resources
 cmd/tsz-<gateway>-processor/            # optional dedicated entry point
-deployments/<gateway>/                  # version-pinned deployment assets
+deployment/helm/thyris-sz/templates/    # optional, values-gated deployment assets
 examples/bring-your-gateway/<gateway>/  # focused runnable examples
 ```
 

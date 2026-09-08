@@ -100,7 +100,7 @@ README.md
 ### 1. Start TSZ
 
 ```bash
-docker compose up -d
+docker compose -f deployment/docker/docker-compose.yml up -d
 ```
 
 ### 2. Start Jaeger (OpenTelemetry Backend)

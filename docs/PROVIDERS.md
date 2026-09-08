@@ -298,7 +298,7 @@ For production deployments on AWS (EC2, ECS, EKS, Lambda):
 
 2. **Use Profile**:
    ```bash
-   AWS_PROFILE=tsz-bedrock docker-compose up -d
+   AWS_PROFILE=tsz-bedrock docker compose -f deployment/docker/docker-compose.yml up -d
    ```
 
 ##### Minimum IAM Policy (Specific Model)

@@ -1,6 +1,6 @@
 apiVersion: v2
 name: thyris-sz
-description: Helm chart for deploying TSZ (Thyris Safe Zone) with optional PostgreSQL and Redis
+description: Helm chart for deploying TSZ with optional Envoy Gateway, PostgreSQL and Redis components
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

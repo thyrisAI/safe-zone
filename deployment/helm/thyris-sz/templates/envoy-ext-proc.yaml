@@ -1,0 +1,175 @@
+{{- if .Values.envoyGateway.enabled }}
+{{- if not (has .Values.envoyGateway.mode (list "native" "manual")) }}
+{{- fail "envoyGateway.mode must be native or manual" }}
+{{- end }}
+{{- if and (eq .Values.envoyGateway.mode "native") .Values.envoyGateway.attachment.enabled }}
+{{- fail "envoyGateway.attachment.enabled must be false in native mode because the controller owns attachments" }}
+{{- end }}
+{{- $name := include "thyris-sz.envoyGateway.extProcName" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "thyris-sz.labels" . | nindent 4 }}
+    app.kubernetes.io/component: envoy-ext-proc
+spec:
+  {{- if not .Values.envoyGateway.extProc.autoscaling.enabled }}
+  replicas: {{ .Values.envoyGateway.extProc.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "thyris-sz.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: envoy-ext-proc
+  template:
+    metadata:
+      labels:
+        {{- include "thyris-sz.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: envoy-ext-proc
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.envoyGateway.migrations.enabled }}
+      initContainers:
+        - name: wait-for-policy-schema
+          image: "{{ .Values.envoyGateway.migrations.image.repository }}:{{ .Values.envoyGateway.migrations.image.tag }}"
+          imagePullPolicy: {{ .Values.envoyGateway.migrations.image.pullPolicy }}
+          envFrom:
+            - secretRef:
+                name: {{ include "thyris-sz.secretName" . }}
+          command: ["sh", "-ec"]
+          args:
+            - db_dsn="${DB_DSN%%&TimeZone=*}"; db_dsn="${db_dsn%%?TimeZone=*}"; until psql "$db_dsn" -tAc "SELECT to_regclass('public.guardrail_template_snapshots') IS NOT NULL" | grep -q t; do sleep 2; done
+      {{- end }}
+      containers:
+        - name: tsz-ext-proc
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/app/tsz-ext-proc"]
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: grpc
+              containerPort: {{ .Values.envoyGateway.extProc.service.grpcPort }}
+              protocol: TCP
+            - name: health
+              containerPort: {{ .Values.envoyGateway.extProc.service.healthPort }}
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: {{ include "thyris-sz.secretName" . }}
+          env:
+            - name: TSZ_HTTP_PORT
+              value: {{ .Values.envoyGateway.extProc.service.healthPort | quote }}
+            - name: TSZ_GRPC_PORT
+              value: {{ .Values.envoyGateway.extProc.service.grpcPort | quote }}
+            - name: TSZ_FAIL_MODE
+              value: {{ .Values.envoyGateway.extProc.config.failMode | quote }}
+            - name: TSZ_MAX_CONCURRENT_STREAMS
+              value: {{ .Values.envoyGateway.extProc.config.maxConcurrentStreams | quote }}
+            - name: TSZ_MAX_GRPC_MESSAGE_BYTES
+              value: {{ .Values.envoyGateway.extProc.config.maxGrpcMessageBytes | quote }}
+            - name: TSZ_MAX_BODY_BYTES
+              value: {{ .Values.envoyGateway.extProc.config.maxBodyBytes | quote }}
+            - name: TSZ_MAX_STREAM_BUFFER_BYTES
+              value: {{ .Values.envoyGateway.extProc.config.maxStreamBufferBytes | quote }}
+            - name: TSZ_PROCESSING_TIMEOUT_MS
+              value: {{ .Values.envoyGateway.extProc.config.processingTimeoutMs | quote }}
+            - name: TSZ_POLICY_RECONCILE_INTERVAL
+              value: {{ .Values.envoyGateway.extProc.config.policyReconcileInterval | quote }}
+            - name: TSZ_POLICY_MAX_STALENESS
+              value: {{ .Values.envoyGateway.extProc.config.policyMaxStaleness | quote }}
+            - name: TSZ_POLICY_RECONCILE_FAILURE_THRESHOLD
+              value: {{ .Values.envoyGateway.extProc.config.policyReconcileFailureThreshold | quote }}
+            - name: TSZ_POLICY_RESOLUTION_MODE
+              value: {{ ternary "attribute" "header" (eq .Values.envoyGateway.mode "native") | quote }}
+            - name: TSZ_GRACEFUL_SHUTDOWN_TIMEOUT
+              value: {{ .Values.envoyGateway.extProc.config.gracefulShutdownTimeout | quote }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.envoyGateway.extProc.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "thyris-sz.labels" . | nindent 4 }}
+    app.kubernetes.io/component: envoy-ext-proc
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "thyris-sz.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: envoy-ext-proc
+  ports:
+    - name: grpc
+      port: {{ .Values.envoyGateway.extProc.service.grpcPort }}
+      targetPort: grpc
+      protocol: TCP
+      appProtocol: kubernetes.io/h2c
+    - name: health
+      port: {{ .Values.envoyGateway.extProc.service.healthPort }}
+      targetPort: health
+      protocol: TCP
+{{- if .Values.envoyGateway.extProc.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "thyris-sz.labels" . | nindent 4 }}
+    app.kubernetes.io/component: envoy-ext-proc
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $name }}
+  minReplicas: {{ .Values.envoyGateway.extProc.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.envoyGateway.extProc.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.envoyGateway.extProc.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.envoyGateway.extProc.autoscaling.targetMemoryUtilizationPercentage }}
+{{- end }}
+{{- if .Values.envoyGateway.extProc.podDisruptionBudget.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "thyris-sz.labels" . | nindent 4 }}
+    app.kubernetes.io/component: envoy-ext-proc
+spec:
+  maxUnavailable: {{ .Values.envoyGateway.extProc.podDisruptionBudget.maxUnavailable }}
+  selector:
+    matchLabels:
+      {{- include "thyris-sz.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: envoy-ext-proc
+{{- end }}
+{{- end }}

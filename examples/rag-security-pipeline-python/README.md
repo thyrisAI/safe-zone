@@ -61,7 +61,7 @@ examples/
 ### 1. Start TSZ
 ```bash
 cd safe-zone
-docker-compose up -d
+docker compose -f deployment/docker/docker-compose.yml up -d
 ```
 ### 2. Setup environment
 ```bash

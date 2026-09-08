@@ -56,6 +56,22 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-redis" (include "thyris-sz.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "thyris-sz.envoyGateway.extProcName" -}}
+{{- printf "%s-ext-proc" (include "thyris-sz.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "thyris-sz.envoyGateway.controllerName" -}}
+{{- printf "%s-controller" (include "thyris-sz.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "thyris-sz.envoyGateway.controllerServiceAccountName" -}}
+{{- if .Values.envoyGateway.controller.serviceAccount.create -}}
+{{- default (include "thyris-sz.envoyGateway.controllerName" .) .Values.envoyGateway.controller.serviceAccount.name -}}
+{{- else -}}
+{{- default "default" .Values.envoyGateway.controller.serviceAccount.name -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "thyris-sz.dbDsn" -}}
 {{- if .Values.secrets.dbDsn -}}
 {{- .Values.secrets.dbDsn -}}

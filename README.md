@@ -40,6 +40,10 @@ For all user and customer‑facing documentation, see the `docs/` directory:
   `docs/ARCHITECTURE_SECURITY.md`
 - **Security Roadmap** – Current security hardening plan and milestones  
   `docs/SECURITY_ROADMAP.md`
+- **Product Roadmap** – Planned capabilities and delivery status
+  `docs/ROADMAP.md`
+- **Adopters** – Public production adoption record
+  `docs/ADOPTERS.md`
 - **Postman Collection** – Ready‑to‑use collection  
   `docs/TSZ_Postman_Collection.json`
 - **Bring Your Gateway** – Envoy Gateway support matrix, installation profiles and runnable Kind examples

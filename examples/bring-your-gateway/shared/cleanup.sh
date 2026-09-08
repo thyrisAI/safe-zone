@@ -9,7 +9,7 @@ if [[ -n "${example_dir}" ]]; then
     kubectl delete -f "${example_dir}/resources.yaml" --ignore-not-found
   fi
 fi
-kubectl -n tsz-byg-demo delete -f deployments/envoy-gateway/tsz-ext-proc-envoy-extension-policy.yaml --ignore-not-found
+kubectl -n tsz-byg-demo delete -f examples/bring-your-gateway/cluster/tsz-ext-proc-envoy-extension-policy.yaml --ignore-not-found
 # Streaming fixtures add a ConfigMap volume to the reusable mock deployment.
 # Remove that template mutation before deleting the ConfigMap, otherwise the
 # next buffered example's bootstrap can wait forever for a missing volume.

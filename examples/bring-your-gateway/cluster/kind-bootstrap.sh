@@ -15,6 +15,7 @@ readonly DEMO_NAMESPACE="tsz-byg-demo"
 readonly GATEWAY_NAME="echo-gateway"
 readonly LOCAL_PORT="${TSZ_BYG_LOCAL_PORT:-18080}"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 readonly TOOLS_DIR="${TSZ_BYG_TOOLS_DIR:-${TMPDIR:-/tmp}/tsz-byg-tools}"
 readonly KUBECONFIG_PATH="${TSZ_BYG_KUBECONFIG:-${TOOLS_DIR}/${CLUSTER_NAME}.kubeconfig}"
 
@@ -185,12 +186,13 @@ apply_demo() {
 apply_policy_dependencies() {
   log "Applying pinned PostgreSQL and Redis dependencies"
   kubectl -n "$DEMO_NAMESPACE" create configmap tsz-byg-postgres-init \
-    --from-file=init.sql="${SCRIPT_DIR}/../../init.sql" \
+    --from-file=init.sql="${REPO_ROOT}/scripts/database/init.sql" \
     --dry-run=client -o yaml | kubectl apply -f -
   kubectl -n "$DEMO_NAMESPACE" create configmap tsz-byg-policy-migrations \
-    --from-file=000001_create_policy_snapshots.up.sql="${SCRIPT_DIR}/../../internal/extproc/policy/migrations/000001_create_policy_snapshots.up.sql" \
-    --from-file=000002_create_route_policy_bindings.up.sql="${SCRIPT_DIR}/../../internal/extproc/policy/migrations/000002_create_route_policy_bindings.up.sql" \
-    --from-file=000003_create_owner_crd_refs.up.sql="${SCRIPT_DIR}/../../internal/extproc/policy/migrations/000003_create_owner_crd_refs.up.sql" \
+    --from-file=000001_create_policy_snapshots.up.sql="${REPO_ROOT}/internal/extproc/policy/migrations/000001_create_policy_snapshots.up.sql" \
+    --from-file=000002_create_route_policy_bindings.up.sql="${REPO_ROOT}/internal/extproc/policy/migrations/000002_create_route_policy_bindings.up.sql" \
+    --from-file=000003_create_owner_crd_refs.up.sql="${REPO_ROOT}/internal/extproc/policy/migrations/000003_create_owner_crd_refs.up.sql" \
+    --from-file=000004_create_guardrail_template_snapshots.up.sql="${REPO_ROOT}/internal/extproc/policy/migrations/000004_create_guardrail_template_snapshots.up.sql" \
     --dry-run=client -o yaml | kubectl apply -f -
   kubectl apply -f "${SCRIPT_DIR}/policy-dependencies.yaml"
   kubectl -n "$DEMO_NAMESPACE" rollout status deployment/postgres --timeout=180s
@@ -316,7 +318,7 @@ verify_replica_lifecycle() {
   kubectl -n "$DEMO_NAMESPACE" wait --for=condition=complete job/tsz-policy-migrations --timeout=180s
 
   log "Building and loading the local tsz-ext-proc image into Kind"
-  docker build -t thyris-sz:local "${SCRIPT_DIR}/../.."
+  docker build -f "${REPO_ROOT}/deployment/docker/Dockerfile" -t thyris-sz:local "${REPO_ROOT}"
   "$KIND" load docker-image thyris-sz:local --name "$CLUSTER_NAME"
   kubectl apply -f "${SCRIPT_DIR}/tsz-ext-proc.yaml"
   kubectl apply -k "${SCRIPT_DIR}/kustomize/network-policy/overlays/same-namespace"
@@ -410,10 +412,10 @@ verify_controller_reconciliation() {
   apply_policy_dependencies
 
   log "Building and loading the local controller/ext-proc image into Kind"
-  docker build -t thyris-sz:local "${SCRIPT_DIR}/../.."
+  docker build -f "${REPO_ROOT}/deployment/docker/Dockerfile" -t thyris-sz:local "${REPO_ROOT}"
   "$KIND" load docker-image thyris-sz:local --name "$CLUSTER_NAME"
-  kubectl apply -f "${SCRIPT_DIR}/../../config/crd/bases/security.thyris.ai_tszguardrailpolicies.yaml"
-  kubectl apply -f "${SCRIPT_DIR}/../../config/rbac/role.yaml"
+  kubectl apply -f "${REPO_ROOT}/config/crd/bases/security.thyris.ai_tszguardrailpolicies.yaml"
+  kubectl apply -f "${REPO_ROOT}/config/rbac/role.yaml"
   kubectl apply -f "${SCRIPT_DIR}/tsz-ext-proc.yaml"
   kubectl apply -k "${SCRIPT_DIR}/kustomize/network-policy/overlays/same-namespace"
   kubectl apply -f "${SCRIPT_DIR}/controller/controller.yaml"

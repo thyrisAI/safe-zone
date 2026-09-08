@@ -84,6 +84,12 @@ The documentation set is organized as follows:
 - **Security Roadmap** – Detailed hardening milestones and implementation status  
   `SECURITY_ROADMAP.md`
 
+- **Product Roadmap** – Planned capabilities and delivery status
+  `ROADMAP.md`
+
+- **Adopters** – Public production adoption record
+  `ADOPTERS.md`
+
 - **Postman Collection** – Ready‑to‑use collection for exploring the API  
   `TSZ_Postman_Collection.json`
 

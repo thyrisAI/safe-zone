@@ -1,0 +1,33 @@
+{{- if and .Values.envoyGateway.enabled .Values.envoyGateway.attachment.enabled }}
+{{- $_ := required "envoyGateway.attachment.targetRef.name is required when attachment.enabled=true" .Values.envoyGateway.attachment.targetRef.name }}
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyExtensionPolicy
+metadata:
+  name: {{ .Values.envoyGateway.attachment.name }}
+  labels:
+    {{- include "thyris-sz.labels" . | nindent 4 }}
+    app.kubernetes.io/component: envoy-attachment
+spec:
+  targetRefs:
+    - group: {{ .Values.envoyGateway.attachment.targetRef.group | quote }}
+      kind: {{ .Values.envoyGateway.attachment.targetRef.kind }}
+      name: {{ .Values.envoyGateway.attachment.targetRef.name }}
+  extProc:
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: {{ include "thyris-sz.envoyGateway.extProcName" . }}
+          port: {{ .Values.envoyGateway.extProc.service.grpcPort }}
+      messageTimeout: {{ .Values.envoyGateway.attachment.messageTimeout }}
+      failOpen: {{ .Values.envoyGateway.attachment.failOpen }}
+      processingMode:
+        request:
+          body: {{ .Values.envoyGateway.attachment.requestBodyMode }}
+          attributes:
+            - xds.route_name
+        response:
+          body: {{ .Values.envoyGateway.attachment.responseBodyMode }}
+      metadata:
+        writableNamespaces:
+          - io.thyris.tsz
+{{- end }}

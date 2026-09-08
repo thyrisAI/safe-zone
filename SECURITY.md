@@ -6,7 +6,7 @@ TSZ (Thyris Safe Zone) is designed to be used in security‑sensitive environmen
 
 ## Supported Versions
 
-This project is in active development. Until a formal versioning and release process is documented (see `ROADMAP.md`, Phase 7), we generally only provide security fixes on the latest `main` branch and the most recent tagged releases (if any).
+This project is in active development. Until a formal versioning and release process is documented (see `docs/ROADMAP.md`, Phase 7), we generally only provide security fixes on the latest `main` branch and the most recent tagged releases (if any).
 
 If you are running TSZ in production and have specific support requirements, please reach out to the maintainers.
 
@@ -94,8 +94,8 @@ Thank you for helping us keep TSZ and its users safe.
 
 TSZ is actively implementing a comprehensive security hardening roadmap to achieve production-ready status. For details, see:
 
-- **[SECURITY_ROADMAP.md](SECURITY_ROADMAP.md)** – Detailed security-hardening plan (authentication, authorization, rate limiting, TLS, audit logging, vulnerability scanning)
-- **[ROADMAP.md](ROADMAP.md)** – Phase 1 Subsection 1b includes security milestones and timeline
+- **[SECURITY_ROADMAP.md](docs/SECURITY_ROADMAP.md)** – Detailed security-hardening plan (authentication, authorization, rate limiting, TLS, audit logging, vulnerability scanning)
+- **[ROADMAP.md](docs/ROADMAP.md)** – Phase 1 Subsection 1b includes security milestones and timeline
 
 ### Current Limitations (Being Addressed)
 
@@ -122,7 +122,7 @@ Until these are implemented, TSZ should be deployed **only in secure, trusted en
 
 ### Timeline to Production Ready
 
-See [SECURITY_ROADMAP.md](SECURITY_ROADMAP.md) for the complete timeline:
+See [SECURITY_ROADMAP.md](docs/SECURITY_ROADMAP.md) for the complete timeline:
 
 - **Weeks 1-2**: HTTP security (headers, size limits, timeouts)
 - **Weeks 2-3**: Authentication & authorization

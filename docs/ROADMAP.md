@@ -202,7 +202,7 @@ The roadmap is split into phases. Each bullet is a concrete, actionable item.
   - [x] Reuse the existing detector, validators, templates, allowlist/blocklist and SIEM pipeline through a transport-neutral policy runtime
   - [x] Guarantee atomic policy activation, consistent request/response policy versions and last-known-good rollback
   - [x] Add a `TSZGuardrailPolicy` CRD following Gateway API `targetRefs`, section attachment, precedence and status conventions
-  - [x] Add a compatible `TSZGuardrailPolicy` v1beta1 API, retain served v1alpha1, test storage upgrade and document rollback ([graduation record](docs/operations/TSZ_POLICY_API_UPGRADE.md))
+  - [x] Add a compatible `TSZGuardrailPolicy` v1beta1 API, retain served v1alpha1, test storage upgrade and document rollback ([graduation record](operations/TSZ_POLICY_API_UPGRADE.md))
   - [ ] Record CRD-specific adopter feedback and full-stack upgrade/rollback evidence before GA
   - [x] Add a TSZ Gateway Controller that resolves policies and reconciles owned `EnvoyExtensionPolicy` resources
   - [x] Publish `Accepted`, `ResolvedRefs`, `Programmed`, `PolicySynced`, conflict and degraded status conditions

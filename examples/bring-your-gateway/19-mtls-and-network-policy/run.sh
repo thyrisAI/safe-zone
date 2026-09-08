@@ -8,8 +8,8 @@ kubeconfig="${TSZ_BYG_KUBECONFIG:-${TMPDIR:-/tmp}/tsz-byg-tools/tsz-byg.kubeconf
 
 "${example_dir}/generate-certs.sh"
 certs="${example_dir}/certs"
-TSZ_BYG_KUBECONFIG="$kubeconfig" "${repo_root}/deployments/envoy-gateway/kind-bootstrap.sh" up
-TSZ_BYG_KUBECONFIG="$kubeconfig" "${repo_root}/deployments/envoy-gateway/kind-bootstrap.sh" verify-replica-lifecycle
+TSZ_BYG_KUBECONFIG="$kubeconfig" "${repo_root}/examples/bring-your-gateway/cluster/kind-bootstrap.sh" up
+TSZ_BYG_KUBECONFIG="$kubeconfig" "${repo_root}/examples/bring-your-gateway/cluster/kind-bootstrap.sh" verify-replica-lifecycle
 export KUBECONFIG="$kubeconfig"
 
 kubectl -n "$namespace" create secret generic tsz-ext-proc-server-tls \

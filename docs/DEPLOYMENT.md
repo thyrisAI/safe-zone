@@ -11,7 +11,7 @@ For local Docker Compose setup, see `docs/QUICK_START.md`.
 
 - Kubernetes 1.23+
 - Helm 3
-- A container image for the API, built from the repository `Dockerfile`
+- A container image for the API, built with `deployment/docker/Dockerfile`
 - Optional: existing PostgreSQL and Redis services for production
 
 ---
@@ -21,7 +21,7 @@ For local Docker Compose setup, see `docs/QUICK_START.md`.
 Build the image from the repository root:
 
 ```bash
-docker build -t ghcr.io/thyrisai/thyris-sz:0.1.0 .
+docker build -f deployment/docker/Dockerfile -t ghcr.io/thyrisai/thyris-sz:0.1.0 .
 docker push ghcr.io/thyrisai/thyris-sz:0.1.0
 ```
 
@@ -108,6 +108,38 @@ The existing secret must contain:
 - `REDIS_URL`
 - `AI_API_KEY`
 - `ADMIN_API_KEY`
+
+---
+
+## Optional Envoy Gateway / BYG Components
+
+The same chart owns the API and Envoy integration. Existing installations are
+unchanged because `envoyGateway.enabled` defaults to `false`.
+
+Enable the native controller-managed profile:
+
+```bash
+kubectl apply -f config/crd/bases/security.thyris.ai_tszguardrailpolicies.yaml
+helm upgrade --install thyris-sz deployment/helm/thyris-sz \
+  --namespace tsz-system \
+  --create-namespace \
+  --set image.repository=ghcr.io/thyrisai/thyris-sz \
+  --set image.tag=0.1.0 \
+  --set envoyGateway.enabled=true \
+  --set envoyGateway.mode=native
+```
+
+Use `envoyGateway.mode=manual` for header-resolved policy selection. A manual
+`EnvoyExtensionPolicy` can also be rendered by setting
+`envoyGateway.attachment.enabled=true` and providing
+`envoyGateway.attachment.targetRef.name`.
+
+The chart can additionally manage the ext-proc HPA, PDB, NetworkPolicy,
+database migrations, controller RBAC, and Prometheus rules through the nested
+`envoyGateway` values. Envoy Gateway and its own CRDs remain platform
+prerequisites. Local Kind fixtures are under
+`examples/bring-your-gateway/cluster` and are not a production deployment
+package.
 
 ---
 

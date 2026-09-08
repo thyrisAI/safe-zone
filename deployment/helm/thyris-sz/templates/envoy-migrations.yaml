@@ -1,0 +1,60 @@
+{{- if and .Values.envoyGateway.enabled .Values.envoyGateway.migrations.enabled }}
+{{- $migrationHash := printf "%s%s%s%s%s:%s" (.Files.Get "files/envoy-migrations/000001_create_policy_snapshots.up.sql") (.Files.Get "files/envoy-migrations/000002_create_route_policy_bindings.up.sql") (.Files.Get "files/envoy-migrations/000003_create_owner_crd_refs.up.sql") (.Files.Get "files/envoy-migrations/000004_create_guardrail_template_snapshots.up.sql") .Values.envoyGateway.migrations.image.repository .Values.envoyGateway.migrations.image.tag | sha256sum | trunc 8 -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "thyris-sz.envoyGateway.extProcName" . }}-migrations
+  labels:
+    {{- include "thyris-sz.labels" . | nindent 4 }}
+    app.kubernetes.io/component: envoy-migrations
+data:
+  000001_create_policy_snapshots.up.sql: |-
+{{ .Files.Get "files/envoy-migrations/000001_create_policy_snapshots.up.sql" | indent 4 }}
+  000002_create_route_policy_bindings.up.sql: |-
+{{ .Files.Get "files/envoy-migrations/000002_create_route_policy_bindings.up.sql" | indent 4 }}
+  000003_create_owner_crd_refs.up.sql: |-
+{{ .Files.Get "files/envoy-migrations/000003_create_owner_crd_refs.up.sql" | indent 4 }}
+  000004_create_guardrail_template_snapshots.up.sql: |-
+{{ .Files.Get "files/envoy-migrations/000004_create_guardrail_template_snapshots.up.sql" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "thyris-sz.envoyGateway.extProcName" . }}-migrations-{{ $migrationHash }}
+  labels:
+    {{- include "thyris-sz.labels" . | nindent 4 }}
+    app.kubernetes.io/component: envoy-migrations
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        {{- include "thyris-sz.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: envoy-migrations
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: "{{ .Values.envoyGateway.migrations.image.repository }}:{{ .Values.envoyGateway.migrations.image.tag }}"
+          imagePullPolicy: {{ .Values.envoyGateway.migrations.image.pullPolicy }}
+          envFrom:
+            - secretRef:
+                name: {{ include "thyris-sz.secretName" . }}
+          command: ["sh", "-ec"]
+          args:
+            - |
+              db_dsn="${DB_DSN%%&TimeZone=*}"
+              db_dsn="${db_dsn%%?TimeZone=*}"
+              until psql "$db_dsn" -c 'select 1' >/dev/null 2>&1; do sleep 2; done
+              for migration in /migrations/*.sql; do
+                psql -v ON_ERROR_STOP=1 "$db_dsn" -f "$migration"
+              done
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+      volumes:
+        - name: migrations
+          configMap:
+            name: {{ include "thyris-sz.envoyGateway.extProcName" . }}-migrations
+{{- end }}

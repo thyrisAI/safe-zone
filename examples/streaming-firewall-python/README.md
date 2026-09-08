@@ -85,7 +85,7 @@ examples/
 
 ## Start TSZ Server
 ```bash
-docker compose up -d
+docker compose -f deployment/docker/docker-compose.yml up -d
 ```
 
 ## Setup

@@ -14,7 +14,7 @@ readonly RESULTS_DIR="${TSZ_PERF_RESULTS_DIR:-test-reports/perf}"
 readonly K6_BIN="${K6_BIN:-k6}"
 readonly KUBECONFIG_PATH="${TSZ_BYG_KUBECONFIG:-${TMPDIR:-/tmp}/tsz-byg-tools/tsz-byg.kubeconfig}"
 readonly PERF_EXAMPLE="examples/bring-your-gateway/01-minimal-inspection"
-readonly EXTENSION_POLICY="deployments/envoy-gateway/tsz-ext-proc-envoy-extension-policy.yaml"
+readonly EXTENSION_POLICY="examples/bring-your-gateway/cluster/tsz-ext-proc-envoy-extension-policy.yaml"
 readonly MAX_ADDED_P95_MS="${TSZ_PERF_MAX_ADDED_P95_MS:-20}"
 
 fail() {

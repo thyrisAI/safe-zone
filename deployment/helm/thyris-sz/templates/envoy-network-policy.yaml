@@ -1,0 +1,86 @@
+{{- if and .Values.envoyGateway.enabled .Values.envoyGateway.networkPolicy.enabled }}
+{{- $name := include "thyris-sz.envoyGateway.extProcName" . -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-default-deny
+  labels:
+    {{- include "thyris-sz.labels" . | nindent 4 }}
+    app.kubernetes.io/component: envoy-ext-proc
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "thyris-sz.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: envoy-ext-proc
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-allow-envoy
+  labels:
+    {{- include "thyris-sz.labels" . | nindent 4 }}
+    app.kubernetes.io/component: envoy-ext-proc
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "thyris-sz.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: envoy-ext-proc
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.envoyGateway.networkPolicy.envoyNamespaceLabels | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.envoyGateway.networkPolicy.envoyPodLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.envoyGateway.extProc.service.grpcPort }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-allow-dependencies
+  labels:
+    {{- include "thyris-sz.labels" . | nindent 4 }}
+    app.kubernetes.io/component: envoy-ext-proc
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "thyris-sz.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: envoy-ext-proc
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.envoyGateway.networkPolicy.dnsNamespaceLabels | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.envoyGateway.networkPolicy.dnsPodLabels | nindent 14 }}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    {{- if .Values.postgresql.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "thyris-sz.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: postgresql
+      ports:
+        - {protocol: TCP, port: {{ .Values.postgresql.service.port }}}
+    {{- end }}
+    {{- if .Values.redis.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "thyris-sz.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: redis
+      ports:
+        - {protocol: TCP, port: {{ .Values.redis.service.port }}}
+    {{- end }}
+{{- end }}

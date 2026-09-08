@@ -1,10 +1,8 @@
-version: '3.8'
-
 services:
   api:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile
     image: thyris-sz:local
     container_name: thyris_api
     read_only: true
@@ -34,7 +32,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ../../scripts/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     restart: always
 
   redis:

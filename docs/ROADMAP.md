@@ -119,7 +119,7 @@ The roadmap is split into phases. Each bullet is a concrete, actionable item.
   - [ ] Define security SLA for vulnerability fixes (CRITICAL: 24h, HIGH: 7d, MEDIUM: 30d)
 
 - [ ] **Milestone 7: Production Hardening & Deployment** (5-18 October 2026; Weeks 8-9)
-  - [ ] Remove default credentials from `docker-compose.yml` and `init.sql`
+  - [ ] Remove default credentials from `deployment/docker/docker-compose.yml` and `scripts/database/init.sql`
   - [ ] Document recommended network topology (reverse proxy, TLS termination, private subnets)
   - [ ] Run containers as non-root user
   - [ ] Set resource limits in Docker/Kubernetes (memory, CPU)
@@ -202,7 +202,7 @@ The roadmap is split into phases. Each bullet is a concrete, actionable item.
   - [x] Reuse the existing detector, validators, templates, allowlist/blocklist and SIEM pipeline through a transport-neutral policy runtime
   - [x] Guarantee atomic policy activation, consistent request/response policy versions and last-known-good rollback
   - [x] Add a `TSZGuardrailPolicy` CRD following Gateway API `targetRefs`, section attachment, precedence and status conventions
-  - [x] Add a compatible `TSZGuardrailPolicy` v1beta1 API, retain served v1alpha1, test storage upgrade and document rollback ([graduation record](docs/operations/TSZ_POLICY_API_UPGRADE.md))
+  - [x] Add a compatible `TSZGuardrailPolicy` v1beta1 API, retain served v1alpha1, test storage upgrade and document rollback ([graduation record](operations/TSZ_POLICY_API_UPGRADE.md))
   - [ ] Record CRD-specific adopter feedback and full-stack upgrade/rollback evidence before GA
   - [x] Add a TSZ Gateway Controller that resolves policies and reconciles owned `EnvoyExtensionPolicy` resources
   - [x] Publish `Accepted`, `ResolvedRefs`, `Programmed`, `PolicySynced`, conflict and degraded status conditions

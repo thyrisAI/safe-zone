@@ -41,10 +41,10 @@ while [[ $# -gt 0 ]]; do
 done
 case "${response_mode}" in
   buffered)
-    extension_policy="${repo_root}/deployments/envoy-gateway/tsz-ext-proc-envoy-extension-policy.yaml"
+    extension_policy="${repo_root}/examples/bring-your-gateway/cluster/tsz-ext-proc-envoy-extension-policy.yaml"
     ;;
   streamed)
-    extension_policy="${repo_root}/deployments/envoy-gateway/tsz-ext-proc-envoy-extension-policy-streamed.yaml"
+    extension_policy="${repo_root}/examples/bring-your-gateway/cluster/tsz-ext-proc-envoy-extension-policy-streamed.yaml"
     ;;
   *)
     echo "response mode must be buffered or streamed, got ${response_mode}" >&2
@@ -89,9 +89,9 @@ if [[ "${TSZ_BYG_SKIP_BOOTSTRAP:-0}" != "1" ]]; then
   # Pass the path explicitly so Kind refreshes it if Docker has reassigned the
   # API-server port of an already-existing cluster.
   TSZ_BYG_KUBECONFIG="${kubeconfig}" \
-    "${repo_root}/deployments/envoy-gateway/kind-bootstrap.sh" up
+    "${repo_root}/examples/bring-your-gateway/cluster/kind-bootstrap.sh" up
   TSZ_BYG_KUBECONFIG="${kubeconfig}" \
-    "${repo_root}/deployments/envoy-gateway/kind-bootstrap.sh" verify-replica-lifecycle
+    "${repo_root}/examples/bring-your-gateway/cluster/kind-bootstrap.sh" verify-replica-lifecycle
 fi
 export KUBECONFIG="${kubeconfig}"
 

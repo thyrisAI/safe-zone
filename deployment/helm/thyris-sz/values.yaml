@@ -145,3 +145,94 @@ redis:
     size: 2Gi
     storageClass: ""
   resources: {}
+
+# Envoy Gateway / Bring Your Gateway components are part of this chart but
+# remain opt-in so existing API-only installations are unchanged.
+envoyGateway:
+  enabled: false
+  mode: native # native (controller-managed) or manual (header-resolved)
+
+  migrations:
+    enabled: true
+    image:
+      repository: postgres
+      tag: 16-alpine
+      pullPolicy: IfNotPresent
+
+  extProc:
+    replicaCount: 2
+    service:
+      grpcPort: 9002
+      healthPort: 8080
+    config:
+      failMode: closed
+      maxConcurrentStreams: "100"
+      maxGrpcMessageBytes: "4194304"
+      maxBodyBytes: "1048576"
+      maxStreamBufferBytes: "262144"
+      processingTimeoutMs: "2000"
+      policyReconcileInterval: 30s
+      policyMaxStaleness: 5m
+      policyReconcileFailureThreshold: "3"
+      gracefulShutdownTimeout: 10s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: "1"
+        memory: 512Mi
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 60
+      targetMemoryUtilizationPercentage: 80
+    podDisruptionBudget:
+      enabled: true
+      maxUnavailable: 1
+
+  controller:
+    enabled: true
+    replicaCount: 2
+    serviceAccount:
+      create: true
+      name: ""
+    rbac:
+      create: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: "1"
+        memory: 512Mi
+
+  # Manual mode can optionally create the EnvoyExtensionPolicy. Envoy Gateway
+  # and its CRDs must already be installed in the cluster.
+  attachment:
+    enabled: false
+    name: tsz-request-guardrail
+    targetRef:
+      group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: ""
+    messageTimeout: 2s
+    failOpen: false
+    requestBodyMode: Buffered
+    responseBodyMode: Buffered
+
+  networkPolicy:
+    enabled: false
+    envoyNamespaceLabels:
+      kubernetes.io/metadata.name: envoy-gateway-system
+    envoyPodLabels:
+      security.thyris.ai/tsz-peer: "true"
+    dnsNamespaceLabels:
+      kubernetes.io/metadata.name: kube-system
+    dnsPodLabels:
+      k8s-app: kube-dns
+
+  observability:
+    prometheusRule:
+      enabled: false

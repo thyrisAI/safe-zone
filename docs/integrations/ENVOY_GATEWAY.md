@@ -1,8 +1,8 @@
 # Envoy Gateway Integration
 
 This guide covers Envoy Gateway v1.8.3 with Gateway API v1.5.1. The checked-in
-Kind example under `deployments/envoy-gateway/` is the reproducible reference
-environment.
+Kind environment under `examples/bring-your-gateway/cluster/` is the
+reproducible reference environment.
 
 ## Support status and integration level
 
@@ -30,11 +30,11 @@ operator responsibilities described in this guide.
 
 ## Deployment package
 
-The supported Kubernetes packaging entry point is the Kustomize package in
-[`deployments/envoy-gateway/kustomize/`](../../deployments/envoy-gateway/kustomize/).
-It provides portable preview, native managed, and separate-data-namespace
-production overlays. The package README explains its prerequisites, image and
-Secret configuration boundaries, install commands, verification, and removal.
+The supported Kubernetes packaging entry point is the single Helm chart in
+[`deployment/helm/thyris-sz`](../../deployment/helm/thyris-sz). Set
+`envoyGateway.enabled=true` and select `envoyGateway.mode=native` or `manual`.
+The raw manifests under `examples/bring-your-gateway/cluster/` exist only for
+the reproducible Kind examples and are not a second production package.
 
 Operational deployment, observability, and incident-triage guidance is kept
 in the [BYG operations guides](../operations/BYG_DEPLOYMENT.md) to keep this
@@ -42,8 +42,8 @@ integration guide focused on the Envoy-specific configuration contract.
 
 ## Network isolation
 
-The Kind bootstrap applies the `same-namespace` overlay under
-`deployments/envoy-gateway/kustomize/network-policy/`.
+The Kind bootstrap applies the `same-namespace` fixture under
+`examples/bring-your-gateway/cluster/kustomize/network-policy/`.
 It selects `tsz-ext-proc` pods, denies all ingress and egress by default, then
 permits only:
 
@@ -61,10 +61,10 @@ The reference deployment intentionally keeps PostgreSQL and Redis in
 
 ```bash
 # Current Kind topology
-kubectl kustomize deployments/envoy-gateway/kustomize/network-policy/overlays/same-namespace
+kubectl kustomize examples/bring-your-gateway/cluster/kustomize/network-policy/overlays/same-namespace
 
 # Production topology: processor in tsz-system; PostgreSQL and Redis in tsz-data
-kubectl kustomize deployments/envoy-gateway/kustomize/network-policy/overlays/separate-data-namespace
+kubectl kustomize examples/bring-your-gateway/cluster/kustomize/network-policy/overlays/separate-data-namespace
 ```
 
 For another namespace layout, change the `namespace` and `tsz-data` values in
@@ -231,7 +231,7 @@ gateway does not have a native TSZ controller adapter.
 2. Deploy `tsz-ext-proc` with `TSZ_POLICY_RESOLUTION_MODE=header` (or omit the
    variable; `header` is the default).
 3. Apply
-   `deployments/envoy-gateway/tsz-ext-proc-envoy-extension-policy.yaml` after
+   `examples/bring-your-gateway/cluster/tsz-ext-proc-envoy-extension-policy.yaml` after
    changing its `targetRefs` and backend reference for your namespace.
 4. Configure a gateway-owned **early** header mutation that overwrites
    `X-TSZ-Policy` with the activated policy name. Do not trust a value sent by
@@ -248,7 +248,7 @@ part of migration.
 Use this profile when Kubernetes should be the attachment and lifecycle control
 plane.
 
-1. Install the generated CRD and RBAC:
+1. Install the generated TSZ CRD:
 
    New installations use `security.thyris.ai/v1beta1`. The CRD also serves
    deprecated `v1alpha1` manifests. For an existing installation, apply the
@@ -257,17 +257,17 @@ plane.
 
    ```bash
    kubectl apply -f config/crd/bases/security.thyris.ai_tszguardrailpolicies.yaml
-   kubectl apply -f config/rbac/role.yaml
    ```
 
-2. Deploy `tsz-controller` using
-   `deployments/envoy-gateway/controller/controller.yaml`.
-3. Deploy `tsz-ext-proc` with
-   `TSZ_POLICY_RESOLUTION_MODE=attribute`. The checked-in native manifest is
-   `deployments/envoy-gateway/tsz-ext-proc.yaml`.
+   The Helm chart creates the controller RBAC when the native profile is
+   enabled.
+
+2. Install the Helm chart with `envoyGateway.enabled=true` and
+   `envoyGateway.mode=native`; it deploys both `tsz-controller` and
+   `tsz-ext-proc` and selects attribute-based policy resolution.
 4. Remove any manual TSZ `EnvoyExtensionPolicy` for routes being migrated.
 5. Apply a `TSZGuardrailPolicy`. The ready-to-run Kind example is
-   `deployments/envoy-gateway/controller/checkpoint-inline-policy.yaml`.
+   `examples/bring-your-gateway/cluster/controller/checkpoint-inline-policy.yaml`.
 
 For an inline policy, the controller creates and activates a deterministic,
 controller-owned policy snapshot. For `policySource: PostgresRef`, it verifies
@@ -351,11 +351,13 @@ client access for workload rollback.
 
    ```bash
    kubectl apply -f config/crd/bases/security.thyris.ai_tszguardrailpolicies.yaml
-   kubectl apply -f config/rbac/role.yaml
-   kubectl apply -f deployments/envoy-gateway/controller/controller.yaml
-   kubectl apply -f deployments/envoy-gateway/tsz-ext-proc.yaml
-   kubectl -n tsz-byg-demo rollout status deployment/tsz-controller --timeout=5m
-   kubectl -n tsz-byg-demo rollout status deployment/tsz-ext-proc --timeout=5m
+   helm upgrade thyris-sz deployment/helm/thyris-sz \
+     --namespace tsz-system \
+     --reuse-values \
+     --set image.tag=REPLACE_WITH_RELEASE_TAG \
+     --set envoyGateway.enabled=true
+   kubectl -n tsz-system rollout status deployment/thyris-sz-controller --timeout=5m
+   kubectl -n tsz-system rollout status deployment/thyris-sz-ext-proc --timeout=5m
    ```
 
    Replace these paths and namespace with the rendered, version-pinned assets
@@ -470,7 +472,7 @@ described above. The detailed incident paths are in
 Remove the throwaway reference cluster after verification:
 
 ```bash
-deployments/envoy-gateway/kind-bootstrap.sh down
+examples/bring-your-gateway/cluster/kind-bootstrap.sh down
 ```
 
 This command is scoped to the configured example Kind cluster. Production

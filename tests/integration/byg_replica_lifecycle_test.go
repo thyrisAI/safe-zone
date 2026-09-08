@@ -14,7 +14,7 @@ func TestBYGPolicyStoreReadiness(t *testing.T) {
 	if os.Getenv("TSZ_BYG_KIND_E2E") != "1" {
 		t.Skip("set TSZ_BYG_KIND_E2E=1 after provisioning the pinned Kind/PostgreSQL/Redis harness")
 	}
-	command := exec.Command("./deployments/envoy-gateway/kind-bootstrap.sh", "verify-policy-store-readiness")
+	command := exec.Command("./examples/bring-your-gateway/cluster/kind-bootstrap.sh", "verify-policy-store-readiness")
 	command.Dir = "../.."
 	output, err := command.CombinedOutput()
 	if err != nil {

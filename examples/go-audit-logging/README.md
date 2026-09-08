@@ -109,7 +109,7 @@ README.md
 
 ### Start TSZ
 ```bash
-docker-compose up --build
+docker compose -f deployment/docker/docker-compose.yml up --build
 ```
 
 ## Run the audit demo

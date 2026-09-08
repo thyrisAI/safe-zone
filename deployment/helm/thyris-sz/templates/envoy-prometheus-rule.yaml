@@ -1,0 +1,30 @@
+{{- if and .Values.envoyGateway.enabled .Values.envoyGateway.observability.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "thyris-sz.envoyGateway.extProcName" . }}
+  labels:
+    {{- include "thyris-sz.labels" . | nindent 4 }}
+    app.kubernetes.io/component: envoy-observability
+spec:
+  groups:
+    - name: tsz-byg-policy-health
+      rules:
+        - alert: TSZPolicyVersionSkew
+          expr: count by (policy) (count by (policy, version) (tsz_policy_cache_snapshot_info)) > 1
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: TSZ processor replicas have divergent policy versions
+        - alert: TSZPolicyActivationDeliveryPending
+          expr: increase(tsz_controller_policy_activations_total{result="notification_pending"}[10m]) > 0
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: TSZ policy activation is pending snapshot distribution
+        - alert: TSZLastKnownGoodPolicyDegraded
+          expr: increase(tsz_policy_cache_reconcile_duration_seconds_count{result="error"}[10m]) > 0 and tsz_policy_cache_active_snapshots > 0
+          labels: {severity: warning}
+          annotations:
+            summary: TSZ is retaining active snapshots while reconciliation fails
+{{- end }}

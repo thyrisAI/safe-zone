@@ -44,7 +44,7 @@ spec:
 The example requires the target and immutable TSZ snapshot to exist. For a
 runnable Inline example in the reference environment, follow the
 [native installation guide](ENVOY_GATEWAY.md) and use the
-[checkpoint policy](../../deployments/envoy-gateway/controller/checkpoint-inline-policy.yaml).
+[checkpoint policy](../../examples/bring-your-gateway/cluster/controller/checkpoint-inline-policy.yaml).
 
 Both served API versions expose the same additive selector, preserving `None`
 conversion. Install the regenerated CRD before the updated controller. The

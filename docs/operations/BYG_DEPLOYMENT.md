@@ -39,24 +39,31 @@ and use a distinct Deployment when the modes must coexist.
 
 ## Install and verify
 
-Use the packaged Kustomize profiles for a new installation:
+Use the repository's single Helm chart for a new installation. Envoy Gateway
+components are opt-in and the existing API-only behavior remains the default:
 
 ```bash
-kubectl kustomize deployments/envoy-gateway/kustomize/overlays/production
-kubectl apply -k deployments/envoy-gateway/kustomize/overlays/production
+helm upgrade --install thyris-sz deployment/helm/thyris-sz \
+  --namespace tsz-system \
+  --create-namespace \
+  --set image.repository=ghcr.io/thyrisai/thyris-sz \
+  --set image.tag=REPLACE_WITH_RELEASE_TAG \
+  --set envoyGateway.enabled=true \
+  --set envoyGateway.mode=native
 ```
 
-The production profile requires an immutable image reference and Secret-backed
-database/Redis settings before it is applied. Its complete prerequisites and
-profile-specific commands are in the
-[Kustomize package README](../../deployments/envoy-gateway/kustomize/README.md).
+Production installs should additionally disable bundled PostgreSQL and Redis,
+use `secrets.existingSecret`, enable the NetworkPolicy after matching the
+actual Envoy labels, and pin an immutable image reference. The local Kind
+fixtures remain under `examples/bring-your-gateway/cluster`; they are not a
+second production deployment package.
 
 For a native installation, the operational acceptance check is not just a
 ready Pod. Confirm the controller has reconciled every intended policy:
 
 ```bash
-kubectl -n tsz-system rollout status deployment/tsz-ext-proc --timeout=5m
-kubectl -n tsz-system rollout status deployment/tsz-controller --timeout=5m
+kubectl -n tsz-system rollout status deployment/thyris-sz-ext-proc --timeout=5m
+kubectl -n tsz-system rollout status deployment/thyris-sz-controller --timeout=5m
 kubectl -n tsz-system get tszguardrailpolicy,envoyextensionpolicy
 ```
 
@@ -103,8 +110,8 @@ PostgreSQL according to the organization’s approved procedure before a release
 with database migrations. Redis distributes snapshot activation notifications;
 it is not a replacement for the durable PostgreSQL backup.
 
-To remove a package, delete only the selected Kustomize overlay. This does not
-delete Envoy Gateway, routes, PostgreSQL, Redis, or manually created preview
+To remove the Envoy components while retaining the base TSZ installation, set
+`envoyGateway.enabled=false` in the owning Helm release. This does not delete
+Envoy Gateway, routes, external PostgreSQL/Redis, or manually created preview
 attachments. Detach policies deliberately and preserve required audit records
-before removing an environment.
-
+before changing the release.

@@ -19,14 +19,31 @@ import (
 )
 
 func TestAdapterConformance(t *testing.T) {
-	adaptertest.RunConformance(t, envoyConformanceDriver{t: t})
+	adaptertest.RunConformance(t, envoyConformanceDriver{
+		t: t, name: "envoy-gateway", capabilities: capabilities.EnvoyGatewayCapabilities,
+	})
 }
 
-type envoyConformanceDriver struct{ t *testing.T }
+// TestAgentgatewayOpenAIChatCompletionsCompatibility proves that the existing
+// Envoy ExternalProcessor implementation can be used by agentgateway without
+// a second guardrail or transport path. The shared suite uses buffered OpenAI
+// Chat Completions request and response payloads and verifies mutation,
+// immediate responses, failure behavior, and PII-safe telemetry.
+func TestAgentgatewayOpenAIChatCompletionsCompatibility(t *testing.T) {
+	adaptertest.RunConformance(t, envoyConformanceDriver{
+		t: t, name: "agentgateway", capabilities: capabilities.AgentgatewayChatCompletionsCapabilities,
+	})
+}
 
-func (envoyConformanceDriver) Name() string { return "envoy-gateway" }
-func (envoyConformanceDriver) Capabilities() capabilities.AdapterCapabilities {
-	return capabilities.EnvoyGatewayCapabilities
+type envoyConformanceDriver struct {
+	t            *testing.T
+	name         string
+	capabilities capabilities.AdapterCapabilities
+}
+
+func (driver envoyConformanceDriver) Name() string { return driver.name }
+func (driver envoyConformanceDriver) Capabilities() capabilities.AdapterCapabilities {
+	return driver.capabilities
 }
 
 func (driver envoyConformanceDriver) Execute(ctx context.Context, scenario adaptertest.ConformanceScenario) (adaptertest.ConformanceObservation, error) {

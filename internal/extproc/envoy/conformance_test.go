@@ -31,7 +31,7 @@ func TestAdapterConformance(t *testing.T) {
 // immediate responses, failure behavior, and PII-safe telemetry.
 func TestAgentgatewayOpenAIChatCompletionsCompatibility(t *testing.T) {
 	adaptertest.RunConformance(t, envoyConformanceDriver{
-		t: t, name: "agentgateway", capabilities: capabilities.AgentgatewayChatCompletionsCapabilities,
+		t: t, name: "agentgateway", capabilities: capabilities.AgentgatewayOpenAIBufferedCapabilities,
 	})
 }
 
@@ -53,7 +53,7 @@ func (driver envoyConformanceDriver) Execute(ctx context.Context, scenario adapt
 		scenario.Processor,
 		conformancePolicyCache{snapshot: scenario.Snapshot},
 		auditor,
-		ServerSettings{FailMode: scenario.DefaultFailureMode, MaxBodyBytes: 1024 * 1024, ProcessingTimeout: defaultServerSettings().ProcessingTimeout, MetricsObserver: metrics},
+		ServerSettings{AdapterName: driver.name, FailMode: scenario.DefaultFailureMode, MaxBodyBytes: 1024 * 1024, ProcessingTimeout: defaultServerSettings().ProcessingTimeout, MetricsObserver: metrics},
 	)
 	if err != nil {
 		return adaptertest.ConformanceObservation{}, err

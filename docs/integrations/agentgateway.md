@@ -3,11 +3,11 @@
 ## Status
 
 The current compatibility slice supports buffered, non-streaming OpenAI Chat
-Completions and targets the agentgateway 1.5 policy schema. Its Envoy ExtProc
-wire compatibility is covered in-process; a live agentgateway compatibility
-matrix is not yet claimed. This is the first item of Phase 1 in issue #50;
-OpenAI Responses, Anthropic Messages, streaming, and automatic TSZ controller
-reconciliation are also outside this slice.
+Completions and Responses API-compatible payloads and targets the agentgateway
+1.5 policy schema. Its Envoy ExtProc wire compatibility is covered in-process;
+a live agentgateway compatibility matrix is not yet claimed. These are the
+first two items of Phase 1 in issue #50; Anthropic Messages, streaming, and
+automatic TSZ controller reconciliation remain outside this slice.
 
 ## Architecture
 
@@ -24,6 +24,11 @@ agentgateway implements `envoy.service.ext_proc.v3.ExternalProcessor`, so this
 integration reuses `internal/extproc/envoy.Server` and the gateway-neutral BYG
 processor. There is no agentgateway-specific guardrail engine.
 
+Set `TSZ_GATEWAY_ADAPTER=agentgateway` on the TSZ ExtProc deployment. This
+trusted startup setting labels safe metadata and audit events correctly; it is
+not derived from client traffic. The default remains `envoy-gateway` for
+backwards compatibility.
+
 ## OpenAI Chat Completions
 
 TSZ inspects supported text in `system`, `developer`, `user`, `assistant`, and
@@ -37,6 +42,22 @@ selects only `/v1/chat/completions` and explicitly configures `Buffered` request
 and response bodies. Do not use agentgateway's default `FullDuplexStreamed`
 body mode for this profile: TSZ must receive the complete JSON document before
 it can guarantee masking or blocking.
+
+## OpenAI Responses API
+
+The [Responses API policy example](../../examples/bring-your-gateway/agentgateway/openai-responses.yaml)
+selects only `/v1/responses` and uses the same buffered ExtProc contract.
+
+Request inspection covers top-level `instructions`, string input, message
+history with `system`, `developer`, `user`, and `assistant` roles, text content
+parts, function-call arguments, and function-call outputs. Image, audio, and
+file content remains unchanged rather than being interpreted as text.
+
+Buffered response inspection covers every assistant `output_text` or refusal
+item and function-call arguments. When a compatible response also includes the
+convenience `output_text` field, mutation keeps that aggregate synchronized
+with the guarded output items. Unknown fields, ordering, and untouched JSON
+bytes are preserved.
 
 ## Policy identity and failures
 
@@ -63,15 +84,17 @@ does not call the selected LLM backend.
 
 ## Verification
 
-The agentgateway compatibility test drives buffered Chat Completions request
-and response bodies through the same Envoy ExtProc gRPC server used in
-production. It verifies request masking, immediate request blocking, response
-masking, fail-open/fail-closed behavior, and PII-safe audit/metadata output.
+The agentgateway compatibility tests drive buffered Chat Completions and
+Responses request/response bodies through the same Envoy ExtProc gRPC server
+used in production. They verify request masking, immediate request blocking,
+response masking, fail-open/fail-closed behavior, safe adapter identity, and
+PII-safe audit/metadata output.
 
 Run it with:
 
 ```sh
 go test ./internal/extproc/envoy -run AgentgatewayOpenAIChatCompletionsCompatibility
+go test ./internal/extproc/envoy -run AgentgatewayOpenAIResponsesCompatibility
 ```
 
 See the [example README](../../examples/bring-your-gateway/agentgateway/README.md)

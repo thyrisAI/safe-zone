@@ -21,6 +21,7 @@ const (
 	defaultExtProcPolicyMaxStaleness              = 5 * time.Minute
 	defaultExtProcPolicyReconcileFailureThreshold = 3
 	defaultExtProcGracefulShutdownTimeout         = 10 * time.Second
+	defaultExtProcGatewayAdapter                  = "envoy-gateway"
 )
 
 // DefaultExtProcProcessingTimeout is also used by legacy AI validation as its
@@ -38,6 +39,7 @@ const (
 // Durations are parsed once at startup so invalid configuration cannot reach
 // request processing.
 type ExtProcConfig struct {
+	GatewayAdapter                  string
 	HTTPPort                        int
 	GRPCPort                        int
 	FailMode                        ExtProcFailMode
@@ -61,6 +63,10 @@ type ExtProcConfig struct {
 // Unlike legacy config helpers, malformed values are returned as startup
 // errors rather than silently replaced with defaults.
 func LoadExtProcConfig() (*ExtProcConfig, error) {
+	gatewayAdapter := strings.ToLower(envOrDefault("TSZ_GATEWAY_ADAPTER", defaultExtProcGatewayAdapter))
+	if gatewayAdapter != "envoy-gateway" && gatewayAdapter != "agentgateway" {
+		return nil, fmt.Errorf("TSZ_GATEWAY_ADAPTER must be %q or %q, got %q", "envoy-gateway", "agentgateway", gatewayAdapter)
+	}
 	httpPort, err := positiveInt("TSZ_HTTP_PORT", defaultExtProcHTTPPort)
 	if err != nil {
 		return nil, err
@@ -147,6 +153,7 @@ func LoadExtProcConfig() (*ExtProcConfig, error) {
 	}
 
 	return &ExtProcConfig{
+		GatewayAdapter:                  gatewayAdapter,
 		HTTPPort:                        httpPort,
 		GRPCPort:                        grpcPort,
 		FailMode:                        failMode,

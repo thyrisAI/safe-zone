@@ -8,6 +8,7 @@ import (
 )
 
 var extProcEnvKeys = []string{
+	"TSZ_GATEWAY_ADAPTER",
 	"TSZ_HTTP_PORT",
 	"TSZ_GRPC_PORT",
 	"TSZ_FAIL_MODE",
@@ -35,6 +36,9 @@ func TestLoadExtProcConfigDefaults(t *testing.T) {
 
 	if cfg.HTTPPort != 8080 || cfg.GRPCPort != 9002 {
 		t.Fatalf("unexpected ports: HTTP=%d gRPC=%d", cfg.HTTPPort, cfg.GRPCPort)
+	}
+	if cfg.GatewayAdapter != "envoy-gateway" {
+		t.Fatalf("GatewayAdapter = %q, want envoy-gateway", cfg.GatewayAdapter)
 	}
 	if cfg.FailMode != ExtProcFailClosed {
 		t.Fatalf("FailMode = %q, want %q", cfg.FailMode, ExtProcFailClosed)
@@ -70,6 +74,7 @@ func TestLoadExtProcConfigDefaults(t *testing.T) {
 
 func TestLoadExtProcConfigOverrides(t *testing.T) {
 	clearExtProcEnv(t)
+	t.Setenv("TSZ_GATEWAY_ADAPTER", "AGENTGATEWAY")
 	t.Setenv("TSZ_HTTP_PORT", "18080")
 	t.Setenv("TSZ_GRPC_PORT", "19002")
 	t.Setenv("TSZ_FAIL_MODE", "OPEN")
@@ -92,6 +97,9 @@ func TestLoadExtProcConfigOverrides(t *testing.T) {
 	}
 	if cfg.HTTPPort != 18080 || cfg.GRPCPort != 19002 || cfg.FailMode != ExtProcFailOpen {
 		t.Fatalf("unexpected basic config: %+v", cfg)
+	}
+	if cfg.GatewayAdapter != "agentgateway" {
+		t.Fatalf("GatewayAdapter = %q, want agentgateway", cfg.GatewayAdapter)
 	}
 	if cfg.MaxConcurrentStreams != 25 || cfg.MaxGRPCMessageBytes != 8388608 || cfg.MaxBodyBytes != 2097152 || cfg.MaxStreamBufferBytes != 131072 {
 		t.Fatalf("unexpected limit config: %+v", cfg)
@@ -120,6 +128,7 @@ func TestLoadExtProcConfigRejectsInvalidValues(t *testing.T) {
 		value string
 	}{
 		{name: "zero HTTP port", key: "TSZ_HTTP_PORT", value: "0"},
+		{name: "invalid gateway adapter", key: "TSZ_GATEWAY_ADAPTER", value: "client-controlled"},
 		{name: "negative gRPC port", key: "TSZ_GRPC_PORT", value: "-1"},
 		{name: "port above range", key: "TSZ_GRPC_PORT", value: "65536"},
 		{name: "same ports", key: "TSZ_GRPC_PORT", value: "8080"},

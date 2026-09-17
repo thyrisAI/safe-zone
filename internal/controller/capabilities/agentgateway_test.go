@@ -7,8 +7,8 @@ import (
 	securityv1beta1 "thyris-sz/api/v1beta1"
 )
 
-func TestAgentgatewayBufferedLLMCapabilities(t *testing.T) {
-	if err := ValidateDeclaration(AgentgatewayBufferedLLMCapabilities); err != nil {
+func TestAgentgatewayBufferedContentCapabilities(t *testing.T) {
+	if err := ValidateDeclaration(AgentgatewayBufferedContentCapabilities); err != nil {
 		t.Fatalf("ValidateDeclaration() error = %v", err)
 	}
 
@@ -21,7 +21,7 @@ func TestAgentgatewayBufferedLLMCapabilities(t *testing.T) {
 		CapabilityResponseBodyMutation,
 		CapabilityDynamicMetadata,
 	}
-	negotiation, err := Negotiate(required, AgentgatewayBufferedLLMCapabilities)
+	negotiation, err := Negotiate(required, AgentgatewayBufferedContentCapabilities)
 	if err != nil {
 		t.Fatalf("Negotiate() error = %v", err)
 	}
@@ -30,15 +30,15 @@ func TestAgentgatewayBufferedLLMCapabilities(t *testing.T) {
 	}
 }
 
-func TestAgentgatewayBufferedLLMProfileDoesNotOverclaimLaterPhases(t *testing.T) {
+func TestAgentgatewayBufferedContentProfileDoesNotOverclaimLaterPhases(t *testing.T) {
 	streaming := securityv1beta1.TSZGuardrailPolicySpec{
 		Streaming: &securityv1beta1.StreamingSpec{Enabled: true, Mode: string(StreamingWindowed)},
 	}
-	if _, err := NegotiateSpec(streaming, AgentgatewayBufferedLLMCapabilities); !errors.Is(err, ErrUnsupportedCapability) {
+	if _, err := NegotiateSpec(streaming, AgentgatewayBufferedContentCapabilities); !errors.Is(err, ErrUnsupportedCapability) {
 		t.Fatalf("streaming negotiation error = %v, want ErrUnsupportedCapability", err)
 	}
 
-	if AgentgatewayBufferedLLMCapabilities.NativePolicyAttachment {
+	if AgentgatewayBufferedContentCapabilities.NativePolicyAttachment {
 		t.Fatal("profile claims automatic native policy reconciliation before it is implemented")
 	}
 }

@@ -1,9 +1,9 @@
-# agentgateway: buffered LLM APIs
+# agentgateway: buffered content APIs
 
-These Phase 1 examples attach the existing TSZ External Processor to
-agentgateway `HTTPRoute` resources. The current scope is buffered,
+These Phase 1 and Phase 2 examples attach the existing TSZ External Processor
+to agentgateway `HTTPRoute` resources. The current scope is buffered,
 non-streaming OpenAI Chat Completions, OpenAI Responses API, and Anthropic
-Messages traffic.
+Messages traffic, plus buffered MCP JSON-RPC messages over Streamable HTTP.
 
 Apply [`openai-chat-completions.yaml`](openai-chat-completions.yaml) after the
 agentgateway, `openai` `AgentgatewayBackend`, TSZ deployment, and a compiled TSZ
@@ -27,6 +27,11 @@ Apply [`anthropic-messages.yaml`](anthropic-messages.yaml) for
 `/v1/messages` route is explicitly typed as `Messages`. Create its referenced
 `anthropic-secret` first, and install the internal `tsz-ext-proc` Service if
 the Chat Completions example was not applied.
+
+Apply [`mcp-json-rpc.yaml`](mcp-json-rpc.yaml) for an MCP endpoint under
+`/mcp`. The example defines a `StreamableHTTP` `AgentgatewayBackend` whose
+upstream `mcp-server` Service listens on port `80` at `/mcp`. With the route
+prefix and target path shown, agentgateway clients connect at `/mcp/mcp`.
 
 The included route uses `RequestHeaderModifier.set` to overwrite
 `X-TSZ-Policy`, `X-TSZ-Gateway`, and `X-TSZ-Route` before ExtProc runs. Do not
@@ -66,6 +71,17 @@ curl --fail-with-body \
   http://AGENTGATEWAY_ADDRESS/v1/messages
 ```
 
+For an MCP tool call, complete the target server's initialization flow first
+and include its session header when required:
+
+```sh
+curl --fail-with-body \
+  --header 'content-type: application/json' \
+  --header 'accept: application/json' \
+  --data '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"lookup","arguments":{"email":"person@example.com"}}}' \
+  http://AGENTGATEWAY_ADDRESS/mcp/mcp
+```
+
 With a masking policy, the backend must receive sanitized message content. A
 blocking policy must return a TSZ immediate response without contacting the
 backend. When response enforcement is enabled, TSZ inspects and may mask or
@@ -81,6 +97,12 @@ assistant text, tool-use inputs, and tool-result text on requests, plus
 assistant text and tool-use inputs on responses. Image/document sources and
 thinking blocks are preserved unchanged.
 
+For MCP JSON-RPC, TSZ inspects `prompts/get` and `tools/call` argument and
+result content while preserving protocol routing fields and binary content.
+agentgateway remains responsible for MCP authentication, authorization,
+sessions, server routing, and tool selection.
+
 Streaming and automatic `AgentgatewayPolicy` reconciliation are not claimed by
-these examples. `/v1/messages/count_tokens` is a separate route and remains
+these examples. MCP SSE, batches, and stdio transport are outside this buffered
+JSON profile. `/v1/messages/count_tokens` is a separate route and remains
 outside this compatibility slice.

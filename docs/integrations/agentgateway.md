@@ -6,9 +6,10 @@ The current compatibility slice supports buffered, non-streaming OpenAI Chat
 Completions, OpenAI Responses API, and Anthropic Messages-compatible payloads
 and targets the agentgateway 1.5 policy schema. Its Envoy ExtProc wire
 compatibility is covered in-process; a live agentgateway compatibility matrix
-is not yet claimed. This completes the three payload-family items in Phase 1
-of issue #50. Streaming and automatic TSZ controller reconciliation remain
-outside this slice.
+is not yet claimed. The three payload-family items in Phase 1 and buffered MCP
+JSON-RPC traffic from the first item of Phase 2 in issue #50 are implemented.
+A2A, generic JSON, streaming, and automatic TSZ controller reconciliation
+remain outside this slice.
 
 ## Architecture
 
@@ -79,6 +80,29 @@ and untouched JSON bytes are preserved rather than interpreted as text.
 The `/v1/messages/count_tokens` route is intentionally not included. It is a
 separate agentgateway route type and is outside this issue item.
 
+## MCP JSON-RPC
+
+The [MCP example](../../examples/bring-your-gateway/agentgateway/mcp-json-rpc.yaml)
+uses an `AgentgatewayBackend` with a `StreamableHTTP` MCP target, an `HTTPRoute`
+for `/mcp`, and conditional buffered ExtProc processing. agentgateway continues
+to own MCP server selection, protocol negotiation, sessions, authentication,
+and tool authorization. TSZ only applies content guardrails to individual
+JSON-RPC 2.0 messages.
+
+TSZ inspects `prompts/get` string arguments and returned text or embedded text
+resources. For `tools/call`, it inspects request argument objects and response
+text, embedded text resources, and `structuredContent`. JSON-RPC IDs, method and
+tool names, annotations, resource links, and binary image, audio, or resource
+blob data remain unchanged. Request method state is retained inside the ExtProc
+transaction so a response cannot claim a different originating method.
+
+Initialization, discovery, notifications, unrelated methods, and JSON-RPC
+errors pass without content mutation. Malformed covered content follows the
+configured route failure policy. This profile requires complete
+`application/json` request and response documents; MCP SSE, JSON-RPC batches,
+stdio transport, and binary inspection are not claimed. Configure clients and
+servers for JSON responses when strict response enforcement is required.
+
 ## Policy identity and failures
 
 The current deployment uses the existing trusted-route-header resolver. The
@@ -105,10 +129,10 @@ does not call the selected LLM backend.
 ## Verification
 
 The agentgateway compatibility tests drive buffered Chat Completions,
-Responses, and Anthropic Messages request/response bodies through the same
-Envoy ExtProc gRPC server used in production. They verify request masking,
-immediate request blocking, response masking, fail-open/fail-closed behavior,
-safe adapter identity, and PII-safe audit/metadata output.
+Responses, Anthropic Messages, and MCP JSON-RPC request/response bodies through
+the same Envoy ExtProc gRPC server used in production. They verify request
+masking, immediate request blocking, response masking, fail-open/fail-closed
+behavior, safe adapter identity, and PII-safe audit/metadata output.
 
 Run it with:
 
@@ -116,6 +140,7 @@ Run it with:
 go test ./internal/extproc/envoy -run AgentgatewayOpenAIChatCompletionsCompatibility
 go test ./internal/extproc/envoy -run AgentgatewayOpenAIResponsesCompatibility
 go test ./internal/extproc/envoy -run AgentgatewayAnthropicMessagesCompatibility
+go test ./internal/extproc/envoy -run AgentgatewayMCPJSONRPCCompatibility
 ```
 
 See the [example README](../../examples/bring-your-gateway/agentgateway/README.md)

@@ -1,0 +1,75 @@
+# Phase 1 / item 3: buffered Anthropic Messages through agentgateway.
+# Create anthropic-secret and the tsz-ext-proc Service/Deployment separately.
+# The TSZ deployment must set TSZ_GATEWAY_ADAPTER=agentgateway.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: anthropic
+  namespace: ai-platform
+spec:
+  ai:
+    provider:
+      anthropic: {}
+  policies:
+    ai:
+      routes:
+        /v1/messages: Messages
+        '*': Passthrough
+    auth:
+      secretRef:
+        name: anthropic-secret
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: anthropic-messages
+  namespace: ai-platform
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /v1/messages
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - name: X-TSZ-Policy
+                value: production-ai
+              - name: X-TSZ-Gateway
+                value: agentgateway-proxy
+              - name: X-TSZ-Route
+                value: anthropic-messages
+      backendRefs:
+        - group: agentgateway.dev
+          kind: AgentgatewayBackend
+          name: anthropic
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: tsz-anthropic-messages
+  namespace: ai-platform
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: anthropic-messages
+  traffic:
+    extProc:
+      conditional:
+        - condition: 'request.path == "/v1/messages"'
+          policy:
+            backendRef:
+              name: tsz-ext-proc
+              port: 9002
+            processingOptions:
+              requestHeaderMode: Send
+              responseHeaderMode: Send
+              requestBodyMode: Buffered
+              responseBodyMode: Buffered
+              requestTrailerMode: Skip
+              responseTrailerMode: Skip
+              allowModeOverride: false

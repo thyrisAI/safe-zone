@@ -583,7 +583,7 @@ func TestRequestProcessorHandlesAnthropicMessages(t *testing.T) {
 		t.Fatalf("NewOpenAIRequestProcessor() error = %v", err)
 	}
 	requestResult, err := processor.Process(context.Background(), ProcessingRequest{
-		Stage: StageRequest, ContentType: "application/json", Headers: map[string][]string{"anthropic-version": {"2023-06-01"}},
+		Stage: StageRequest, RequestPath: "/v1/messages?beta=true", ContentType: "application/json",
 		Body:           []byte(`{"system":"secret system","messages":[{"role":"user","content":[{"type":"text","text":"safe"},{"type":"image","source":{"type":"base64","data":"AAAA"}}]}]}`),
 		PolicySnapshot: &policy.CompiledSnapshot{PolicyID: "default", Version: 1, Definition: requestPolicyDefinition()},
 	})
@@ -603,6 +603,29 @@ func TestRequestProcessorHandlesAnthropicMessages(t *testing.T) {
 	}
 	if responseResult.Action != ActionBlock || responseResult.ImmediateStatus != 403 || responseResult.Metadata.Adapter != anthropicProvider {
 		t.Fatalf("Anthropic response result = %+v", responseResult)
+	}
+}
+
+func TestAnthropicMessagesRequestDetectionRecognizesExactMessagesPath(t *testing.T) {
+	tests := []struct {
+		name    string
+		request ProcessingRequest
+		want    bool
+	}{
+		{name: "request path", request: ProcessingRequest{Stage: StageRequest, RequestPath: "/v1/messages"}, want: true},
+		{name: "request path with query", request: ProcessingRequest{Stage: StageRequest, RequestPath: "/v1/messages?beta=true"}, want: true},
+		{name: "pseudo path header", request: ProcessingRequest{Stage: StageRequest, Headers: map[string][]string{":path": {"/v1/messages"}}}, want: true},
+		{name: "anthropic header", request: ProcessingRequest{Stage: StageRequest, Headers: map[string][]string{"anthropic-version": {"2023-06-01"}}}, want: true},
+		{name: "legacy body marker", request: ProcessingRequest{Stage: StageRequest, Body: []byte(`{"anthropic_version":"2023-06-01"}`)}, want: true},
+		{name: "token counting endpoint", request: ProcessingRequest{Stage: StageRequest, RequestPath: "/v1/messages/count_tokens", Headers: map[string][]string{"anthropic-version": {"2023-06-01"}}}, want: false},
+		{name: "chat endpoint", request: ProcessingRequest{Stage: StageRequest, RequestPath: "/v1/chat/completions"}, want: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := isAnthropicMessagesRequest(test.request); got != test.want {
+				t.Fatalf("isAnthropicMessagesRequest() = %t, want %t", got, test.want)
+			}
+		})
 	}
 }
 

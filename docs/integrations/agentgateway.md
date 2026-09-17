@@ -3,11 +3,12 @@
 ## Status
 
 The current compatibility slice supports buffered, non-streaming OpenAI Chat
-Completions and Responses API-compatible payloads and targets the agentgateway
-1.5 policy schema. Its Envoy ExtProc wire compatibility is covered in-process;
-a live agentgateway compatibility matrix is not yet claimed. These are the
-first two items of Phase 1 in issue #50; Anthropic Messages, streaming, and
-automatic TSZ controller reconciliation remain outside this slice.
+Completions, OpenAI Responses API, and Anthropic Messages-compatible payloads
+and targets the agentgateway 1.5 policy schema. Its Envoy ExtProc wire
+compatibility is covered in-process; a live agentgateway compatibility matrix
+is not yet claimed. This completes the three payload-family items in Phase 1
+of issue #50. Streaming and automatic TSZ controller reconciliation remain
+outside this slice.
 
 ## Architecture
 
@@ -59,6 +60,25 @@ convenience `output_text` field, mutation keeps that aggregate synchronized
 with the guarded output items. Unknown fields, ordering, and untouched JSON
 bytes are preserved.
 
+## Anthropic Messages
+
+agentgateway exposes Anthropic-compatible traffic by assigning the `Messages`
+route type to `/v1/messages` on an `AgentgatewayBackend`. The checked-in
+[Anthropic Messages example](../../examples/bring-your-gateway/agentgateway/anthropic-messages.yaml)
+configures that route and attaches buffered ExtProc enforcement only to the
+exact Messages endpoint. TSZ recognizes the trusted request path, so it does
+not depend on clients sending `anthropic-version` before agentgateway performs
+provider processing.
+
+Request inspection covers top-level system prompts, user and assistant text,
+tool-use input objects, and tool-result text. Buffered response inspection
+covers assistant text and tool-use input objects. Image and document sources,
+thinking and redacted-thinking blocks, signatures, unknown fields, ordering,
+and untouched JSON bytes are preserved rather than interpreted as text.
+
+The `/v1/messages/count_tokens` route is intentionally not included. It is a
+separate agentgateway route type and is outside this issue item.
+
 ## Policy identity and failures
 
 The current deployment uses the existing trusted-route-header resolver. The
@@ -84,17 +104,18 @@ does not call the selected LLM backend.
 
 ## Verification
 
-The agentgateway compatibility tests drive buffered Chat Completions and
-Responses request/response bodies through the same Envoy ExtProc gRPC server
-used in production. They verify request masking, immediate request blocking,
-response masking, fail-open/fail-closed behavior, safe adapter identity, and
-PII-safe audit/metadata output.
+The agentgateway compatibility tests drive buffered Chat Completions,
+Responses, and Anthropic Messages request/response bodies through the same
+Envoy ExtProc gRPC server used in production. They verify request masking,
+immediate request blocking, response masking, fail-open/fail-closed behavior,
+safe adapter identity, and PII-safe audit/metadata output.
 
 Run it with:
 
 ```sh
 go test ./internal/extproc/envoy -run AgentgatewayOpenAIChatCompletionsCompatibility
 go test ./internal/extproc/envoy -run AgentgatewayOpenAIResponsesCompatibility
+go test ./internal/extproc/envoy -run AgentgatewayAnthropicMessagesCompatibility
 ```
 
 See the [example README](../../examples/bring-your-gateway/agentgateway/README.md)

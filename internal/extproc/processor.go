@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -208,6 +209,18 @@ func (p *OpenAIRequestProcessor) processRequest(ctx context.Context, request Pro
 }
 
 func isAnthropicMessagesRequest(request ProcessingRequest) bool {
+	path := request.RequestPath
+	if path == "" && request.Stage == StageRequest {
+		path = FirstHeader(request.Headers, ":path")
+	}
+	if parsed, err := url.ParseRequestURI(path); err == nil {
+		switch parsed.Path {
+		case "/v1/messages":
+			return true
+		case "/v1/messages/count_tokens":
+			return false
+		}
+	}
 	if FirstHeader(request.Headers, "anthropic-version") != "" {
 		return true
 	}

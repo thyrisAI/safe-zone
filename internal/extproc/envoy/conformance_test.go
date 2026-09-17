@@ -31,7 +31,7 @@ func TestAdapterConformance(t *testing.T) {
 // immediate responses, failure behavior, and PII-safe telemetry.
 func TestAgentgatewayOpenAIChatCompletionsCompatibility(t *testing.T) {
 	adaptertest.RunConformance(t, envoyConformanceDriver{
-		t: t, name: "agentgateway", capabilities: capabilities.AgentgatewayOpenAIBufferedCapabilities,
+		t: t, name: "agentgateway", capabilities: capabilities.AgentgatewayBufferedLLMCapabilities,
 	})
 }
 

@@ -6,10 +6,10 @@ The current compatibility slice supports buffered, non-streaming OpenAI Chat
 Completions, OpenAI Responses API, and Anthropic Messages-compatible payloads
 and targets the agentgateway 1.5 policy schema. Its Envoy ExtProc wire
 compatibility is covered in-process; a live agentgateway compatibility matrix
-is not yet claimed. The three payload-family items in Phase 1 and buffered MCP
-JSON-RPC traffic from the first item of Phase 2 in issue #50 are implemented.
-A2A, generic JSON, streaming, and automatic TSZ controller reconciliation
-remain outside this slice.
+is not yet claimed. The three payload-family items in Phase 1 and the buffered
+MCP and A2A JSON-RPC items from Phase 2 in issue #50 are implemented. Generic
+JSON, streaming, and automatic TSZ controller reconciliation remain outside
+this slice.
 
 ## Architecture
 
@@ -103,6 +103,29 @@ configured route failure policy. This profile requires complete
 stdio transport, and binary inspection are not claimed. Configure clients and
 servers for JSON responses when strict response enforcement is required.
 
+## A2A JSON-RPC
+
+The [A2A example](../../examples/bring-your-gateway/agentgateway/a2a-json-rpc.yaml)
+uses an `AgentgatewayBackend` with an A2A target, publishes it below
+`/agents/support`, and rewrites that prefix to `/` for the upstream agent. Its
+ExtProc policy targets `POST` requests only, so agentgateway can serve the
+Agent Card over `GET` without sending that non-JSON document to this content
+adapter.
+
+TSZ supports both the `tasks/send` method currently shown by agentgateway and
+the standard `message/send` method. It inspects user message text and structured
+data on requests. On responses it inspects agent messages, task-status messages,
+history, and artifact text or structured data. File bytes and URIs, JSON-RPC
+IDs, roles, task state, and protocol metadata are preserved. Task-management
+methods and JSON-RPC error responses pass without content mutation.
+
+agentgateway remains responsible for A2A routing, authentication, Agent Card
+discovery, and task lifecycle. This profile handles complete JSON-RPC documents
+only. Streaming methods such as `message/stream` and `tasks/sendSubscribe` are
+reported as unsupported processing failures instead of passing uninspected;
+A2A SSE, REST, gRPC, file-content inspection, and push-notification webhooks are
+outside this compatibility slice.
+
 ## Policy identity and failures
 
 The current deployment uses the existing trusted-route-header resolver. The
@@ -129,10 +152,11 @@ does not call the selected LLM backend.
 ## Verification
 
 The agentgateway compatibility tests drive buffered Chat Completions,
-Responses, Anthropic Messages, and MCP JSON-RPC request/response bodies through
-the same Envoy ExtProc gRPC server used in production. They verify request
-masking, immediate request blocking, response masking, fail-open/fail-closed
-behavior, safe adapter identity, and PII-safe audit/metadata output.
+Responses, Anthropic Messages, MCP JSON-RPC, and A2A JSON-RPC request/response
+bodies through the same Envoy ExtProc gRPC server used in production. They
+verify request masking, immediate request blocking, response masking,
+fail-open/fail-closed behavior, safe adapter identity, and PII-safe
+audit/metadata output.
 
 Run it with:
 
@@ -141,6 +165,7 @@ go test ./internal/extproc/envoy -run AgentgatewayOpenAIChatCompletionsCompatibi
 go test ./internal/extproc/envoy -run AgentgatewayOpenAIResponsesCompatibility
 go test ./internal/extproc/envoy -run AgentgatewayAnthropicMessagesCompatibility
 go test ./internal/extproc/envoy -run AgentgatewayMCPJSONRPCCompatibility
+go test ./internal/extproc/envoy -run AgentgatewayA2ACompatibility
 ```
 
 See the [example README](../../examples/bring-your-gateway/agentgateway/README.md)

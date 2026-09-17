@@ -1,0 +1,74 @@
+# Phase 2 / item 2: buffered A2A JSON-RPC through agentgateway.
+# The referenced a2a-agent Service and tsz-ext-proc Service/Deployment are
+# installed separately. The TSZ deployment must set
+# TSZ_GATEWAY_ADAPTER=agentgateway.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: a2a-support-agent
+  namespace: ai-platform
+spec:
+  a2a:
+    host: a2a-agent.ai-platform.svc.cluster.local
+    port: 9090
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: a2a-support-agent
+  namespace: ai-platform
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /agents/support
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - name: X-TSZ-Policy
+                value: production-ai
+              - name: X-TSZ-Gateway
+                value: agentgateway-proxy
+              - name: X-TSZ-Route
+                value: a2a-support-agent
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - group: agentgateway.dev
+          kind: AgentgatewayBackend
+          name: a2a-support-agent
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: tsz-a2a-support-agent
+  namespace: ai-platform
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: a2a-support-agent
+  traffic:
+    extProc:
+      conditional:
+        # The route attachment scopes the agent. POST excludes Agent Card GETs.
+        - condition: 'request.method == "POST"'
+          policy:
+            backendRef:
+              name: tsz-ext-proc
+              port: 9002
+            processingOptions:
+              requestHeaderMode: Send
+              responseHeaderMode: Send
+              requestBodyMode: Buffered
+              responseBodyMode: Buffered
+              requestTrailerMode: Skip
+              responseTrailerMode: Skip
+              allowModeOverride: false

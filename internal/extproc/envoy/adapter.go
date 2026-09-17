@@ -325,7 +325,7 @@ func contractRequest(stage ProcessingStage, headers map[string][]string, body []
 		Attributes: attributes,
 	}
 	if stage == StageRequest {
-		request.RPCMethod = MCPMethodFromMessage(request.ContentType, body)
+		request.RPCMethod = JSONRPCMethodFromMessage(request.ContentType, body)
 	}
 	return request
 }

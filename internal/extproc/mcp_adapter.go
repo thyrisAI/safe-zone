@@ -192,9 +192,9 @@ func isMCPMessage(contentType string, body []byte) bool {
 	return version != nil && version.kind == jsonString && version.stringValue == "2.0"
 }
 
-// MCPMethodFromMessage returns the JSON-RPC method for transport adapters that
-// need to correlate a response with its originating request.
-func MCPMethodFromMessage(contentType string, body []byte) string {
+// JSONRPCMethodFromMessage returns the method for transport adapters that need
+// to correlate a JSON-RPC response with its originating request.
+func JSONRPCMethodFromMessage(contentType string, body []byte) string {
 	if !isMCPMessage(contentType, body) {
 		return ""
 	}
@@ -207,6 +207,12 @@ func MCPMethodFromMessage(contentType string, body []byte) string {
 		return ""
 	}
 	return method.stringValue
+}
+
+// MCPMethodFromMessage is retained for source compatibility.
+// Deprecated: use JSONRPCMethodFromMessage for gateway-neutral correlation.
+func MCPMethodFromMessage(contentType string, body []byte) string {
+	return JSONRPCMethodFromMessage(contentType, body)
 }
 
 func hasDuplicateJSONKeys(node *jsonNode) bool {

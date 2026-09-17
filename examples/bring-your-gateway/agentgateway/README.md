@@ -3,7 +3,8 @@
 These Phase 1 and Phase 2 examples attach the existing TSZ External Processor
 to agentgateway `HTTPRoute` resources. The current scope is buffered,
 non-streaming OpenAI Chat Completions, OpenAI Responses API, and Anthropic
-Messages traffic, plus buffered MCP JSON-RPC messages over Streamable HTTP.
+Messages traffic, plus buffered MCP JSON-RPC messages over Streamable HTTP and
+buffered A2A JSON-RPC traffic through an A2A backend.
 
 Apply [`openai-chat-completions.yaml`](openai-chat-completions.yaml) after the
 agentgateway, `openai` `AgentgatewayBackend`, TSZ deployment, and a compiled TSZ
@@ -32,6 +33,11 @@ Apply [`mcp-json-rpc.yaml`](mcp-json-rpc.yaml) for an MCP endpoint under
 `/mcp`. The example defines a `StreamableHTTP` `AgentgatewayBackend` whose
 upstream `mcp-server` Service listens on port `80` at `/mcp`. With the route
 prefix and target path shown, agentgateway clients connect at `/mcp/mcp`.
+
+Apply [`a2a-json-rpc.yaml`](a2a-json-rpc.yaml) for an A2A agent exposed below
+`/agents/support`. The example defines an A2A `AgentgatewayBackend`, rewrites
+the public prefix to `/`, and applies ExtProc only to `POST` requests so the
+Agent Card remains available over `GET`.
 
 The included route uses `RequestHeaderModifier.set` to overwrite
 `X-TSZ-Policy`, `X-TSZ-Gateway`, and `X-TSZ-Route` before ExtProc runs. Do not
@@ -82,6 +88,16 @@ curl --fail-with-body \
   http://AGENTGATEWAY_ADDRESS/mcp/mcp
 ```
 
+For an A2A message using the method exposed in the current agentgateway
+documentation:
+
+```sh
+curl --fail-with-body \
+  --header 'content-type: application/json' \
+  --data '{"jsonrpc":"2.0","id":"1","method":"tasks/send","params":{"id":"task-1","message":{"role":"user","parts":[{"type":"text","text":"Email person@example.com"}]}}}' \
+  http://AGENTGATEWAY_ADDRESS/agents/support
+```
+
 With a masking policy, the backend must receive sanitized message content. A
 blocking policy must return a TSZ immediate response without contacting the
 backend. When response enforcement is enabled, TSZ inspects and may mask or
@@ -102,7 +118,14 @@ result content while preserving protocol routing fields and binary content.
 agentgateway remains responsible for MCP authentication, authorization,
 sessions, server routing, and tool selection.
 
+For A2A JSON-RPC, TSZ inspects user message text and structured data, plus
+agent messages, task status/history, and artifact content in responses. It
+preserves task and message identity, state, metadata, and file bytes or URIs.
+agentgateway remains responsible for authentication, Agent Card discovery,
+routing, and task lifecycle.
+
 Streaming and automatic `AgentgatewayPolicy` reconciliation are not claimed by
 these examples. MCP SSE, batches, and stdio transport are outside this buffered
-JSON profile. `/v1/messages/count_tokens` is a separate route and remains
-outside this compatibility slice.
+JSON profile. A2A streaming/SSE, REST, gRPC, push-notification webhooks, and file
+inspection are also outside it. `/v1/messages/count_tokens` is a separate route
+and remains outside this compatibility slice.

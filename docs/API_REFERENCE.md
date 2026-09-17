@@ -720,7 +720,8 @@ extension boundary, compatibility and Phase 7 scope.
 #### Response contract
 
 For a strict no-leakage guarantee, use supported buffered, non-streaming OpenAI,
-Anthropic Messages, or Gemini GenerateContent traffic. The request must use
+Anthropic Messages, Gemini GenerateContent, MCP, or A2A traffic. The request
+must use
 `Content-Type: application/json`; unsupported content shapes are processing
 failures, not silently allowed content. The portable Envoy BYG `AsyncAudit`
 compiled-policy mode forwards SSE unchanged and performs bounded post-stream observation; it accepts only
@@ -739,6 +740,7 @@ The supported non-streaming content fields are:
 | Responses | String `instructions`, string `input`, `input_text`/`output_text`/`refusal` fields in supported developer/system/user/assistant message content arrays, `function_call.arguments`, and string or multimodal `function_call_output.output` in `input[]` | Assistant `output_text`, `refusal`, and `function_call.arguments` fields in `output[]`; top-level `output_text` is kept consistent when present |
 | Embeddings (OpenAI-compatible) | Non-empty string `input` or non-empty array of non-empty strings; every item is inspected independently | Input-only: vectors, usage and provider errors pass through unchanged |
 | MCP Streamable HTTP | `prompts/get` string arguments and `tools/call` JSON-object arguments | Prompt text and embedded text resources; tool-result text, embedded text resources and `structuredContent` objects |
+| A2A JSON-RPC | User message text and structured-data parts for `tasks/send` or `message/send` | Agent message, task-status message, history, and artifact text or structured-data parts |
 | Anthropic Messages | Top-level string or text-block `system`; user/assistant string and text-block content; `tool_use.input`; string or text-block `tool_result.content` | Assistant text blocks and `tool_use.input` |
 | Gemini GenerateContent | `systemInstruction` and `contents[].parts[].text`; `functionCall.args`, `functionResponse.response`, server `toolCall.args`/`toolResponse.response`, executable code and execution output | The corresponding supported fields in `candidates[].content.parts[]` |
 
@@ -746,9 +748,10 @@ TSZ changes only the extracted text string values and the derived Responses
 API `output_text` value; item order, unknown fields and untouched JSON bytes
 are preserved. Tool names and execution authorization are not changed. Tool
 payloads in streaming events, the bytes or meaning of multimodal image/audio/file
-data, and Responses, Anthropic, or Gemini streaming events are not covered by
-this capability yet. Anthropic requests are selected using the required
-`anthropic-version` header; Gemini requests are selected by their
+data, and Responses, Anthropic, Gemini, MCP, or A2A streaming events are not
+covered by this capability yet. Anthropic requests are selected by the
+`/v1/messages` path or the `anthropic-version` header; Gemini requests are
+selected by their
 `contents`/`systemInstruction` shape.
 
 | Policy action | Envoy result |
@@ -758,7 +761,8 @@ this capability yet. Anthropic requests are selected using the required
 | `MASK` | Replace unsafe supported content fields and update `content-length`. |
 | `BLOCK` | Replace the upstream response with a safe local `403` response. |
 
-This scope does **not** guarantee Responses, Anthropic, Gemini, or MCP streaming enforcement.
+This scope does **not** guarantee Responses, Anthropic, Gemini, MCP, or A2A
+streaming enforcement.
 Configure both request and response bodies as `Buffered`; do not attach this
 profile to a route that requires an unbuffered or Responses SSE safety
 guarantee.
@@ -837,6 +841,33 @@ or enforce MCP authentication and `Origin` checks; those controls remain with
 the gateway and MCP client/server. Configure both request and response bodies as
 `Buffered`. MCP SSE messages, stdio transport, JSON-RPC batching, resource-read
 payloads and binary content inspection are outside this capability.
+
+#### A2A message and task-content guardrails
+
+The BYG processor supports individual, buffered A2A JSON-RPC 2.0 documents. It
+recognizes both the `tasks/send` method exposed by current agentgateway releases
+and the standard `message/send` method. A2A detection runs before the generic
+MCP JSON-RPC fallback, and the request method is retained for response
+interpretation so a response body cannot select another adapter.
+
+Request inspection covers user-message text and structured-data parts. Response
+inspection covers agent messages returned directly or through task status and
+history, plus artifact text and structured-data parts. `ALLOW` and `AUDIT_ONLY`
+preserve the original body. `MASK` changes only extracted content and updates
+`content-length`; `BLOCK` prevents request delivery or response release.
+
+JSON-RPC IDs, task and message IDs, roles, task state, metadata, and unrelated
+fields remain unchanged. File bytes and URIs are preserved without inspection.
+Unknown or ambiguous part variants, malformed covered content, and duplicate
+keys in covered structures are processing errors subject to the configured failure policy.
+Task-management methods and JSON-RPC error responses pass without mutation.
+
+This adapter performs content guardrails only. agentgateway remains responsible
+for A2A routing, authentication, Agent Card discovery, and task lifecycle.
+Configure request and response bodies as `Buffered`. Streaming methods such as
+`message/stream`, `tasks/sendSubscribe`, and `tasks/resubscribe` fail as
+unsupported instead of silently passing. A2A SSE, REST, gRPC, push-notification
+webhooks, and file-content inspection are outside this capability.
 
 #### Envoy attachment and runtime settings
 

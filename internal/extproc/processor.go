@@ -161,6 +161,13 @@ func (p *OpenAIRequestProcessor) ProcessSSEWindow(ctx context.Context, request P
 }
 
 func (p *OpenAIRequestProcessor) processRequest(ctx context.Context, request ProcessingRequest) (ProcessingResult, error) {
+	if isGenericJSONSelected(request) {
+		payload, err := ParseGenericJSON(request.ContentType, request.Body, "request")
+		if err != nil {
+			return ProcessingResult{}, err
+		}
+		return p.processProviderPayload(ctx, request, payload, false)
+	}
 	if isA2AMessage(request.ContentType, request.Body) {
 		payload, err := ParseA2ARequest(request.ContentType, request.Body)
 		if err != nil {
@@ -288,6 +295,13 @@ func (p *OpenAIRequestProcessor) processChatRequest(ctx context.Context, request
 }
 
 func (p *OpenAIRequestProcessor) processResponse(ctx context.Context, request ProcessingRequest) (ProcessingResult, error) {
+	if isGenericJSONSelected(request) {
+		payload, err := ParseGenericJSON(request.ContentType, request.Body, "response")
+		if err != nil {
+			return ProcessingResult{}, err
+		}
+		return p.processProviderPayload(ctx, request, payload, true)
+	}
 	if isA2AMethod(request.RPCMethod) {
 		payload, err := ParseA2AResponse(request.ContentType, request.Body, request.RPCMethod)
 		if err != nil {

@@ -5,6 +5,8 @@ to agentgateway `HTTPRoute` resources. The current scope is buffered,
 non-streaming OpenAI Chat Completions, OpenAI Responses API, and Anthropic
 Messages traffic, plus buffered MCP JSON-RPC messages over Streamable HTTP and
 buffered A2A JSON-RPC traffic through an A2A backend.
+Generic JSON HTTP request and response bodies are supported through an explicit
+route-owned content-adapter selector.
 
 Apply [`openai-chat-completions.yaml`](openai-chat-completions.yaml) after the
 agentgateway, `openai` `AgentgatewayBackend`, TSZ deployment, and a compiled TSZ
@@ -17,6 +19,14 @@ Configure the TSZ deployment with the trusted adapter identity:
 kubectl -n ai-platform set env deployment/tsz-ext-proc \
   TSZ_GATEWAY_ADAPTER=agentgateway
 ```
+
+Before applying any route example, edit and apply
+[`trusted-routing-context.yaml`](trusted-routing-context.yaml). Replace
+`production-ai` with the compiled policy ID and adjust its path mappings when
+you rename a route. This Gateway-level `PreRouting` transformation overwrites
+the TSZ policy, gateway, route, and content-adapter headers before ExtProc can
+observe them. A post-routing `HTTPRoute` header filter is too late because
+agentgateway executes `traffic.extProc` before post-routing header mutation.
 
 Apply [`openai-responses.yaml`](openai-responses.yaml) for
 `POST /v1/responses`. It reuses the `tsz-ext-proc` Service created by the Chat
@@ -39,14 +49,21 @@ Apply [`a2a-json-rpc.yaml`](a2a-json-rpc.yaml) for an A2A agent exposed below
 the public prefix to `/`, and applies ExtProc only to `POST` requests so the
 Agent Card remains available over `GET`.
 
-The included route uses `RequestHeaderModifier.set` to overwrite
-`X-TSZ-Policy`, `X-TSZ-Gateway`, and `X-TSZ-Route` before ExtProc runs. Do not
-change this to `add`, and do not accept a client-provided policy identity. The
-complete native route-binding flow is a later integration phase.
+Apply [`generic-json-http.yaml`](generic-json-http.yaml) for ordinary JSON APIs
+below `/api/customer-profiles`. The example routes to a Kubernetes Service and
+uses the matching entry in `trusted-routing-context.yaml` to overwrite
+`X-TSZ-Content-Adapter: generic-json`. Replace the backend Service and path and
+update that trusted mapping together.
+
+The `PreRouting` policy uses `set` to overwrite `X-TSZ-Policy`,
+`X-TSZ-Gateway`, and `X-TSZ-Route`; it also removes a client-provided generic
+adapter selector on protocol-specific routes. Do not accept either header as
+client authority. The complete native route-binding flow is a later
+integration phase.
 
 Both body modes are intentionally `Buffered`. agentgateway defaults to
 `FullDuplexStreamed`, while this compatibility profile guarantees enforcement
-only after TSZ receives the complete OpenAI JSON body. Configure the
+only after TSZ receives the complete JSON body. Configure the
 agentgateway frontend buffer limit and `TSZ_MAX_BODY_BYTES` consistently.
 
 Send a request through the route:
@@ -98,6 +115,15 @@ curl --fail-with-body \
   http://AGENTGATEWAY_ADDRESS/agents/support
 ```
 
+For a generic JSON API:
+
+```sh
+curl --fail-with-body \
+  --header 'content-type: application/json' \
+  --data '{"name":"Example","email":"person@example.com","active":true}' \
+  http://AGENTGATEWAY_ADDRESS/api/customer-profiles
+```
+
 With a masking policy, the backend must receive sanitized message content. A
 blocking policy must return a TSZ immediate response without contacting the
 backend. When response enforcement is enabled, TSZ inspects and may mask or
@@ -124,8 +150,14 @@ preserves task and message identity, state, metadata, and file bytes or URIs.
 agentgateway remains responsible for authentication, Agent Card discovery,
 routing, and task lifecycle.
 
+For generic JSON, TSZ evaluates the complete document as structured content so
+schema and semantic validators retain full context. Objects, arrays, and scalar
+values are accepted for `application/json` and `application/*+json`. A masked
+document must remain valid JSON with the same top-level kind.
+
 Streaming and automatic `AgentgatewayPolicy` reconciliation are not claimed by
 these examples. MCP SSE, batches, and stdio transport are outside this buffered
 JSON profile. A2A streaming/SSE, REST, gRPC, push-notification webhooks, and file
 inspection are also outside it. `/v1/messages/count_tokens` is a separate route
-and remains outside this compatibility slice.
+and remains outside this compatibility slice. Multipart, form, binary, NDJSON,
+JSON Text Sequences, and streaming JSON are not handled by the generic adapter.

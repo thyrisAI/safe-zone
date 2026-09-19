@@ -46,6 +46,10 @@ func (stage ProcessingStage) Validate() error {
 }
 
 type ProcessingRequest struct {
+	// ContentAdapter is an explicit, trusted route-selected payload adapter.
+	// Transport adapters must not populate it from an untrusted client header
+	// unless the gateway route overwrites that header first.
+	ContentAdapter string
 	// RequestPath is the original request URI, retained for response processing.
 	// Adapters must derive it from request routing data, never response headers.
 	RequestPath string

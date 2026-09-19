@@ -1,6 +1,7 @@
 # Phase 1 / item 1: buffered OpenAI Chat Completions through agentgateway.
 # The referenced AgentgatewayBackend and tsz-ext-proc Deployment are installed
-# separately. RequestHeaderModifier "set" overwrites client-supplied identity.
+# separately. trusted-routing-context.yaml overwrites client-supplied identity
+# before ExtProc runs.
 # The TSZ deployment must set TSZ_GATEWAY_ADAPTER=agentgateway.
 apiVersion: v1
 kind: Service
@@ -30,16 +31,6 @@ spec:
         - path:
             type: Exact
             value: /v1/chat/completions
-      filters:
-        - type: RequestHeaderModifier
-          requestHeaderModifier:
-            set:
-              - name: X-TSZ-Policy
-                value: production-ai
-              - name: X-TSZ-Gateway
-                value: agentgateway-proxy
-              - name: X-TSZ-Route
-                value: llm-api
       backendRefs:
         - group: agentgateway.dev
           kind: AgentgatewayBackend

@@ -21,6 +21,7 @@ func TestRequestFromEnvoyCarriesHeadersIntoBufferedBody(t *testing.T) {
 			[2]string{"x-request-id", "envoy-1"},
 			[2]string{"x-tsz-rid", "rid-1"},
 			[2]string{"content-type", "application/json"},
+			[2]string{"x-tsz-content-adapter", "generic-json"},
 			[2]string{"x-repeat", "one"},
 			[2]string{"x-repeat", "two"},
 		),
@@ -32,7 +33,7 @@ func TestRequestFromEnvoyCarriesHeadersIntoBufferedBody(t *testing.T) {
 	if kind != envoyRequestHeaders || request.Stage != StageRequest || request.RID != "" || request.EnvoyReqID != "envoy-1" {
 		t.Fatalf("header request = %+v kind=%s", request, kind)
 	}
-	if len(request.Headers["x-repeat"]) != 2 || request.ContentType != "application/json" {
+	if len(request.Headers["x-repeat"]) != 2 || request.ContentType != "application/json" || request.ContentAdapter != "generic-json" {
 		t.Fatalf("headers = %+v content-type=%q", request.Headers, request.ContentType)
 	}
 
@@ -41,8 +42,31 @@ func TestRequestFromEnvoyCarriesHeadersIntoBufferedBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("requestFromEnvoy(body) error = %v", err)
 	}
-	if kind != envoyRequestBody || bodyRequest.RID != "" || string(bodyRequest.Body) != `{"messages":[]}` || bodyRequest.ContentType != "application/json" {
+	if kind != envoyRequestBody || bodyRequest.RID != "" || string(bodyRequest.Body) != `{"messages":[]}` || bodyRequest.ContentType != "application/json" || bodyRequest.ContentAdapter != "generic-json" {
 		t.Fatalf("body request = %+v kind=%s", bodyRequest, kind)
+	}
+}
+
+func TestContentAdapterRetainedAcrossResponseTransaction(t *testing.T) {
+	state := newEnvoyStreamState()
+	headers := requestHeadersForAdapterTest(false)
+	headers.GetRequestHeaders().Headers.Headers = append(headers.GetRequestHeaders().Headers.Headers,
+		&corev3.HeaderValue{Key: "x-tsz-content-adapter", RawValue: []byte("generic-json")},
+	)
+	for _, message := range []*extprocv3.ProcessingRequest{
+		headers,
+		requestBodyForAdapterTest([]byte(`{"safe":true}`), true),
+		responseHeadersForAdapterTest(false),
+		responseBodyForAdapterTest([]byte(`{"safe":true}`), true),
+	} {
+		request, _, err := requestFromEnvoy(message, state)
+		if err != nil || request.ContentAdapter != "generic-json" {
+			t.Fatalf("content adapter = %q, error = %v", request.ContentAdapter, err)
+		}
+	}
+	request, _, err := requestFromEnvoy(requestHeadersForAdapterTest(false), newEnvoyStreamState())
+	if err != nil || request.ContentAdapter != "" {
+		t.Fatalf("content adapter leaked across streams: %q, error = %v", request.ContentAdapter, err)
 	}
 }
 

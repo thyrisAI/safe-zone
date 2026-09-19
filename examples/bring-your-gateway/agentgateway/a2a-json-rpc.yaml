@@ -26,15 +26,6 @@ spec:
             type: PathPrefix
             value: /agents/support
       filters:
-        - type: RequestHeaderModifier
-          requestHeaderModifier:
-            set:
-              - name: X-TSZ-Policy
-                value: production-ai
-              - name: X-TSZ-Gateway
-                value: agentgateway-proxy
-              - name: X-TSZ-Route
-                value: a2a-support-agent
         - type: URLRewrite
           urlRewrite:
             path:

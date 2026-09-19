@@ -214,23 +214,3 @@ func JSONRPCMethodFromMessage(contentType string, body []byte) string {
 func MCPMethodFromMessage(contentType string, body []byte) string {
 	return JSONRPCMethodFromMessage(contentType, body)
 }
-
-func hasDuplicateJSONKeys(node *jsonNode) bool {
-	if node == nil {
-		return false
-	}
-	if node.duplicateKeys {
-		return true
-	}
-	for _, child := range node.object {
-		if hasDuplicateJSONKeys(child) {
-			return true
-		}
-	}
-	for _, child := range node.array {
-		if hasDuplicateJSONKeys(child) {
-			return true
-		}
-	}
-	return false
-}

@@ -7,9 +7,9 @@ Completions, OpenAI Responses API, and Anthropic Messages-compatible payloads
 and targets the agentgateway 1.5 policy schema. Its Envoy ExtProc wire
 compatibility is covered in-process; a live agentgateway compatibility matrix
 is not yet claimed. The three payload-family items in Phase 1 and the buffered
-MCP and A2A JSON-RPC items from Phase 2 in issue #50 are implemented. Generic
-JSON, streaming, and automatic TSZ controller reconciliation remain outside
-this slice.
+MCP, A2A, and generic JSON HTTP items from Phase 2 in issue #50 are implemented.
+Streaming and automatic TSZ controller reconciliation remain outside this
+slice.
 
 ## Architecture
 
@@ -126,13 +126,39 @@ reported as unsupported processing failures instead of passing uninspected;
 A2A SSE, REST, gRPC, file-content inspection, and push-notification webhooks are
 outside this compatibility slice.
 
+## Generic JSON HTTP APIs
+
+The [generic JSON example](../../examples/bring-your-gateway/agentgateway/generic-json-http.yaml)
+protects a normal Kubernetes Service below `/api/customer-profiles`. The route
+mapping in [the trusted routing context policy](../../examples/bring-your-gateway/agentgateway/trusted-routing-context.yaml)
+overwrites `X-TSZ-Content-Adapter: generic-json`; this explicit selector keeps
+unknown or malformed LLM, MCP, and A2A payloads from silently falling back to a
+less specific parser. Treat the selector as trusted route configuration and do
+not accept a client-provided value.
+
+TSZ inspects each complete request or response JSON document as one structured
+value. This retains full context for schema, semantic, AI, PII, secret, pattern,
+allowlist, and blocklist evaluation. Objects, arrays, and scalar JSON values are
+supported with `application/json` and `application/*+json` media types. `ALLOW`
+and `AUDIT_ONLY` preserve the original bytes; `MASK` must produce valid JSON of
+the same top-level kind; `BLOCK` uses the normal safe ExtProc immediate response.
+Duplicate keys, malformed JSON, unsupported media types, and invalid mutations
+follow the configured request or response failure policy.
+
+The profile is deliberately buffered and does not inspect multipart forms,
+form-encoded bodies, arbitrary text, binary data, NDJSON, JSON Text Sequences,
+or streaming JSON. agentgateway continues to own HTTP routing, authentication,
+authorization, retries, timeouts, and backend selection.
+
 ## Policy identity and failures
 
 The current deployment uses the existing trusted-route-header resolver. The
-route owner must overwrite `X-TSZ-Policy`; a client-supplied value is never an
-authoritative policy identifier. Native route bindings and automatic
-`AgentgatewayPolicy` generation will replace this manual step in a later
-phase.
+route owner must overwrite `X-TSZ-Policy` in a Gateway-level `PreRouting`
+transformation; a client-supplied value is never an authoritative policy
+identifier. A normal `HTTPRoute` request-header filter executes too late for
+agentgateway ExtProc, whose policy stage precedes post-routing transformations.
+Native route bindings and automatic `AgentgatewayPolicy` generation will
+replace this manual mapping in a later phase.
 
 TSZ's configured request and response failure modes remain authoritative.
 Use fail-closed for workloads where uninspected content must not pass. A block
@@ -152,10 +178,10 @@ does not call the selected LLM backend.
 ## Verification
 
 The agentgateway compatibility tests drive buffered Chat Completions,
-Responses, Anthropic Messages, MCP JSON-RPC, and A2A JSON-RPC request/response
-bodies through the same Envoy ExtProc gRPC server used in production. They
-verify request masking, immediate request blocking, response masking,
-fail-open/fail-closed behavior, safe adapter identity, and PII-safe
+Responses, Anthropic Messages, MCP JSON-RPC, A2A JSON-RPC, and generic JSON HTTP
+request/response bodies through the same Envoy ExtProc gRPC server used in
+production. They verify request masking, immediate request blocking, response
+masking, fail-open/fail-closed behavior, safe adapter identity, and PII-safe
 audit/metadata output.
 
 Run it with:
@@ -166,6 +192,7 @@ go test ./internal/extproc/envoy -run AgentgatewayOpenAIResponsesCompatibility
 go test ./internal/extproc/envoy -run AgentgatewayAnthropicMessagesCompatibility
 go test ./internal/extproc/envoy -run AgentgatewayMCPJSONRPCCompatibility
 go test ./internal/extproc/envoy -run AgentgatewayA2ACompatibility
+go test ./internal/extproc/envoy -run AgentgatewayGenericJSONCompatibility
 ```
 
 See the [example README](../../examples/bring-your-gateway/agentgateway/README.md)

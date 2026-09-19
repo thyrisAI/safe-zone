@@ -1,28 +1,11 @@
-# Phase 1 / item 3: buffered Anthropic Messages through agentgateway.
-# Create anthropic-secret and the tsz-ext-proc Service/Deployment separately.
-# The TSZ deployment must set TSZ_GATEWAY_ADAPTER=agentgateway.
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
-metadata:
-  name: anthropic
-  namespace: ai-platform
-spec:
-  ai:
-    provider:
-      anthropic: {}
-  policies:
-    ai:
-      routes:
-        /v1/messages: Messages
-        '*': Passthrough
-    auth:
-      secretRef:
-        name: anthropic-secret
----
+# Phase 2 / item 3: buffered generic JSON HTTP APIs through agentgateway.
+# The customer-api Service and tsz-ext-proc Service/Deployment are installed
+# separately. trusted-routing-context.yaml supplies the policy identity and
+# content-adapter selector before ExtProc runs.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: anthropic-messages
+  name: customer-api
   namespace: ai-platform
 spec:
   parentRefs:
@@ -30,27 +13,26 @@ spec:
   rules:
     - matches:
         - path:
-            type: Exact
-            value: /v1/messages
+            type: PathPrefix
+            value: /api/customer-profiles
       backendRefs:
-        - group: agentgateway.dev
-          kind: AgentgatewayBackend
-          name: anthropic
+        - name: customer-api
+          port: 8080
 ---
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayPolicy
 metadata:
-  name: tsz-anthropic-messages
+  name: tsz-customer-api
   namespace: ai-platform
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
-      name: anthropic-messages
+      name: customer-api
   traffic:
     extProc:
       conditional:
-        - condition: 'request.path == "/v1/messages"'
+        - condition: 'request.path.startsWith("/api/customer-profiles")'
           policy:
             backendRef:
               name: tsz-ext-proc

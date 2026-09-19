@@ -31,16 +31,6 @@ spec:
         - path:
             type: PathPrefix
             value: /mcp
-      filters:
-        - type: RequestHeaderModifier
-          requestHeaderModifier:
-            set:
-              - name: X-TSZ-Policy
-                value: production-ai
-              - name: X-TSZ-Gateway
-                value: agentgateway-proxy
-              - name: X-TSZ-Route
-                value: mcp-jsonrpc
       backendRefs:
         - group: agentgateway.dev
           kind: AgentgatewayBackend

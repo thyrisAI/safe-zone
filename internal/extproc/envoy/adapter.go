@@ -75,6 +75,7 @@ type envoyStreamState struct {
 	completedSSEEvents  []OpenAISSEEvent
 	streamBufferLimit   int
 	rpcMethod           string
+	contentAdapter      string
 }
 
 func (state *envoyStreamState) setStreamBufferLimit(limit int) {
@@ -108,6 +109,7 @@ func requestFromEnvoy(message *extprocv3.ProcessingRequest, state *envoyStreamSt
 		state.requestHeadersSeen = true
 		state.requestEnded = typed.RequestHeaders.GetEndOfStream()
 		request := contractRequest(StageRequest, headers, nil, attributes)
+		state.contentAdapter = request.ContentAdapter
 		request.EndOfStream = typed.RequestHeaders.GetEndOfStream()
 		return request, envoyRequestHeaders, nil
 	case *extprocv3.ProcessingRequest_ResponseHeaders:
@@ -129,6 +131,7 @@ func requestFromEnvoy(message *extprocv3.ProcessingRequest, state *envoyStreamSt
 		request := contractRequest(StageResponse, headers, nil, attributes)
 		request.RequestPath = FirstHeader(state.request.headers, ":path")
 		request.RPCMethod = state.rpcMethod
+		request.ContentAdapter = state.contentAdapter
 		request.EndOfStream = typed.ResponseHeaders.GetEndOfStream()
 		return request, envoyResponseHeaders, nil
 	case *extprocv3.ProcessingRequest_RequestBody:
@@ -162,6 +165,7 @@ func requestFromEnvoy(message *extprocv3.ProcessingRequest, state *envoyStreamSt
 		request := contractRequest(StageResponse, state.response.headers, typed.ResponseBody.GetBody(), attributes)
 		request.RequestPath = FirstHeader(state.request.headers, ":path")
 		request.RPCMethod = state.rpcMethod
+		request.ContentAdapter = state.contentAdapter
 		request.EndOfStream = typed.ResponseBody.GetEndOfStream()
 		return request, envoyResponseBody, nil
 	case *extprocv3.ProcessingRequest_RequestTrailers, *extprocv3.ProcessingRequest_ResponseTrailers:
@@ -319,13 +323,14 @@ func contractRequest(stage ProcessingStage, headers map[string][]string, body []
 		RequestPath: FirstHeader(headers, ":path"),
 		EnvoyReqID:  requestID, TraceID: traceID, TraceParent: traceParent, Stage: stage,
 		Headers: CloneHeaders(headers), Body: bodyCopy,
-		ContentType: FirstHeader(headers, "content-type"),
-		Gateway:     FirstHeader(headers, "x-tsz-gateway"), Route: FirstHeader(headers, "x-tsz-route"),
+		ContentType:    FirstHeader(headers, "content-type"),
+		ContentAdapter: FirstHeader(headers, "x-tsz-content-adapter"),
+		Gateway:        FirstHeader(headers, "x-tsz-gateway"), Route: FirstHeader(headers, "x-tsz-route"),
 		Tenant:     FirstHeader(headers, "x-tsz-tenant"),
 		Attributes: attributes,
 	}
 	if stage == StageRequest {
-		request.RPCMethod = MCPMethodFromMessage(request.ContentType, body)
+		request.RPCMethod = JSONRPCMethodFromMessage(request.ContentType, body)
 	}
 	return request
 }

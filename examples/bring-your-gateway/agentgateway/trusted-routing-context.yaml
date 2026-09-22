@@ -1,0 +1,90 @@
+# Trusted TSZ routing context for the checked-in agentgateway examples.
+# PreRouting is required: post-routing HTTPRoute header filters run after
+# traffic.extProc and are therefore not visible to TSZ request headers.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: tsz-trusted-routing-context
+  namespace: ai-platform
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: agentgateway-proxy
+      sectionName: http
+  traffic:
+    phase: PreRouting
+    transformation:
+      conditional:
+        - condition: 'request.path == "/v1/chat/completions"'
+          policy:
+            request:
+              set:
+                - name: x-tsz-policy
+                  value: '"production-ai"'
+                - name: x-tsz-gateway
+                  value: '"agentgateway-proxy"'
+                - name: x-tsz-route
+                  value: '"llm-api"'
+              remove:
+                - x-tsz-content-adapter
+        - condition: 'request.path == "/v1/responses"'
+          policy:
+            request:
+              set:
+                - name: x-tsz-policy
+                  value: '"production-ai"'
+                - name: x-tsz-gateway
+                  value: '"agentgateway-proxy"'
+                - name: x-tsz-route
+                  value: '"responses-api"'
+              remove:
+                - x-tsz-content-adapter
+        - condition: 'request.path == "/v1/messages"'
+          policy:
+            request:
+              set:
+                - name: x-tsz-policy
+                  value: '"production-ai"'
+                - name: x-tsz-gateway
+                  value: '"agentgateway-proxy"'
+                - name: x-tsz-route
+                  value: '"anthropic-messages"'
+              remove:
+                - x-tsz-content-adapter
+        - condition: 'request.path.startsWith("/mcp")'
+          policy:
+            request:
+              set:
+                - name: x-tsz-policy
+                  value: '"production-ai"'
+                - name: x-tsz-gateway
+                  value: '"agentgateway-proxy"'
+                - name: x-tsz-route
+                  value: '"mcp-jsonrpc"'
+              remove:
+                - x-tsz-content-adapter
+        - condition: 'request.path.startsWith("/agents/support")'
+          policy:
+            request:
+              set:
+                - name: x-tsz-policy
+                  value: '"production-ai"'
+                - name: x-tsz-gateway
+                  value: '"agentgateway-proxy"'
+                - name: x-tsz-route
+                  value: '"a2a-support-agent"'
+              remove:
+                - x-tsz-content-adapter
+        - condition: 'request.path.startsWith("/api/customer-profiles")'
+          policy:
+            request:
+              set:
+                - name: x-tsz-policy
+                  value: '"production-ai"'
+                - name: x-tsz-gateway
+                  value: '"agentgateway-proxy"'
+                - name: x-tsz-route
+                  value: '"customer-api"'
+                - name: x-tsz-content-adapter
+                  value: '"generic-json"'

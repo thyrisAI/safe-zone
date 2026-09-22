@@ -9,6 +9,7 @@ pass. Evaluation or selection does not mean support.
 | Gateway | Level | Maturity | Tested version | Protocols | Request/response | Streaming | Native attachment |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Envoy Gateway | Level 2 | Preview, supported reference | 1.8.3; Gateway API 1.5.1 | OpenAI Chat Completions, Responses, Anthropic Messages, Gemini, embeddings input, MCP text payloads | Mask, block, audit-only | AsyncAudit visibility; Windowed mask and halt; not zero-leakage | `TSZGuardrailPolicy` to `EnvoyExtensionPolicy` |
+| agentgateway | Compatibility track | Phase 2 complete | 1.5 policy schema; live matrix pending | OpenAI Chat Completions, Responses, Anthropic Messages, MCP, A2A, and generic JSON HTTP content | Buffered request/response mask, block, audit-only | Not yet claimed | Manual `AgentgatewayPolicy`; controller reconciliation pending |
 | Envoy AI Gateway | Compatibility track | Deferred | Not established | Not claimed | Not claimed | Not claimed | Not claimed |
 | Kong Gateway and KIC | Candidate | Selected for validation | Not established | Not claimed | Not claimed | Not claimed | Adapter not shipped |
 | APISIX, NGINX, Traefik, Istio | Evaluation | Planned | Not established | Not claimed | Not claimed | Not claimed | Adapter not shipped |

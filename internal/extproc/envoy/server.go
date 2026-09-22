@@ -52,6 +52,7 @@ func newStreamState() *streamState {
 type Server struct {
 	extprocv3.UnimplementedExternalProcessorServer
 	processor             Processor
+	adapterName           string
 	policyCache           PolicyCache
 	policyResolver        PolicyResolver
 	auditor               guardrails.Auditor
@@ -126,6 +127,9 @@ func (s *Server) Register(server *grpc.Server) {
 }
 
 type ServerSettings struct {
+	// AdapterName is the trusted gateway adapter identity exported in safe
+	// metadata and audit events. The default preserves Envoy Gateway behavior.
+	AdapterName  string
 	FailMode     policy.FailureMode
 	MaxBodyBytes int64
 	// MaxStreamBufferBytes bounds the per-stream SSE parser and window queue.
@@ -139,7 +143,7 @@ type ServerSettings struct {
 }
 
 func defaultServerSettings() ServerSettings {
-	return ServerSettings{FailMode: policy.FailureModeClosed, MaxBodyBytes: 1024 * 1024, MaxStreamBufferBytes: 256 * 1024, ProcessingTimeout: 2 * time.Second}
+	return ServerSettings{AdapterName: "envoy-gateway", FailMode: policy.FailureModeClosed, MaxBodyBytes: 1024 * 1024, MaxStreamBufferBytes: 256 * 1024, ProcessingTimeout: 2 * time.Second}
 }
 
 func NewServer(processor Processor, policyCache PolicyCache, maxConcurrentStreams ...uint32) (*Server, error) {
@@ -186,6 +190,12 @@ func newServer(processor Processor, policyCache PolicyCache, resolver PolicyReso
 		auditor = guardrails.NoopAuditor{}
 	}
 	defaults := defaultServerSettings()
+	if settings.AdapterName == "" {
+		settings.AdapterName = defaults.AdapterName
+	}
+	if settings.AdapterName != strings.TrimSpace(settings.AdapterName) {
+		return nil, errors.New("ext-proc adapter name must not contain surrounding whitespace")
+	}
 	if settings.FailMode == "" {
 		settings.FailMode = defaults.FailMode
 	}
@@ -209,6 +219,7 @@ func newServer(processor Processor, policyCache PolicyCache, resolver PolicyReso
 	}
 	server := &Server{
 		processor:          processor,
+		adapterName:        settings.AdapterName,
 		policyCache:        policyCache,
 		policyResolver:     resolver,
 		auditor:            auditor,
@@ -335,7 +346,7 @@ func (s *Server) Process(stream extprocv3.ExternalProcessor_ProcessServer) error
 		if immediateStatus, exceeded := bodyLimitStatus(kind, request.Headers, request.Body, s.maxBodyBytes); exceeded {
 			s.metricsObserver.IncFailure("body_limit")
 			result := ProcessingResult{Action: ActionBlock, ImmediateStatus: immediateStatus}
-			enrichResultIdentity(&result, request, kind, 0)
+			s.enrichResultIdentity(&result, request, kind, 0)
 			if err := s.auditDecision(ctx, request, result); err != nil {
 				s.metricsObserver.IncFailure("audit")
 			}
@@ -389,7 +400,7 @@ func (s *Server) Process(stream extprocv3.ExternalProcessor_ProcessServer) error
 				// result is marked degraded after processing below.
 				goto processRequest
 			}
-			enrichResultIdentity(&result, request, kind, 0)
+			s.enrichResultIdentity(&result, request, kind, 0)
 			s.metricsObserver.IncFailure("policy_resolution")
 			s.observeDecision(request, result, 0)
 			_ = s.auditDecision(ctx, request, result)
@@ -431,7 +442,7 @@ func (s *Server) Process(stream extprocv3.ExternalProcessor_ProcessServer) error
 		if err := grpcContextError(ctx, nil); err != nil {
 			return err
 		}
-		enrichResultIdentity(&result, request, kind, time.Since(started))
+		s.enrichResultIdentity(&result, request, kind, time.Since(started))
 		if err := s.auditDecision(ctx, request, result); err != nil {
 			s.metricsObserver.IncFailure("audit")
 			// Audit sink failure must not expose or alter content. The pinned
@@ -443,7 +454,7 @@ func (s *Server) Process(stream extprocv3.ExternalProcessor_ProcessServer) error
 				result.Body = nil
 				result.HeaderMutations = nil
 			}
-			enrichResultIdentity(&result, request, kind, time.Since(started))
+			s.enrichResultIdentity(&result, request, kind, time.Since(started))
 		}
 		s.observeDecision(request, result, time.Since(started))
 		response, err := responseToEnvoy(kind, request.Stage, result)
@@ -494,7 +505,7 @@ func (s *Server) processWindowedResponse(ctx context.Context, state *streamState
 	windowProcessor, ok := s.processor.(StreamingWindowProcessor)
 	if !ok {
 		result := s.failureResult(request)
-		enrichResultIdentity(&result, request, envoyResponseBody, 0)
+		s.enrichResultIdentity(&result, request, envoyResponseBody, 0)
 		s.metricsObserver.IncFailure("processor")
 		if err := s.auditDecision(ctx, request, result); err != nil {
 			s.metricsObserver.IncFailure("audit")
@@ -529,14 +540,14 @@ func (s *Server) processWindowedResponse(ctx context.Context, state *streamState
 		// no mutations alongside an error, so never slice a nil result here.
 		mutated = events
 	}
-	enrichResultIdentity(&result, request, envoyResponseBody, 0)
+	s.enrichResultIdentity(&result, request, envoyResponseBody, 0)
 	if err := s.auditDecision(ctx, request, result); err != nil {
 		s.metricsObserver.IncFailure("audit")
 		result.Degraded = true
 		if auditFailureClosed(request) {
 			result = s.failureResult(request)
 		}
-		enrichResultIdentity(&result, request, envoyResponseBody, time.Since(started))
+		s.enrichResultIdentity(&result, request, envoyResponseBody, time.Since(started))
 	}
 	s.observeDecision(request, result, time.Since(started))
 	if result.Action == ActionBlock {
@@ -567,7 +578,7 @@ func (s *Server) enqueueCancellationAudit(ctx context.Context, state *streamStat
 	}
 	event := guardrails.AuditEvent{
 		Timestamp: time.Now().UTC(), EventType: "operational", Reason: reason,
-		RID: state.rid, RequestID: state.envoyReqID, Adapter: "envoy-gateway",
+		RID: state.rid, RequestID: state.envoyReqID, Adapter: s.adapterName,
 		PolicyID: state.policyID,
 	}
 	if state.hasPolicySnapshot {
@@ -632,7 +643,7 @@ func (s *Server) processAsyncAuditJob(workerCtx context.Context, job asyncAuditJ
 		result.Body = nil
 		result.HeaderMutations = nil
 	}
-	enrichResultIdentity(&result, job.request, envoyResponseBody, time.Since(started))
+	s.enrichResultIdentity(&result, job.request, envoyResponseBody, time.Since(started))
 	if err := s.auditDecision(workerCtx, job.request, result); err != nil {
 		s.metricsObserver.IncFailure("audit")
 	}
@@ -669,7 +680,7 @@ func (s *Server) auditResponseWithoutRequestState(ctx context.Context, request P
 	}
 	return s.auditor.Audit(ctx, guardrails.AuditEvent{
 		Timestamp: time.Now().UTC(), EventType: "guardrail_decision", RID: NewBYGRID(), RequestID: request.EnvoyReqID,
-		Adapter: "envoy-gateway", Target: guardrails.BuildAuditTarget("", "", ""),
+		Adapter: s.adapterName, Target: guardrails.BuildAuditTarget("", "", ""),
 		Stage: guardrails.AuditStageResponse, Action: auditAction, Reason: reason, Degraded: degraded,
 	})
 }
@@ -766,12 +777,12 @@ func bodyLimitStatus(kind envoyMessageKind, headers map[string][]string, body []
 	}
 }
 
-func enrichResultIdentity(result *ProcessingResult, request ProcessingRequest, kind envoyMessageKind, latency time.Duration) {
+func (s *Server) enrichResultIdentity(result *ProcessingResult, request ProcessingRequest, kind envoyMessageKind, latency time.Duration) {
 	result.Metadata.RID = request.RID
 	result.Metadata.RequestID = request.EnvoyReqID
 	result.Metadata.PolicyID = request.PolicyID
 	result.Metadata.PolicyVersion = request.PolicyVersion
-	result.Metadata.Adapter = "envoy-gateway"
+	result.Metadata.Adapter = s.adapterName
 	result.Metadata.Stage = request.Stage
 	result.Metadata.Action = result.Action
 	result.Metadata.ProcessorLatencyMS = latency.Milliseconds()
@@ -799,7 +810,7 @@ func (s *Server) auditDecision(ctx context.Context, request ProcessingRequest, r
 	}
 	return s.auditor.Audit(ctx, guardrails.AuditEvent{
 		Timestamp: time.Now().UTC(), EventType: "guardrail_decision", RID: request.RID, RequestID: request.EnvoyReqID, TraceID: request.TraceID,
-		Adapter: "envoy-gateway", Target: guardrails.BuildAuditTarget(request.Gateway, request.Tenant, request.Route),
+		Adapter: s.adapterName, Target: guardrails.BuildAuditTarget(request.Gateway, request.Tenant, request.Route),
 		Gateway: request.Gateway, Route: request.Route, Tenant: request.Tenant,
 		PolicyID: request.PolicyID, PolicyVersion: request.PolicyVersion, Stage: stage,
 		Action: action, Categories: append([]string(nil), result.Metadata.Categories...),

@@ -585,7 +585,7 @@ func isJSONNull(node *jsonNode, body []byte) bool {
 
 func isJSONContentType(contentType string) bool {
 	mediaType, _, err := mime.ParseMediaType(contentType)
-	return err == nil && strings.EqualFold(mediaType, "application/json")
+	return err == nil && (strings.EqualFold(mediaType, "application/json") || strings.EqualFold(mediaType, "application/a2a+json"))
 }
 
 func chatRequestError(kind ChatRequestErrorKind, messageIndex int, path string, err error) *ChatRequestError {

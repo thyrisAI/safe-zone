@@ -214,6 +214,29 @@ annotations. This control does not authorize tool execution or select trusted
 MCP servers; malformed covered content follows the route failure policy. MCP SSE
 and stdio traffic are outside the Envoy adapter's enforcement boundary.
 
+Buffered A2A JSON-RPC messages use a distinct adapter selected before the MCP
+fallback. TSZ checks user message text and structured data, then checks agent
+messages, task status/history, and artifacts on the response. It preserves
+JSON-RPC and task identity, roles, state, metadata, and file bytes or URIs.
+agentgateway owns A2A authentication, routing, Agent Card discovery, and task
+lifecycle. A2A streaming methods are rejected as unsupported so a strict route
+cannot silently forward content that TSZ did not inspect; SSE, REST, gRPC, push
+notifications, and file-content inspection remain outside this boundary.
+
+Generic JSON HTTP inspection is opt-in through the gateway-neutral content
+adapter field. The Envoy-compatible transport obtains it from a route-overwritten
+`X-TSZ-Content-Adapter: generic-json` header and pins it across the request and
+response transaction. It is not an automatic parser fallback. TSZ inspects the
+complete buffered document so schema and semantic validators retain context;
+masked output must remain valid JSON of the same top-level kind. Duplicate keys
+and malformed documents follow the configured failure policy. Route owners must
+overwrite the selector because client-controlled values are outside the trust
+boundary.
+
+On agentgateway, the trusted overwrite is a Gateway-level `PreRouting`
+transformation. Post-routing HTTPRoute header modifiers execute after ExtProc
+and therefore cannot establish policy or adapter identity for TSZ.
+
 #### Trust boundaries and policy authority
 
 - The client is untrusted. Its guardrail or policy headers never select the

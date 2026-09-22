@@ -720,7 +720,9 @@ extension boundary, compatibility and Phase 7 scope.
 #### Response contract
 
 For a strict no-leakage guarantee, use supported buffered, non-streaming OpenAI,
-Anthropic Messages, or Gemini GenerateContent traffic. The request must use
+Anthropic Messages, Gemini GenerateContent, MCP, A2A, or explicitly selected
+generic JSON traffic. The request
+must use
 `Content-Type: application/json`; unsupported content shapes are processing
 failures, not silently allowed content. The portable Envoy BYG `AsyncAudit`
 compiled-policy mode forwards SSE unchanged and performs bounded post-stream observation; it accepts only
@@ -739,6 +741,8 @@ The supported non-streaming content fields are:
 | Responses | String `instructions`, string `input`, `input_text`/`output_text`/`refusal` fields in supported developer/system/user/assistant message content arrays, `function_call.arguments`, and string or multimodal `function_call_output.output` in `input[]` | Assistant `output_text`, `refusal`, and `function_call.arguments` fields in `output[]`; top-level `output_text` is kept consistent when present |
 | Embeddings (OpenAI-compatible) | Non-empty string `input` or non-empty array of non-empty strings; every item is inspected independently | Input-only: vectors, usage and provider errors pass through unchanged |
 | MCP Streamable HTTP | `prompts/get` string arguments and `tools/call` JSON-object arguments | Prompt text and embedded text resources; tool-result text, embedded text resources and `structuredContent` objects |
+| A2A JSON-RPC | User message text and structured-data parts for `tasks/send` or `message/send` | Agent message, task-status message, history, and artifact text or structured-data parts |
+| Generic JSON HTTP | Complete JSON document selected by trusted route configuration | Complete JSON document, including `application/*+json` responses |
 | Anthropic Messages | Top-level string or text-block `system`; user/assistant string and text-block content; `tool_use.input`; string or text-block `tool_result.content` | Assistant text blocks and `tool_use.input` |
 | Gemini GenerateContent | `systemInstruction` and `contents[].parts[].text`; `functionCall.args`, `functionResponse.response`, server `toolCall.args`/`toolResponse.response`, executable code and execution output | The corresponding supported fields in `candidates[].content.parts[]` |
 
@@ -746,9 +750,10 @@ TSZ changes only the extracted text string values and the derived Responses
 API `output_text` value; item order, unknown fields and untouched JSON bytes
 are preserved. Tool names and execution authorization are not changed. Tool
 payloads in streaming events, the bytes or meaning of multimodal image/audio/file
-data, and Responses, Anthropic, or Gemini streaming events are not covered by
-this capability yet. Anthropic requests are selected using the required
-`anthropic-version` header; Gemini requests are selected by their
+data, and Responses, Anthropic, Gemini, MCP, A2A, or generic JSON streaming
+events are not covered by this capability yet. Anthropic requests are selected
+by the `/v1/messages` path or the `anthropic-version` header; Gemini requests are
+selected by their
 `contents`/`systemInstruction` shape.
 
 | Policy action | Envoy result |
@@ -758,7 +763,8 @@ this capability yet. Anthropic requests are selected using the required
 | `MASK` | Replace unsafe supported content fields and update `content-length`. |
 | `BLOCK` | Replace the upstream response with a safe local `403` response. |
 
-This scope does **not** guarantee Responses, Anthropic, Gemini, or MCP streaming enforcement.
+This scope does **not** guarantee Responses, Anthropic, Gemini, MCP, A2A, or
+generic JSON streaming enforcement.
 Configure both request and response bodies as `Buffered`; do not attach this
 profile to a route that requires an unbuffered or Responses SSE safety
 guarantee.
@@ -838,6 +844,61 @@ the gateway and MCP client/server. Configure both request and response bodies as
 `Buffered`. MCP SSE messages, stdio transport, JSON-RPC batching, resource-read
 payloads and binary content inspection are outside this capability.
 
+#### A2A message and task-content guardrails
+
+The BYG processor supports individual, buffered A2A JSON-RPC 2.0 documents. It
+recognizes both the `tasks/send` method exposed by current agentgateway releases
+and the standard `message/send` method. A2A detection runs before the generic
+MCP JSON-RPC fallback, and the request method is retained for response
+interpretation so a response body cannot select another adapter.
+
+Request inspection covers user-message text and structured-data parts. Response
+inspection covers agent messages returned directly or through task status and
+history, plus artifact text and structured-data parts. `ALLOW` and `AUDIT_ONLY`
+preserve the original body. `MASK` changes only extracted content and updates
+`content-length`; `BLOCK` prevents request delivery or response release.
+
+JSON-RPC IDs, task and message IDs, roles, task state, metadata, and unrelated
+fields remain unchanged. File bytes and URIs are preserved without inspection.
+Unknown or ambiguous part variants, malformed covered content, and duplicate
+keys in covered structures are processing errors subject to the configured failure policy.
+Task-management methods and JSON-RPC error responses pass without mutation.
+
+This adapter performs content guardrails only. agentgateway remains responsible
+for A2A routing, authentication, Agent Card discovery, and task lifecycle.
+Configure request and response bodies as `Buffered`. Streaming methods such as
+`message/stream`, `tasks/sendSubscribe`, and `tasks/resubscribe` fail as
+unsupported instead of silently passing. A2A SSE, REST, gRPC, push-notification
+webhooks, and file-content inspection are outside this capability.
+
+#### Generic JSON HTTP guardrails
+
+The BYG processor supports complete, buffered JSON request and response bodies
+when trusted route configuration explicitly selects `generic-json` through the
+gateway-neutral `ProcessingRequest.ContentAdapter` field. The Envoy-compatible
+transport maps the route-overwritten `X-TSZ-Content-Adapter` header into that
+field and retains it for the response. The generic adapter is never an automatic
+fallback, so malformed protocol-specific payloads cannot silently bypass their
+stricter adapters.
+
+The complete JSON document is inspected as one structured value. This preserves
+field relationships for schema, semantic, and AI validators while also applying
+PII, secret, custom-pattern, allowlist, and blocklist rules. JSON objects, arrays,
+and scalar values are accepted with `application/json` or an
+`application/*+json` media type. `ALLOW` and `AUDIT_ONLY` preserve the original
+bytes. A `MASK` result replaces the document only when it remains valid JSON of
+the same top-level kind; request and response `BLOCK` behavior uses the existing
+ExtProc immediate-response contract.
+
+Route owners must overwrite `X-TSZ-Content-Adapter: generic-json` before
+ExtProc runs; a client-supplied selector is not trusted. With agentgateway,
+use a Gateway-level `AgentgatewayPolicy` transformation in the `PreRouting`
+phase because post-routing `HTTPRoute` header filters execute after ExtProc.
+Malformed JSON, duplicate keys, unsupported media types, and invalid masked
+documents are processing errors governed by the stage-specific failure policy.
+Multipart forms, form-encoded bodies, arbitrary text, binary bodies, NDJSON,
+JSON Text Sequences, and streaming JSON are outside this capability.
+
 #### Envoy attachment and runtime settings
 
 The manual attachment requires these fields:
@@ -866,10 +927,12 @@ The manual attachment requires these fields:
 | `TSZ_POLICY_MAX_STALENESS` | `5m` | Maximum age of the last successful reconciliation before `/readyz` returns `503`. |
 | `TSZ_POLICY_RESOLUTION_MODE` | `header` | `header` for the preview profile; `attribute` for the native controller profile. |
 
-Policy identity is never client authority. In the preview profile, Envoy
-overwrites `X-TSZ-Policy` before calling ext_proc. In the native profile, TSZ
-uses Envoy's trusted `xds.route_name` attribute. Do not accept a
-client-supplied policy header as an override.
+Policy identity is never client authority. In the preview profile, the gateway
+overwrites `X-TSZ-Policy` before calling ext_proc. Agentgateway requires a
+Gateway-level `PreRouting` transformation for this; a post-routing HTTPRoute
+filter is not visible to ExtProc. In the native profile, TSZ uses Envoy's
+trusted `xds.route_name` attribute. Do not accept a client-supplied policy
+header as an override.
 
 #### Failures, limits and safe telemetry
 

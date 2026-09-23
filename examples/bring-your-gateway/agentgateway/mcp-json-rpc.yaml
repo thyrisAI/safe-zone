@@ -1,0 +1,64 @@
+# Phase 2 / item 1: buffered MCP JSON-RPC over Streamable HTTP.
+# The referenced mcp-server Service and tsz-ext-proc Service/Deployment are
+# installed separately. The TSZ deployment must set
+# TSZ_GATEWAY_ADAPTER=agentgateway.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: mcp-backend
+  namespace: ai-platform
+spec:
+  mcp:
+    targets:
+      - name: tools
+        static:
+          backendRef:
+            name: mcp-server
+          port: 80
+          path: /mcp
+          protocol: StreamableHTTP
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mcp-jsonrpc
+  namespace: ai-platform
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /mcp
+      backendRefs:
+        - group: agentgateway.dev
+          kind: AgentgatewayBackend
+          name: mcp-backend
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: tsz-mcp-jsonrpc
+  namespace: ai-platform
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mcp-jsonrpc
+  traffic:
+    extProc:
+      conditional:
+        - condition: 'request.path.startsWith("/mcp")'
+          policy:
+            backendRef:
+              name: tsz-ext-proc
+              port: 9002
+            processingOptions:
+              requestHeaderMode: Send
+              responseHeaderMode: Send
+              requestBodyMode: Buffered
+              responseBodyMode: Buffered
+              requestTrailerMode: Skip
+              responseTrailerMode: Skip
+              allowModeOverride: false

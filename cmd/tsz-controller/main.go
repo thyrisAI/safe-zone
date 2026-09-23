@@ -11,9 +11,12 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"thyris-sz/internal/cache"
 	"thyris-sz/internal/config"
 	controller "thyris-sz/internal/controller"
+	"thyris-sz/internal/controller/agentgatewayresource"
 	"thyris-sz/internal/controller/effectivepolicy"
 	"thyris-sz/internal/controller/envoyresource"
 	"thyris-sz/internal/controller/nativeadapter"
@@ -81,7 +84,24 @@ func main() {
 		log.Fatalf("create controller manager: %v", err)
 	}
 
-	adapters, err := nativeadapter.NewRegistry(&envoyresource.EnvoyResourceReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()})
+	installedAdapters := []nativeadapter.Adapter{}
+	_, discoveryErr := mgr.GetRESTMapper().RESTMapping(schema.GroupKind{Group: "gateway.envoyproxy.io", Kind: "EnvoyExtensionPolicy"}, "v1alpha1")
+	if discoveryErr == nil {
+		installedAdapters = append(installedAdapters, &envoyresource.EnvoyResourceReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()})
+	} else if apimeta.IsNoMatchError(discoveryErr) {
+		log.Printf("Envoy Gateway native adapter disabled: EnvoyExtensionPolicy CRD is not installed")
+	} else {
+		log.Fatalf("discover EnvoyExtensionPolicy API: %v", discoveryErr)
+	}
+	_, discoveryErr = mgr.GetRESTMapper().RESTMapping(schema.GroupKind{Group: "agentgateway.dev", Kind: "AgentgatewayPolicy"}, "v1alpha1")
+	if discoveryErr == nil {
+		installedAdapters = append(installedAdapters, &agentgatewayresource.Reconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()})
+	} else if apimeta.IsNoMatchError(discoveryErr) {
+		log.Printf("agentgateway native adapter disabled: AgentgatewayPolicy CRD is not installed")
+	} else {
+		log.Fatalf("discover AgentgatewayPolicy API: %v", discoveryErr)
+	}
+	adapters, err := nativeadapter.NewRegistry(installedAdapters...)
 	if err != nil {
 		log.Fatalf("configure native adapters: %v", err)
 	}

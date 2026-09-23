@@ -1,0 +1,27 @@
+# Native BYG attachment. The TSZ controller compiles this policy, records the
+# trusted route binding, and owns the resulting AgentgatewayPolicy.
+apiVersion: security.thyris.ai/v1beta1
+kind: TSZGuardrailPolicy
+metadata:
+  name: production-ai
+  namespace: ai-platform
+spec:
+  adapter: agentgateway
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: llm-api
+  policySource: Inline
+  request:
+    pii: Mask
+    secret: Block
+    promptInjection: Block
+  response:
+    enabled: true
+    pii: Mask
+    secret: Block
+    unsafeContent: Block
+  failurePolicy:
+    request: FailClosed
+    response: FailClosed
+  processingTimeout: 2s

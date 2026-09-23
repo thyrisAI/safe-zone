@@ -69,6 +69,8 @@ spec:
               value: {{ .Values.envoyGateway.extProc.service.grpcPort | quote }}
             - name: TSZ_FAIL_MODE
               value: {{ .Values.envoyGateway.extProc.config.failMode | quote }}
+            - name: TSZ_GATEWAY_ADAPTER
+              value: {{ .Values.envoyGateway.extProc.config.gatewayAdapter | quote }}
             - name: TSZ_MAX_CONCURRENT_STREAMS
               value: {{ .Values.envoyGateway.extProc.config.maxConcurrentStreams | quote }}
             - name: TSZ_MAX_GRPC_MESSAGE_BYTES

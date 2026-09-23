@@ -40,6 +40,7 @@ type ProviderTextContent struct {
 	start    int
 	end      int
 	rawJSON  bool
+	jsonKind jsonNodeKind
 }
 
 type ProviderContentMutation struct {
@@ -67,7 +68,16 @@ func (p *ProviderPayload) addString(role, path string, node *jsonNode) {
 func (p *ProviderPayload) addJSONObject(role, path string, node *jsonNode) {
 	p.Contents = append(p.Contents, ProviderTextContent{
 		ID: len(p.Contents), Role: role, JSONPath: path,
-		Content: string(p.body[node.start:node.end]), start: node.start, end: node.end, rawJSON: true,
+		Content: string(p.body[node.start:node.end]), start: node.start, end: node.end,
+		rawJSON: true, jsonKind: jsonObject,
+	})
+}
+
+func (p *ProviderPayload) addJSONDocument(role, path string, node *jsonNode) {
+	p.Contents = append(p.Contents, ProviderTextContent{
+		ID: len(p.Contents), Role: role, JSONPath: path,
+		Content: string(p.body[node.start:node.end]), start: node.start, end: node.end,
+		rawJSON: true, jsonKind: node.kind,
 	})
 }
 
@@ -96,7 +106,7 @@ func (p *ProviderPayload) Mutate(mutations []ProviderContentMutation) ([]byte, e
 		if target.rawJSON {
 			parser := jsonSourceParser{source: []byte(mutation.Content)}
 			node, err := parser.parseDocument()
-			if err != nil || node.kind != jsonObject {
+			if err != nil || node.kind != target.jsonKind || hasDuplicateJSONKeys(node) {
 				return nil, providerPayloadError(p.Provider, target.JSONPath, ErrInvalidProviderMutation)
 			}
 			encoded = []byte(mutation.Content)
@@ -133,4 +143,24 @@ func parseProviderDocument(provider, contentType string, body []byte) (*jsonNode
 		return nil, providerPayloadError(provider, "", ErrUnsupportedProviderPayload)
 	}
 	return root, nil
+}
+
+func hasDuplicateJSONKeys(node *jsonNode) bool {
+	if node == nil {
+		return false
+	}
+	if node.duplicateKeys {
+		return true
+	}
+	for _, child := range node.object {
+		if hasDuplicateJSONKeys(child) {
+			return true
+		}
+	}
+	for _, child := range node.array {
+		if hasDuplicateJSONKeys(child) {
+			return true
+		}
+	}
+	return false
 }

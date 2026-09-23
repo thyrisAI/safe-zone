@@ -256,6 +256,31 @@ jobs:
           TSZ_TEST_BEARER_TOKEN: token_admin
         run: go test ./tests/integration/...
 
+  agentgateway-extproc:
+    name: Real agentgateway ExtProc compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Install pinned agentgateway 1.5.0
+        run: |
+          curl --fail --location --retry 3 --output agentgateway-linux-amd64 \
+            https://github.com/agentgateway/agentgateway/releases/download/v1.5.0/agentgateway-linux-amd64
+          echo 'daca5cda76e8c5ab0c1a75912fecf2d6365095403f810db72029c49d14a37e7b  agentgateway-linux-amd64' | sha256sum --check
+          install -m 0755 agentgateway-linux-amd64 "$RUNNER_TEMP/agentgateway"
+          "$RUNNER_TEMP/agentgateway" --version
+
+      - name: Verify real HTTP to ExtProc to backend path
+        env:
+          TSZ_TEST_AGENTGATEWAY_BINARY: ${{ runner.temp }}/agentgateway
+        run: go test ./internal/extproc/envoy -run '^TestLiveAgentgatewayExtProc$' -count=1 -v
+
   smoke-tests:
     name: Smoke / Sanity tests (e2e)
     runs-on: ubuntu-latest

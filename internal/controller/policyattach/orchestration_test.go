@@ -62,7 +62,8 @@ func TestReconcilePublishesPolicySyncedForResolvedPostgresReference(t *testing.T
 	c := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(object).WithIndex(&securityv1beta1.TSZGuardrailPolicy{}, targetRefIndex, targetRefIndexValues).WithObjects(object).Build()
 	target := ResolvedTarget{Kind: "HTTPRoute", Ref: object.Spec.TargetRefs[0], Object: &gatewayv1.HTTPRoute{ObjectMeta: metav1.ObjectMeta{Name: "orders", Namespace: "apps"}}, SectionOK: true}
 	envoy := &recordingEnvoy{}
-	r := NewPolicyAttachmentReconciler(c, staticTargets{targets: []ResolvedTarget{target}}, selector{}, &effectivepolicy.ReferenceResolver{Repo: resolvedReferenceRepository{snapshot: policy.PolicySnapshot{Version: intPointer(4), Status: policy.StatusActive}}}, nil, testRegistry(t, envoy))
+	bindings := &recordingRouteBindings{}
+	r := NewPolicyAttachmentReconciler(c, staticTargets{targets: []ResolvedTarget{target}}, selector{}, &effectivepolicy.ReferenceResolver{Repo: resolvedReferenceRepository{snapshot: policy.PolicySnapshot{Version: intPointer(4), Status: policy.StatusActive}}}, nil, testRegistry(t, envoy)).WithRoutePolicyBindings(bindings)
 	if _, err := r.Reconcile(context.Background(), request(object)); err != nil {
 		t.Fatal(err)
 	}
@@ -71,6 +72,9 @@ func TestReconcilePublishesPolicySyncedForResolvedPostgresReference(t *testing.T
 	condition := findCondition(got.Status.Conditions, securityv1beta1.ConditionPolicySynced)
 	if condition.Status != metav1.ConditionTrue || condition.Reason != securityv1beta1.ReasonSnapshotActive {
 		t.Fatalf("PolicySynced = %+v", condition)
+	}
+	if len(bindings.upserts) != 1 || bindings.upserts[0].PolicyID != "banking" {
+		t.Fatalf("route binding upserts = %+v, want referenced policy banking", bindings.upserts)
 	}
 }
 
@@ -342,6 +346,19 @@ func (r *recordingEnvoy) Reconcile(context.Context, *securityv1beta1.TSZGuardrai
 type recordingOwnership struct {
 	claims   []string
 	releases []string
+}
+
+type recordingRouteBindings struct {
+	upserts []policy.RoutePolicyBinding
+}
+
+func (r *recordingRouteBindings) UpsertRoutePolicy(_ context.Context, _ policy.RouteIdentity, binding policy.RoutePolicyBinding) error {
+	r.upserts = append(r.upserts, binding)
+	return nil
+}
+
+func (*recordingRouteBindings) DeleteRoutePolicy(context.Context, policy.RouteIdentity) error {
+	return nil
 }
 
 func (r *recordingOwnership) ClaimOwnership(_ context.Context, policyName string, _ *string, _, _ string) error {

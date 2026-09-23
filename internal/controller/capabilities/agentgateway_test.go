@@ -30,7 +30,7 @@ func TestAgentgatewayBufferedContentCapabilities(t *testing.T) {
 	}
 }
 
-func TestAgentgatewayBufferedContentProfileDoesNotOverclaimLaterPhases(t *testing.T) {
+func TestAgentgatewayBufferedContentProfileDoesNotOverclaimStreaming(t *testing.T) {
 	streaming := securityv1beta1.TSZGuardrailPolicySpec{
 		Streaming: &securityv1beta1.StreamingSpec{Enabled: true, Mode: string(StreamingWindowed)},
 	}
@@ -38,7 +38,7 @@ func TestAgentgatewayBufferedContentProfileDoesNotOverclaimLaterPhases(t *testin
 		t.Fatalf("streaming negotiation error = %v, want ErrUnsupportedCapability", err)
 	}
 
-	if AgentgatewayBufferedContentCapabilities.NativePolicyAttachment {
-		t.Fatal("profile claims automatic native policy reconciliation before it is implemented")
+	if !AgentgatewayBufferedContentCapabilities.NativePolicyAttachment {
+		t.Fatal("profile does not claim the installed native AgentgatewayPolicy reconciler")
 	}
 }

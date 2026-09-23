@@ -199,12 +199,12 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				policy.Status.PolicyVersion = &version
 			}
 			policy.Status.EffectivePolicyID = dbPolicyName
-			if r.routeBindings != nil {
-				if err := r.routeBindings.UpsertRoutePolicy(ctx, adapter.RouteIdentity(target.Ref, target.Object), extprocpolicy.RoutePolicyBinding{PolicyID: dbPolicyName}); err != nil {
-					return r.ownershipUnavailable(ctx, policy, err)
-				}
-			}
 			securityv1beta1.SetStatusCondition(&policy.Status.Conditions, metav1.Condition{Type: securityv1beta1.ConditionPolicySynced, Status: metav1.ConditionTrue, Reason: securityv1beta1.ReasonSnapshotActive, Message: "activation published; per-replica confirmation not yet implemented", ObservedGeneration: policy.Generation})
+		}
+		if r.routeBindings != nil && policy.Status.EffectivePolicyID != "" {
+			if err := r.routeBindings.UpsertRoutePolicy(ctx, adapter.RouteIdentity(target.Ref, target.Object), extprocpolicy.RoutePolicyBinding{PolicyID: policy.Status.EffectivePolicyID}); err != nil {
+				return r.ownershipUnavailable(ctx, policy, err)
+			}
 		}
 		_, err = adapter.Reconcile(ctx, policy, target.Ref, nativeadapter.EffectivePolicy{ProcessingTimeout: policy.Spec.ProcessingTimeoutOrDefault(), FailOpen: policy.Spec.FailOpen(), NegotiatedCapabilities: negotiation.Clone()})
 		if err != nil {

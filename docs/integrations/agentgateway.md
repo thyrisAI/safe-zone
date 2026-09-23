@@ -5,11 +5,15 @@
 The current compatibility slice supports buffered, non-streaming OpenAI Chat
 Completions, OpenAI Responses API, and Anthropic Messages-compatible payloads
 and targets the agentgateway 1.5 policy schema. Its Envoy ExtProc wire
-compatibility is covered in-process; a live agentgateway compatibility matrix
-is not yet claimed. The three payload-family items in Phase 1 and the buffered
+compatibility is covered in-process. CI also runs a real agentgateway 1.5.0
+standalone proxy against TSZ's ExtProc server for buffered OpenAI Chat
+Completions and generic JSON request and response masking, plus immediate
+request blocking. The controller reconciliation path is covered against the
+agentgateway 1.5 policy schema; a live Kubernetes compatibility matrix is not
+yet claimed. The three
+payload-family items in Phase 1 and the buffered
 MCP, A2A, and generic JSON HTTP items from Phase 2 in issue #50 are implemented.
-Streaming and automatic TSZ controller reconciliation remain outside this
-slice.
+Streaming remains outside this slice.
 
 ## Architecture
 
@@ -30,6 +34,44 @@ Set `TSZ_GATEWAY_ADAPTER=agentgateway` on the TSZ ExtProc deployment. This
 trusted startup setting labels safe metadata and audit events correctly; it is
 not derived from client traffic. The default remains `envoy-gateway` for
 backwards compatibility.
+
+## Native policy attachment
+
+The TSZ controller registers `agentgateway` as a native adapter. Apply the
+[native TSZ policy example](../../examples/bring-your-gateway/agentgateway/native-tsz-policy.yaml)
+to a `Gateway` or `HTTPRoute` target. The controller compiles the policy,
+records its trusted route binding, and creates one deterministic
+`AgentgatewayPolicy` owned by the `TSZGuardrailPolicy`.
+
+The generated policy uses buffered request and response bodies, sends headers,
+skips trailers, disables ExtProc mode overrides, and maps TSZ `FailOpen` or
+`FailClosed` to agentgateway's `failureMode`. It supplies gateway, listener,
+route, and rule identity through ExtProc `requestAttributes`; client headers do
+not choose the native policy. Deleting the TSZ policy garbage-collects the
+owned agentgateway resource. Conflicts and unsupported streaming requests are
+rejected by the shared controller admission path.
+
+The controller service account requires create, update, watch, and delete
+permissions for `agentgatewaypolicies.agentgateway.dev`. The Helm native BYG
+RBAC includes these permissions. Install the agentgateway CRDs before starting
+the TSZ controller. If discovery cannot find the served
+`agentgateway.dev/v1alpha1` resource, the controller disables only this adapter
+and continues serving installed adapters; restart it after installing the CRD.
+
+Enable the shared native BYG components and label ExtProc telemetry correctly:
+
+```sh
+helm upgrade --install thyris-sz deployment/helm/thyris-sz \
+  --set envoyGateway.enabled=true \
+  --set envoyGateway.mode=native \
+  --set envoyGateway.extProc.config.gatewayAdapter=agentgateway
+```
+
+`processingTimeout` remains part of the TSZ policy contract, but agentgateway
+1.5 has no timeout field on `traffic.extProc`. Configure the TSZ Service backend
+deadline with a separate Service-targeted agentgateway backend policy when a
+gateway-enforced deadline is required. This limitation does not change the
+generated ExtProc failure mode.
 
 ## OpenAI Chat Completions
 
@@ -157,8 +199,9 @@ route owner must overwrite `X-TSZ-Policy` in a Gateway-level `PreRouting`
 transformation; a client-supplied value is never an authoritative policy
 identifier. A normal `HTTPRoute` request-header filter executes too late for
 agentgateway ExtProc, whose policy stage precedes post-routing transformations.
-Native route bindings and automatic `AgentgatewayPolicy` generation will
-replace this manual mapping in a later phase.
+Manual manifests can continue using this mapping. Native controller-managed
+attachments instead send controller-owned identity through ExtProc request
+attributes and resolve it through the route binding store.
 
 TSZ's configured request and response failure modes remain authoritative.
 Use fail-closed for workloads where uninspected content must not pass. A block
@@ -197,3 +240,20 @@ go test ./internal/extproc/envoy -run AgentgatewayGenericJSONCompatibility
 
 See the [example README](../../examples/bring-your-gateway/agentgateway/README.md)
 for the current prerequisites, request, and known limitations.
+
+CI downloads and checksum-verifies the pinned agentgateway 1.5.0 Linux binary,
+then runs `TestLiveAgentgatewayExtProc`. To run the same test locally, set
+`TSZ_TEST_AGENTGATEWAY_BINARY` to an agentgateway 1.5.0 binary and run:
+
+```sh
+go test ./internal/extproc/envoy -run '^TestLiveAgentgatewayExtProc$' -count=1 -v
+```
+
+This test starts agentgateway, the TSZ gRPC server, and a local HTTP backend.
+It checks the actual HTTP request and response mutations and confirms a blocked
+request does not reach the backend. The standalone fixture supplies policy and
+content-adapter headers directly. Native controller tests cover
+`AgentgatewayPolicy` generation, trusted identity attributes, failure mode,
+ownership, updates, and deletion. A live Kubernetes matrix and the other four
+payload families still need live cluster coverage before a stable compatibility
+claim.

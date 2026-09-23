@@ -51,6 +51,12 @@ not choose the native policy. Deleting the TSZ policy garbage-collects the
 owned agentgateway resource. Conflicts and unsupported streaming requests are
 rejected by the shared controller admission path.
 
+Agentgateway exposes one `failureMode` for the whole ExtProc attachment. Set
+`failurePolicy.request` and `failurePolicy.response` to the same value. A mixed
+pair is rejected with `UnsupportedCapability` before the controller creates or
+updates an `AgentgatewayPolicy`; it is never collapsed to `FailOpen` in a way
+that weakens the fail-closed direction.
+
 The controller service account requires create, update, watch, and delete
 permissions for `agentgatewaypolicies.agentgateway.dev`. The Helm native BYG
 RBAC includes these permissions. Install the agentgateway CRDs before starting

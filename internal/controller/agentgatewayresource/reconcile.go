@@ -107,7 +107,9 @@ func BuildAgentgatewayPolicy(owner *securityv1beta1.TSZGuardrailPolicy, target g
 		attributes["xds.route_rule_name"] = strconv.Quote(identity.Rule)
 	}
 	failureMode := "FailClosed"
-	if effective.FailOpen {
+	// agentgateway exposes one mode for both directions. Capability negotiation
+	// rejects mixed modes; require both here as a defense against direct callers.
+	if effective.RequestFailOpen && effective.ResponseFailOpen {
 		failureMode = "FailOpen"
 	}
 	extProc := map[string]any{

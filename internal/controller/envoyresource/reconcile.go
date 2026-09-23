@@ -58,7 +58,9 @@ func BuildEnvoyExtensionPolicy(owner *securityv1beta1.TSZGuardrailPolicy, target
 	if timeout <= 0 {
 		timeout = owner.Spec.ProcessingTimeoutOrDefault()
 	}
-	failOpen := effective.FailOpen
+	// Envoy exposes one flag for both directions. Capability negotiation rejects
+	// mixed modes; require both here as a defense against direct callers.
+	failOpen := effective.RequestFailOpen && effective.ResponseFailOpen
 	messageTimeout := gatewayv1.Duration(timeout.String())
 	group, kind, port := gatewayv1.Group(""), gatewayv1.Kind("Service"), gatewayv1.PortNumber(9002)
 	return &egv1alpha1.EnvoyExtensionPolicy{

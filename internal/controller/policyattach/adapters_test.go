@@ -157,7 +157,7 @@ func TestSelectedAdapterOwnsResourcesAndConflictsAreAdapterScoped(t *testing.T) 
 }
 
 func TestUnsupportedAdapterNeverProgramsAndPreservesExistingResources(t *testing.T) {
-	for _, scenario := range []string{"unknown", "inline mask", "snapshot mask", "target", "section"} {
+	for _, scenario := range []string{"unknown", "inline mask", "inline split failure", "snapshot mask", "snapshot split failure", "target", "section"} {
 		t.Run(scenario, func(t *testing.T) {
 			object := compilingInlinePolicy("policy", target("HTTPRoute", "orders", nil))
 			object.UID, object.Spec.Adapter = "owner-uid", "test-gateway"
@@ -168,11 +168,17 @@ func TestUnsupportedAdapterNeverProgramsAndPreservesExistingResources(t *testing
 				object.Spec.Adapter = "uninstalled"
 			case "inline mask":
 				native.caps.RequestBodyMutation = false
+			case "inline split failure":
+				object.Spec.FailurePolicy = security.FailurePolicySpec{Request: security.FailureModeClosed, Response: security.FailureModeOpen}
 			case "snapshot mask":
 				object.Spec.PolicySource, object.Spec.Request, object.Spec.Response = security.PolicySourcePostgresRef, nil, nil
 				object.Spec.PolicyRef = &security.PolicyReference{Name: "banking", Version: new(int32(1))}
 				native.caps.ResponseBodyMutation = false
 				r.referenceResolver = &effectivepolicy.ReferenceResolver{Repo: resolvedReferenceRepository{snapshot: policy.PolicySnapshot{Version: intPointer(1), Status: policy.StatusActive, Definition: policy.PolicyDefinition{Response: policy.ResponsePolicy{Enabled: true, PII: policy.ActionMask}}}}}
+			case "snapshot split failure":
+				object.Spec.PolicySource, object.Spec.Request, object.Spec.Response = security.PolicySourcePostgresRef, nil, nil
+				object.Spec.PolicyRef = &security.PolicyReference{Name: "banking", Version: new(int32(1))}
+				r.referenceResolver = &effectivepolicy.ReferenceResolver{Repo: resolvedReferenceRepository{snapshot: policy.PolicySnapshot{Version: intPointer(1), Status: policy.StatusActive, Definition: policy.PolicyDefinition{FailurePolicy: policy.FailurePolicy{Request: policy.FailureModeClosed, Response: policy.FailureModeOpen}}}}}
 			case "target":
 				object.Spec.TargetRefs[0].Kind = "GRPCRoute"
 			case "section":

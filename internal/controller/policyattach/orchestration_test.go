@@ -63,7 +63,13 @@ func TestReconcilePublishesPolicySyncedForResolvedPostgresReference(t *testing.T
 	target := ResolvedTarget{Kind: "HTTPRoute", Ref: object.Spec.TargetRefs[0], Object: &gatewayv1.HTTPRoute{ObjectMeta: metav1.ObjectMeta{Name: "orders", Namespace: "apps"}}, SectionOK: true}
 	envoy := &recordingEnvoy{}
 	bindings := &recordingRouteBindings{}
-	r := NewPolicyAttachmentReconciler(c, staticTargets{targets: []ResolvedTarget{target}}, selector{}, &effectivepolicy.ReferenceResolver{Repo: resolvedReferenceRepository{snapshot: policy.PolicySnapshot{Version: intPointer(4), Status: policy.StatusActive}}}, nil, testRegistry(t, envoy)).WithRoutePolicyBindings(bindings)
+	r := NewPolicyAttachmentReconciler(c, staticTargets{targets: []ResolvedTarget{target}}, selector{}, &effectivepolicy.ReferenceResolver{Repo: resolvedReferenceRepository{snapshot: policy.PolicySnapshot{
+		Version: intPointer(4), Status: policy.StatusActive,
+		Definition: policy.PolicyDefinition{
+			FailurePolicy: policy.FailurePolicy{Request: policy.FailureModeOpen, Response: policy.FailureModeOpen},
+			Limits:        policy.Limits{ProcessingTimeoutMS: 1750},
+		},
+	}}}, nil, testRegistry(t, envoy)).WithRoutePolicyBindings(bindings)
 	if _, err := r.Reconcile(context.Background(), request(object)); err != nil {
 		t.Fatal(err)
 	}
@@ -75,6 +81,9 @@ func TestReconcilePublishesPolicySyncedForResolvedPostgresReference(t *testing.T
 	}
 	if len(bindings.upserts) != 1 || bindings.upserts[0].PolicyID != "banking" {
 		t.Fatalf("route binding upserts = %+v, want referenced policy banking", bindings.upserts)
+	}
+	if !envoy.effective.RequestFailOpen || !envoy.effective.ResponseFailOpen || envoy.effective.ProcessingTimeout != 1750*time.Millisecond {
+		t.Fatalf("effective native settings = %+v, want snapshot failure policy and timeout", envoy.effective)
 	}
 }
 
@@ -335,11 +344,13 @@ func (missingRepository) PolicyByName(context.Context, string, *string) (policy.
 
 type recordingEnvoy struct {
 	envoyresource.EnvoyResourceReconciler
-	calls int
+	calls     int
+	effective nativeadapter.EffectivePolicy
 }
 
-func (r *recordingEnvoy) Reconcile(context.Context, *securityv1beta1.TSZGuardrailPolicy, gatewayv1alpha2.LocalPolicyTargetReferenceWithSectionName, envoyresource.EffectivePolicy) (controllerutil.OperationResult, error) {
+func (r *recordingEnvoy) Reconcile(_ context.Context, _ *securityv1beta1.TSZGuardrailPolicy, _ gatewayv1alpha2.LocalPolicyTargetReferenceWithSectionName, effective envoyresource.EffectivePolicy) (controllerutil.OperationResult, error) {
 	r.calls++
+	r.effective = effective
 	return controllerutil.OperationResultCreated, nil
 }
 

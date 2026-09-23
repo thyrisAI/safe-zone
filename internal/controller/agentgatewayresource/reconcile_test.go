@@ -36,8 +36,10 @@ func TestBuildAgentgatewayPolicyUsesBufferedExtProcAndTrustedIdentity(t *testing
 	assertNested(t, object.Object, `"llm-api"`, "spec", "traffic", "extProc", "requestAttributes", "xds.route_name")
 	assertNested(t, object.Object, `"chat"`, "spec", "traffic", "extProc", "requestAttributes", "xds.route_rule_name")
 
-	failOpen := agentgatewayresource.BuildAgentgatewayPolicy(owner, target, nativeadapter.EffectivePolicy{FailOpen: true}, policy.RouteIdentity{Route: "llm-api"})
+	failOpen := agentgatewayresource.BuildAgentgatewayPolicy(owner, target, nativeadapter.EffectivePolicy{RequestFailOpen: true, ResponseFailOpen: true}, policy.RouteIdentity{Route: "llm-api"})
 	assertNested(t, failOpen.Object, "FailOpen", "spec", "traffic", "extProc", "failureMode")
+	mixed := agentgatewayresource.BuildAgentgatewayPolicy(owner, target, nativeadapter.EffectivePolicy{ResponseFailOpen: true}, policy.RouteIdentity{Route: "llm-api"})
+	assertNested(t, mixed.Object, "FailClosed", "spec", "traffic", "extProc", "failureMode")
 }
 
 func TestReconcileAndOwnedRemoval(t *testing.T) {
@@ -68,7 +70,7 @@ func TestReconcileAndOwnedRemoval(t *testing.T) {
 	}
 	assertNested(t, created.Object, `"ai-gateway"`, "spec", "traffic", "extProc", "requestAttributes", "xds.gateway_name")
 	assertNested(t, created.Object, `"https"`, "spec", "traffic", "extProc", "requestAttributes", "xds.listener_name")
-	if _, err := reconciler.Reconcile(context.Background(), owner, target, nativeadapter.EffectivePolicy{FailOpen: true}); err != nil {
+	if _, err := reconciler.Reconcile(context.Background(), owner, target, nativeadapter.EffectivePolicy{RequestFailOpen: true, ResponseFailOpen: true}); err != nil {
 		t.Fatal(err)
 	}
 	if err := kubeClient.Get(context.Background(), clientKey(created), created); err != nil {

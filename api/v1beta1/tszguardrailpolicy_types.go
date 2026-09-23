@@ -163,10 +163,12 @@ func (s TSZGuardrailPolicySpec) ProcessingTimeoutOrDefault() time.Duration {
 	return s.ProcessingTimeout.Duration
 }
 
-// FailOpen reports whether either request or response handling explicitly
-// opts into fail-open. Omitted failurePolicy defaults to fail-closed.
+// FailOpen reports whether both request and response handling explicitly opt
+// into fail-open. Native adapters with one global failure mode must reject a
+// mixed pair; requiring both here prevents a fail-closed direction from being
+// silently weakened. Omitted failurePolicy defaults to fail-closed.
 func (s TSZGuardrailPolicySpec) FailOpen() bool {
-	return s.FailurePolicy.Request == FailureModeOpen || s.FailurePolicy.Response == FailureModeOpen
+	return s.FailurePolicy.Request == FailureModeOpen && s.FailurePolicy.Response == FailureModeOpen
 }
 
 // StreamingSpec configures best-effort streaming enforcement for an

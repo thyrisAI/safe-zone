@@ -18,7 +18,7 @@ type AdapterCapabilities struct {
 	RequestHeaders, RequestBufferedBody, RequestBodyMutation, ImmediateResponse bool
 	ResponseBufferedBody, ResponseBodyMutation                                  bool
 	ResponseStreaming                                                           StreamingCapability
-	DynamicMetadata, NativePolicyAttachment                                     bool
+	DynamicMetadata, NativePolicyAttachment, IndependentFailurePolicy           bool
 }
 
 // Capability is a security-relevant behavior that a policy may require from a
@@ -36,6 +36,7 @@ const (
 	CapabilityResponseBodyMutation      Capability = "responseBodyMutation"
 	CapabilityResponseStreamingWindowed Capability = "responseStreaming:Windowed"
 	CapabilityDynamicMetadata           Capability = "dynamicMetadata"
+	CapabilityIndependentFailurePolicy  Capability = "independentRequestResponseFailurePolicy"
 )
 
 var (
@@ -127,9 +128,10 @@ func NegotiateSpec(spec securityv1beta1.TSZGuardrailPolicySpec, offered AdapterC
 // bypassing adapter admission.
 func NegotiateDefinition(def policy.PolicyDefinition, offered AdapterCapabilities) (Negotiation, error) {
 	spec := securityv1beta1.TSZGuardrailPolicySpec{
-		Request:   &securityv1beta1.RequestPolicySpec{PII: apiAction(def.Request.PII), Secret: apiAction(def.Request.Secret), PromptInjection: apiAction(def.Request.PromptInjection)},
-		Response:  &securityv1beta1.ResponsePolicySpec{Enabled: def.Response.Enabled, PII: apiAction(def.Response.PII), Secret: apiAction(def.Response.Secret), UnsafeContent: apiAction(def.Response.UnsafeContent)},
-		Streaming: &securityv1beta1.StreamingSpec{Enabled: def.Streaming.Mode == policy.StreamingModeWindowed, Mode: def.Streaming.Mode},
+		Request:       &securityv1beta1.RequestPolicySpec{PII: apiAction(def.Request.PII), Secret: apiAction(def.Request.Secret), PromptInjection: apiAction(def.Request.PromptInjection)},
+		Response:      &securityv1beta1.ResponsePolicySpec{Enabled: def.Response.Enabled, PII: apiAction(def.Response.PII), Secret: apiAction(def.Response.Secret), UnsafeContent: apiAction(def.Response.UnsafeContent)},
+		FailurePolicy: securityv1beta1.FailurePolicySpec{Request: apiFailureMode(def.FailurePolicy.Request), Response: apiFailureMode(def.FailurePolicy.Response)},
+		Streaming:     &securityv1beta1.StreamingSpec{Enabled: def.Streaming.Mode == policy.StreamingModeWindowed, Mode: def.Streaming.Mode},
 	}
 	return NegotiateSpec(spec, offered)
 }
@@ -148,6 +150,9 @@ func CheckDefinition(def policy.PolicyDefinition, caps AdapterCapabilities) erro
 
 func requirementsForSpec(spec securityv1beta1.TSZGuardrailPolicySpec) (Requirements, error) {
 	required := Requirements{CapabilityNativePolicyAttachment, CapabilityRequestHeaders, CapabilityRequestBufferedBody}
+	if failureModeOrDefault(spec.FailurePolicy.Request) != failureModeOrDefault(spec.FailurePolicy.Response) {
+		required = append(required, CapabilityIndependentFailurePolicy)
+	}
 	if spec.Request != nil {
 		required = appendActionRequirements(required, true, spec.Request.PII, spec.Request.Secret, spec.Request.PromptInjection)
 	}
@@ -217,9 +222,25 @@ func supports(caps AdapterCapabilities, capability Capability) bool {
 		return caps.ResponseStreaming == StreamingWindowed
 	case CapabilityDynamicMetadata:
 		return caps.DynamicMetadata
+	case CapabilityIndependentFailurePolicy:
+		return caps.IndependentFailurePolicy
 	default:
 		return false
 	}
+}
+
+func failureModeOrDefault(mode securityv1beta1.FailureMode) securityv1beta1.FailureMode {
+	if mode == "" {
+		return securityv1beta1.FailureModeClosed
+	}
+	return mode
+}
+
+func apiFailureMode(mode policy.FailureMode) securityv1beta1.FailureMode {
+	if mode == policy.FailureModeOpen {
+		return securityv1beta1.FailureModeOpen
+	}
+	return securityv1beta1.FailureModeClosed
 }
 
 func apiAction(action policy.Action) securityv1beta1.PolicyAction {

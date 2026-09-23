@@ -155,9 +155,20 @@ schema and semantic validators retain full context. Objects, arrays, and scalar
 values are accepted for `application/json` and `application/*+json`. A masked
 document must remain valid JSON with the same top-level kind.
 
-Streaming and automatic `AgentgatewayPolicy` reconciliation are not claimed by
-these examples. MCP SSE, batches, and stdio transport are outside this buffered
-JSON profile. A2A streaming/SSE, REST, gRPC, push-notification webhooks, and file
+The [native TSZ policy](native-tsz-policy.yaml) demonstrates controller-owned
+`AgentgatewayPolicy` reconciliation for the `llm-api` route. Install the TSZ
+CRD, agentgateway CRDs, and controller, then apply the route manifest followed
+by this policy. Verify both resources and their ownership with:
+
+```sh
+kubectl -n ai-platform get tszguardrailpolicy production-ai
+kubectl -n ai-platform get agentgatewaypolicy
+kubectl -n ai-platform get agentgatewaypolicy -o jsonpath='{range .items[*].metadata.ownerReferences[*]}{.kind}/{.name}{"\n"}{end}'
+```
+
+Streaming is not claimed by these examples. MCP SSE, batches, and stdio
+transport are outside this buffered JSON profile. A2A streaming/SSE, REST,
+gRPC, push-notification webhooks, and file
 inspection are also outside it. `/v1/messages/count_tokens` is a separate route
 and remains outside this compatibility slice. Multipart, form, binary, NDJSON,
 JSON Text Sequences, and streaming JSON are not handled by the generic adapter.

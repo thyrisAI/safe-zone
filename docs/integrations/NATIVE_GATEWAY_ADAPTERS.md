@@ -89,6 +89,12 @@ impossible combinations such as body mutation without body inspection prevent
 the controller from starting with that adapter. This keeps capability failures
 deterministic and prevents a malformed declaration from weakening admission.
 
+Failure behavior is negotiated too. Envoy Gateway and agentgateway each expose
+one failure mode for an entire ExtProc attachment, while the TSZ API can express
+separate request and response modes. These adapters reject a mixed pair as the
+missing `independentRequestResponseFailurePolicy` capability before any native
+resource write. Equal `FailClosed` or equal `FailOpen` values are supported.
+
 An unsupported name, target scope or enforcement requirement reports
 `Accepted=False` and `Programmed=False`, reason `UnsupportedCapability`, with
 the observed generation. Existing resources remain intact on this rejection;

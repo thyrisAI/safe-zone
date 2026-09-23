@@ -710,9 +710,10 @@ evidence, storage migration, supported rollback and the remaining GA feedback ga
 `TSZGuardrailPolicy.spec.adapter` selects an installed native adapter. It defaults
 to `envoy-gateway`, accepts a DNS-label name up to 63 characters, and is immutable.
 Both served API versions expose the same field. The shipped controller registers
-only `envoy-gateway`; other names report `Accepted=False` and `Programmed=False`
-with reason `UnsupportedCapability`. Requested actions and target/section scopes
-must be supported by that adapter, including actions in referenced snapshots.
+`envoy-gateway` and `agentgateway` when their CRDs are discoverable; other names
+report `Accepted=False` and `Programmed=False` with reason
+`UnsupportedCapability`. Requested actions, failure behavior, and target/section
+scopes must be supported by that adapter, including values in referenced snapshots.
 Existing native resources remain unchanged when a new generation is rejected.
 See [native adapter selection](integrations/NATIVE_GATEWAY_ADAPTERS.md) for the
 extension boundary, compatibility and Phase 7 scope.

@@ -19,7 +19,8 @@ import (
 // EffectivePolicy contains validated data-plane attachment settings.
 type EffectivePolicy struct {
 	ProcessingTimeout      time.Duration
-	FailOpen               bool
+	RequestFailOpen        bool
+	ResponseFailOpen       bool
 	NegotiatedCapabilities capabilities.Negotiation
 }
 

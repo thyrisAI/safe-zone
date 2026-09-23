@@ -8,8 +8,8 @@ package capabilities
 // transport can inspect and mutate buffered OpenAI Chat Completions, OpenAI
 // Responses, Anthropic Messages, MCP JSON-RPC, A2A JSON-RPC, and explicitly
 // selected generic JSON requests and responses and can return an immediate
-// response. Native TSZ controller reconciliation and streaming are not claimed
-// until their own phases are implemented and tested.
+// response. The TSZ controller also reconciles buffered AgentgatewayPolicy
+// attachments. Streaming remains unclaimed until it is implemented and tested.
 var AgentgatewayBufferedContentCapabilities = AdapterCapabilities{
 	Name:                   "agentgateway",
 	Version:                "1.0.0",
@@ -21,7 +21,7 @@ var AgentgatewayBufferedContentCapabilities = AdapterCapabilities{
 	ResponseBodyMutation:   true,
 	ResponseStreaming:      StreamingNone,
 	DynamicMetadata:        true,
-	NativePolicyAttachment: false,
+	NativePolicyAttachment: true,
 }
 
 // AgentgatewayBufferedLLMCapabilities is retained for source compatibility.

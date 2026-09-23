@@ -121,6 +121,11 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			return r.unsupportedAdapter(ctx, policy, err)
 		}
 	}
+	effective := nativeadapter.EffectivePolicy{
+		ProcessingTimeout: policy.Spec.ProcessingTimeoutOrDefault(),
+		RequestFailOpen:   policy.Spec.FailurePolicy.Request == securityv1beta1.FailureModeOpen,
+		ResponseFailOpen:  policy.Spec.FailurePolicy.Response == securityv1beta1.FailureModeOpen,
+	}
 
 	resolved := r.targetResolver.ResolveTargets(ctx, policy)
 	// A failing reference never changes a last-known-good native policy.
@@ -133,6 +138,11 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		negotiation, err = capabilities.NegotiateDefinition(result.Snapshot.Definition, descriptor.Capabilities)
 		if err != nil {
 			return r.unsupportedAdapter(ctx, policy, err)
+		}
+		effective.RequestFailOpen = result.Snapshot.Definition.FailurePolicy.Request == extprocpolicy.FailureModeOpen
+		effective.ResponseFailOpen = result.Snapshot.Definition.FailurePolicy.Response == extprocpolicy.FailureModeOpen
+		if timeout := result.Snapshot.Definition.Limits.ProcessingTimeoutMS; timeout > 0 {
+			effective.ProcessingTimeout = time.Duration(timeout) * time.Millisecond
 		}
 		if result.Snapshot.Version != nil {
 			version := *result.Snapshot.Version
@@ -199,14 +209,15 @@ func (r *PolicyAttachmentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				policy.Status.PolicyVersion = &version
 			}
 			policy.Status.EffectivePolicyID = dbPolicyName
-			if r.routeBindings != nil {
-				if err := r.routeBindings.UpsertRoutePolicy(ctx, adapter.RouteIdentity(target.Ref, target.Object), extprocpolicy.RoutePolicyBinding{PolicyID: dbPolicyName}); err != nil {
-					return r.ownershipUnavailable(ctx, policy, err)
-				}
-			}
 			securityv1beta1.SetStatusCondition(&policy.Status.Conditions, metav1.Condition{Type: securityv1beta1.ConditionPolicySynced, Status: metav1.ConditionTrue, Reason: securityv1beta1.ReasonSnapshotActive, Message: "activation published; per-replica confirmation not yet implemented", ObservedGeneration: policy.Generation})
 		}
-		_, err = adapter.Reconcile(ctx, policy, target.Ref, nativeadapter.EffectivePolicy{ProcessingTimeout: policy.Spec.ProcessingTimeoutOrDefault(), FailOpen: policy.Spec.FailOpen(), NegotiatedCapabilities: negotiation.Clone()})
+		if r.routeBindings != nil && policy.Status.EffectivePolicyID != "" {
+			if err := r.routeBindings.UpsertRoutePolicy(ctx, adapter.RouteIdentity(target.Ref, target.Object), extprocpolicy.RoutePolicyBinding{PolicyID: policy.Status.EffectivePolicyID}); err != nil {
+				return r.ownershipUnavailable(ctx, policy, err)
+			}
+		}
+		effective.NegotiatedCapabilities = negotiation.Clone()
+		_, err = adapter.Reconcile(ctx, policy, target.Ref, effective)
 		if err != nil {
 			return ctrl.Result{}, err
 		}

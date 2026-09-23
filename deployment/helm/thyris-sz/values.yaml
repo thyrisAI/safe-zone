@@ -166,6 +166,8 @@ envoyGateway:
       healthPort: 8080
     config:
       failMode: closed
+      # Use agentgateway when the native AgentgatewayPolicy adapter is selected.
+      gatewayAdapter: envoy-gateway
       maxConcurrentStreams: "100"
       maxGrpcMessageBytes: "4194304"
       maxBodyBytes: "1048576"

@@ -6,6 +6,7 @@ const navItems = [
   { label: 'Patterns', path: '/patterns' },
   { label: 'Guardrails', path: '/guardrails' },
   { label: 'Events', path: '/events' },
+  { label: 'Lists', path: '/lists' },
   { label: 'Configuration', path: '/configuration' },
 ]
 

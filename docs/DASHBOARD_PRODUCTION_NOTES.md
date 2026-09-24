@@ -47,7 +47,7 @@ maintainer confirmation, not a default assumed by the code in this PR.
 ## What This PR Does Ship
 
 - A fully functional dashboard reachable via `npm run dev`, connecting to
-  a locally running Safe Zone instance (see `web/README.md` — TODO in
+  a locally running Safe Zone instance (see `dashboard/README.md` — TODO in
   FAZ 25 — for setup steps).
 - Backend endpoints (`/dashboard/summary`, `/dashboard/events`,
   `/dashboard/config`) that are always available once the Go binary is

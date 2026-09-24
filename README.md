@@ -91,7 +91,7 @@ TSZ provides official client libraries for common stacks:
 
 ## Dashboard (Web UI)
 
-A lightweight, read-only web dashboard is available under `web/`, giving a
+A lightweight, read-only web dashboard is available under `dashboard/`, giving a
 visual view of PII detection patterns, guardrails, recent request activity,
 and safe (non-sensitive) configuration values — without needing to call the
 API directly.
@@ -108,7 +108,7 @@ state) pending maintainer input.
 2. In a separate terminal:
 
 ```bash
-   cd web
+   cd dashboard
    npm install
    npm run dev
 ```
@@ -116,7 +116,7 @@ state) pending maintainer input.
 3. Open `http://localhost:5173` in a browser.
 
 Requests from the dashboard are proxied to the backend during development
-(see `web/vite.config.ts`); no backend URL is hardcoded in the frontend
+(see `dashboard/vite.config.ts`); no backend URL is hardcoded in the frontend
 code.
 
 ### What It Shows
@@ -138,7 +138,7 @@ for details.
 ### Testing
 
 ```bash
-cd web
+cd dashboard
 npm run test
 ```
 

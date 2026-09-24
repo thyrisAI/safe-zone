@@ -45,7 +45,13 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
       throw new ApiError(`Request failed with status ${response.status}`, response.status)
     }
 
+    // 204 No Content (e.g. DELETE responses) has no body to parse.
+    if (response.status === 204) {
+      return undefined as T
+    }
+
     return (await response.json()) as T
+    
   } catch (err) {
     if (err instanceof ApiError) throw err
     if (err instanceof DOMException && err.name === 'AbortError') {

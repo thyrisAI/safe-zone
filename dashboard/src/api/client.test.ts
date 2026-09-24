@@ -37,6 +37,14 @@ describe('request', () => {
 
     await expect(request('/patterns')).rejects.toBeInstanceOf(ApiError)
   })
+
+  it('returns undefined for a 204 No Content response without parsing JSON', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 204 }))
+
+    const result = await request('/allowlist/1', { method: 'DELETE' })
+
+    expect(result).toBeUndefined()
+  })
 })
 
 describe('requestText', () => {

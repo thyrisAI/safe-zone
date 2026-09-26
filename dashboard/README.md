@@ -1,6 +1,6 @@
 # Safe Zone Dashboard
 
-A lightweight, read-only web dashboard for Thyris Safe Zone, built with
+A lightweight web dashboard for Thyris Safe Zone, built with
 React, Vite, and TypeScript. See [issue #16](https://github.com/thyrisAI/safe-zone/issues/16)
 for the original feature request.
 
@@ -14,12 +14,21 @@ the rest of the project, see the "Dashboard (Web UI)" section in the
 - A running Safe Zone backend, reachable at `http://localhost:8080`
   (see the root [Quick Start guide](../docs/QUICK_START.md))
 
+### CORS for write operations (Add/Delete entries)
+
+The backend's `CORS_ALLOWED_ORIGINS` defaults to empty, which blocks any
+POST/DELETE request from a browser (read-only GET requests are
+unaffected). To use the Lists screen's add/delete functionality locally,
+set the following in the backend's `.env` before starting it:
+
+    CORS_ALLOWED_ORIGINS="http://localhost:5173"
+
+Restart the backend after changing this value.
+
 ## Development
 
-```bash
-npm install
-npm run dev
-```
+    npm install
+    npm run dev
 
 Open `http://localhost:5173`. Requests to the backend are proxied during
 development — see `vite.config.ts` for the proxy configuration. No backend
@@ -27,21 +36,15 @@ URL is hardcoded anywhere in the frontend code.
 
 ## Testing
 
-```bash
-npm run test
-```
+    npm run test
 
 ## Type Checking
 
-```bash
-npx tsc --noEmit
-```
+    npx tsc --noEmit
 
 ## Building
 
-```bash
-npm run build
-```
+    npm run build
 
 Note: no production serving strategy has been decided yet for the built
 output. See `../docs/DASHBOARD_PRODUCTION_NOTES.md` for the open options
@@ -49,14 +52,12 @@ under discussion.
 
 ## Project Structure
 
-```text
-src/
-  api/          HTTP client and per-resource fetch functions
-  components/   Reusable UI pieces (status badges, pills)
-  layouts/      App shell (sidebar, header)
-  pages/        One component per route (Overview, Patterns, ...)
-  types/        TypeScript types mirroring backend response shapes
-```
+    src/
+      api/          HTTP client and per-resource fetch functions
+      components/   Reusable UI pieces (status badges, pills, modals, dialogs)
+      layouts/      App shell (sidebar, header)
+      pages/        One component per route (Overview, Patterns, Lists, ...)
+      types/        TypeScript types mirroring backend response shapes
 
 ## Environment Variables
 
@@ -72,5 +73,8 @@ src/
 - Enable/disable actions for patterns and guardrails are not implemented,
   as the backend does not currently expose a reliable update endpoint for
   them.
-- Allowlist and blocklist management are out of scope for this initial
-  version.
+- Allowlist and blocklist entries can be viewed, added, and deleted from
+  the Lists screen. Editing an existing entry is not supported (the
+  backend has no update endpoint for these); an entry must be deleted
+  and re-added instead. There is no maximum length or format validation
+  on the `Value` field beyond requiring it to be non-empty.

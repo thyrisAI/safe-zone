@@ -14,18 +14,12 @@ the rest of the project, see the "Dashboard (Web UI)" section in the
 - A running Safe Zone backend, reachable at `http://localhost:8080`
   (see the root [Quick Start guide](../docs/QUICK_START.md))
 
-### CORS for write operations (Add/Delete/Enable/Disable)
+### Local development and CORS
 
-The backend's `CORS_ALLOWED_ORIGINS` defaults to empty, and
-`CORS_ALLOWED_METHODS` does not include `PATCH`. Either one blocks
-write requests from a browser (read-only GET requests are unaffected).
-To use add/delete on the Lists screen and enable/disable on the
-Patterns screen locally, set the following in the backend's `.env`:
-
-    CORS_ALLOWED_ORIGINS="http://localhost:5173"
-    CORS_ALLOWED_METHODS="GET,POST,OPTIONS,DELETE,PATCH"
-
-Restart the backend (recreate the container) after changing these values.
+In development, the Vite proxy removes the `Origin` header before
+forwarding requests, so no CORS configuration is needed in the backend's
+`.env`. This applies to the dev server only; a production deployment must
+configure `CORS_ALLOWED_ORIGINS` itself.
 
 ## Development
 

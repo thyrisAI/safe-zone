@@ -6,16 +6,22 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      // Frontend'den atılan "/api/..." istekleri, development sırasında
-      // gerçek Safe Zone backend'ine (localhost:8080) yönlendirilir.
-      // Böylece frontend kodunda backend adresi hiç hardcode edilmez,
-      // ve tarayıcı açısından istekler "aynı origin"den gidiyormuş gibi
-      // görünür (CORS sorunlarını development'ta önler).
+      // During development, "/api/..." requests from the frontend are
+      // forwarded to the real Safe Zone backend (localhost:8080), so the
+      // backend address is never hardcoded in frontend code.
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
-        // "/api/patterns" -> "/patterns" (backend /api önekini tanımıyor)
+        // "/api/patterns" -> "/patterns" (the backend does not know the /api prefix)
         rewrite: (path) => path.replace(/^\/api/, ''),
+        configure: (proxy) => {
+          // The browser adds an Origin header to POST/PATCH/DELETE requests.
+          // Since the proxy makes these requests effectively same-origin,
+          // strip it so the backend's CORS allowlist is not needed in dev.
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.removeHeader('origin')
+          })
+        },
       },
     },
   },

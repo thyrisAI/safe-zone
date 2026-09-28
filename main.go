@@ -197,6 +197,8 @@ func main() {
 	mux.Handle("POST /patterns", auth.RequirePermission("patterns:admin")(http.HandlerFunc(handlers.CreatePattern)))
 	mux.Handle("GET /patterns", auth.RequirePermission("patterns:admin")(http.HandlerFunc(handlers.ListPatterns)))
 	mux.Handle("DELETE /patterns/{id}", auth.RequirePermission("patterns:admin")(http.HandlerFunc(handlers.DeletePattern)))
+	// Toggle a pattern's IsActive flag only (dashboard enable/disable).
+	mux.Handle("PATCH /patterns/{id}", auth.RequirePermission("patterns:admin")(http.HandlerFunc(handlers.UpdatePatternActive)))
 
 	mux.Handle("POST /allowlist", auth.RequirePermission("allowlist:admin")(http.HandlerFunc(handlers.CreateAllowlistItem)))
 	mux.Handle("GET /allowlist", auth.RequirePermission("allowlist:admin")(http.HandlerFunc(handlers.ListAllowlistItems)))

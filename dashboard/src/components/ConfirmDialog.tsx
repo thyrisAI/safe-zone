@@ -4,6 +4,9 @@ interface ConfirmDialogProps {
   itemLabel?: string
   isConfirming: boolean
   confirmError: string | null
+  confirmLabel?: string
+  confirmingLabel?: string
+  confirmVariant?: 'danger' | 'success'
   onCancel: () => void
   onConfirm: () => void
 }
@@ -14,6 +17,9 @@ export default function ConfirmDialog({
   itemLabel,
   isConfirming,
   confirmError,
+  confirmLabel = 'Delete',
+  confirmingLabel = 'Deleting...',
+  confirmVariant = 'danger',
   onCancel,
   onConfirm,
 }: ConfirmDialogProps) {
@@ -37,8 +43,13 @@ export default function ConfirmDialog({
           <button type="button" className="button-secondary" onClick={onCancel} disabled={isConfirming}>
             Cancel
           </button>
-          <button type="button" className="button-danger" onClick={onConfirm} disabled={isConfirming}>
-            {isConfirming ? 'Deleting...' : 'Delete'}
+          <button
+            type="button"
+            className={`button-${confirmVariant}`}
+            onClick={onConfirm}
+            disabled={isConfirming}
+          >
+            {isConfirming ? confirmingLabel : confirmLabel}
           </button>
         </div>
       </div>

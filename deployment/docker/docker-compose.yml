@@ -7,7 +7,8 @@ services:
     container_name: thyris_api
     read_only: true
     env_file:
-      - ../../.env
+      - path: ../../.env
+        required: false
     environment:
       - DB_DSN=postgres://postgres:postgres@db:5432/thyris?sslmode=disable&TimeZone=Europe/Istanbul
       - REDIS_URL=redis://:thyrisredis@redis:6379/0

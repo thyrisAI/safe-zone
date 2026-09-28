@@ -14,16 +14,18 @@ the rest of the project, see the "Dashboard (Web UI)" section in the
 - A running Safe Zone backend, reachable at `http://localhost:8080`
   (see the root [Quick Start guide](../docs/QUICK_START.md))
 
-### CORS for write operations (Add/Delete entries)
+### CORS for write operations (Add/Delete/Enable/Disable)
 
-The backend's `CORS_ALLOWED_ORIGINS` defaults to empty, which blocks any
-POST/DELETE request from a browser (read-only GET requests are
-unaffected). To use the Lists screen's add/delete functionality locally,
-set the following in the backend's `.env` before starting it:
+The backend's `CORS_ALLOWED_ORIGINS` defaults to empty, and
+`CORS_ALLOWED_METHODS` does not include `PATCH`. Either one blocks
+write requests from a browser (read-only GET requests are unaffected).
+To use add/delete on the Lists screen and enable/disable on the
+Patterns screen locally, set the following in the backend's `.env`:
 
     CORS_ALLOWED_ORIGINS="http://localhost:5173"
+    CORS_ALLOWED_METHODS="GET,POST,OPTIONS,DELETE,PATCH"
 
-Restart the backend after changing this value.
+Restart the backend (recreate the container) after changing these values.
 
 ## Development
 
@@ -70,9 +72,11 @@ under discussion.
 - Request counters and recent events are stored in memory on the backend
   and reset on every backend restart (see `internal/metrics/store.go`).
   This is a deliberate trade-off for the initial version, not a bug.
-- Enable/disable actions for patterns and guardrails are not implemented,
-  as the backend does not currently expose a reliable update endpoint for
-  them.
+- Patterns can be enabled or disabled from the Patterns screen (backed by
+  the new `PATCH /patterns/{id}` endpoint). Guardrails cannot: validators
+  have no active/inactive field in the data model, so a toggle would need
+  a schema change and engine support, which is left as an open question
+  for maintainers.
 - Allowlist and blocklist entries can be viewed, added, and deleted from
   the Lists screen. Editing an existing entry is not supported (the
   backend has no update endpoint for these); an entry must be deleted

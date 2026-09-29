@@ -147,7 +147,7 @@ func LoadConfig() {
 		// Authentication & Authorization
 		AuthEnabled:            getEnvAsBool("AUTH_ENABLED", false),
 		AuthTokenPermissions:   getEnv("AUTH_TOKEN_PERMISSIONS", ""),
-		AuthPublicPaths:        getEnv("AUTH_PUBLIC_PATHS", "/healthz,/ready"),
+		AuthPublicPaths:        getEnv("AUTH_PUBLIC_PATHS", "/healthz,/ready,/auth/login,/auth/logout,/auth/me"),
 		AuthRequireBearerToken: getEnvAsBool("AUTH_REQUIRE_BEARER_TOKEN", true),
 
 		// Rate limiting

@@ -29,6 +29,9 @@ func main() {
 	// Initialize Database
 	database.InitDB()
 
+	// Bootstrap the first admin user (no-op if already exists or env unset)
+	auth.EnsureAdminUser(os.Getenv("ADMIN_EMAIL"), os.Getenv("ADMIN_PASSWORD"))
+
 	// Initialize Redis
 	cache.InitRedis()
 
@@ -223,6 +226,11 @@ func main() {
 	mux.Handle("GET /dashboard/summary", auth.RequirePermission("dashboard:read")(http.HandlerFunc(handlers.GetDashboardSummary)))
 	mux.Handle("GET /dashboard/events", auth.RequirePermission("dashboard:read")(http.HandlerFunc(handlers.GetDashboardEvents)))
 	mux.Handle("GET /dashboard/config", auth.RequirePermission("dashboard:read")(http.HandlerFunc(handlers.GetDashboardConfig)))
+	// Dashboard user auth (V3.0) -- session-based, separate from the
+	// token-based machine auth above.
+	mux.HandleFunc("POST /auth/login", handlers.Login)
+	mux.HandleFunc("POST /auth/logout", handlers.Logout)
+	mux.HandleFunc("GET /auth/me", handlers.Me)
 
 	// ===== MILESTONE 1: MIDDLEWARE WRAPPING =====
 	// Wrap mux with middleware (applied in reverse order: last middleware is outermost)

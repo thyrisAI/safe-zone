@@ -3,11 +3,13 @@ import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import StatusBadge from '../components/StatusBadge'
 import { getSystemStatus, type SystemStatus } from '../api/health'
+import { useAuth } from '../context/AuthContext'
 import './Layout.css'
 
 const REFRESH_INTERVAL_MS = 30000
 
 export default function AppLayout() {
+  const { logout } = useAuth()
   const [status, setStatus] = useState<SystemStatus | 'loading'>('loading')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
@@ -46,7 +48,12 @@ export default function AppLayout() {
           </button>
           <span className="app-header-title">Safe Zone</span>
         </div>
-        <StatusBadge status={status} />
+        <div className="app-header-right">
+          <StatusBadge status={status} />
+          <button type="button" className="button-secondary button-small" onClick={() => logout()}>
+            Log out
+          </button>
+        </div>
       </header>
       <div className="app-body">
         <Sidebar isOpen={isSidebarOpen} onNavigate={() => setIsSidebarOpen(false)} />

@@ -99,6 +99,13 @@
     gap: var(--space-2);
   }
   
+  /* Right side of the header: status badge + log out button. */
+  .app-header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  
   .hamburger-button {
     display: none;
     background: none;

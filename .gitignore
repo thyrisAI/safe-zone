@@ -96,3 +96,4 @@ examples/bring-your-gateway/19-mtls-and-network-policy/certs/
 .DS_Store
 ._*
 Thumbs.db
+cookies.txt

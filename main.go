@@ -223,9 +223,11 @@ func main() {
 
 	// Dashboard Endpoints (bkz. issue #16 -- read-only, in-memory metrics)
 
-	mux.Handle("GET /dashboard/summary", auth.RequirePermission("dashboard:read")(http.HandlerFunc(handlers.GetDashboardSummary)))
-	mux.Handle("GET /dashboard/events", auth.RequirePermission("dashboard:read")(http.HandlerFunc(handlers.GetDashboardEvents)))
-	mux.Handle("GET /dashboard/config", auth.RequirePermission("dashboard:read")(http.HandlerFunc(handlers.GetDashboardConfig)))
+	// Dashboard routes are for human users logged in via session
+	// (see /auth/login above), not token-based API callers.
+	mux.Handle("GET /dashboard/summary", middleware.RequireSession(http.HandlerFunc(handlers.GetDashboardSummary)))
+	mux.Handle("GET /dashboard/events", middleware.RequireSession(http.HandlerFunc(handlers.GetDashboardEvents)))
+	mux.Handle("GET /dashboard/config", middleware.RequireSession(http.HandlerFunc(handlers.GetDashboardConfig)))
 	// Dashboard user auth (V3.0) -- session-based, separate from the
 	// token-based machine auth above.
 	mux.HandleFunc("POST /auth/login", handlers.Login)

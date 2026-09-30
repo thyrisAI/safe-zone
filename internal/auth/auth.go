@@ -41,7 +41,7 @@ func Init(conf AuthConfig) {
 
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !cfg.Enabled || publicPaths[r.URL.Path] {
+		if !cfg.Enabled || isPublicPath(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -115,6 +115,23 @@ func HasPermission(r *http.Request, permission string) bool {
 	}
 	principal, ok := FromContext(r.Context())
 	if !ok {
+		return false
+	}
+	return hasPermission(principal, permission)
+}
+
+// CheckTokenPermission authenticates the request directly from its headers,
+// independent of any context value set by the outer Middleware. Routes that
+// are marked public at the Middleware level (so that a session-only request
+// can reach them) but still need to accept CLI/SDK tokens use this instead
+// of HasPermission, which depends on context the outer Middleware no longer
+// sets for these paths.
+func CheckTokenPermission(r *http.Request, permission string) bool {
+	if !cfg.Enabled {
+		return true
+	}
+	principal, err := AuthenticateRequest(r)
+	if err != nil {
 		return false
 	}
 	return hasPermission(principal, permission)
@@ -205,6 +222,23 @@ func parsePublicPaths(raw string) map[string]bool {
 		paths["/ready"] = true
 	}
 	return paths
+}
+
+// isPublicPath reports whether path matches a configured public path,
+// either exactly or as a sub-resource of one (e.g. "/patterns/123" matches
+// the public path "/patterns"). This lets the outer Middleware step aside
+// for route groups whose real auth decision is made by their own per-route
+// middleware further down the chain (see CheckTokenPermission).
+func isPublicPath(path string) bool {
+	if publicPaths[path] {
+		return true
+	}
+	for p := range publicPaths {
+		if p != "" && strings.HasPrefix(path, p+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func secureEqual(a, b string) bool {

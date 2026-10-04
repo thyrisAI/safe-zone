@@ -37,6 +37,12 @@ func RequireReadAccess(tokenPermission string) func(http.Handler) http.Handler {
 // RequireWriteAccess protects a write (POST/PATCH/DELETE) route the same
 // way as RequireReadAccess, except a dashboard session must additionally
 // have the "admin" role -- a "viewer" session is not enough to write.
+//
+// Status codes are chosen to match what each case actually means:
+//   - no valid token and no valid session at all -> 401 Unauthorized
+//     (we don't know who this is)
+//   - a valid session, but its role isn't "admin" -> 403 Forbidden
+//     (we know who this is, they just lack the permission)
 func RequireWriteAccess(tokenPermission string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -45,12 +51,18 @@ func RequireWriteAccess(tokenPermission string) func(http.Handler) http.Handler 
 				return
 			}
 
-			if session, ok := sessionFromRequest(r); ok && session.Role == "admin" {
-				next.ServeHTTP(w, r)
+			session, ok := sessionFromRequest(r)
+			if !ok {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
 
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			if session.Role != "admin" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
 		})
 	}
 }

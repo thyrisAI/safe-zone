@@ -82,3 +82,24 @@ func sessionFromRequest(r *http.Request) (*auth.Session, bool) {
 
 	return session, true
 }
+
+// RequireAdminSession protects a route so that only a dashboard session
+// with the "admin" role may proceed. Unlike RequireReadAccess/
+// RequireWriteAccess, it has no token-based path -- user management has
+// no CLI/SDK equivalent, so only a logged-in admin may call it.
+func RequireAdminSession(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, ok := sessionFromRequest(r)
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		if session.Role != "admin" {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}

@@ -20,3 +20,13 @@ func GetUserByEmail(email string) (*models.User, error) {
 func CreateUser(user *models.User) error {
 	return database.DB.Create(user).Error
 }
+
+// ListUsers returns all users, ordered by creation date.
+func ListUsers() ([]models.User, error) {
+	var users []models.User
+	result := database.DB.Order("created_at").Find(&users)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return users, nil
+}

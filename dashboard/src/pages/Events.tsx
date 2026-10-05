@@ -9,6 +9,18 @@ type LoadState = 'loading' | 'success' | 'empty' | 'error' | 'unauthorized'
 const DEFAULT_LIMIT = 20
 const EXPANDED_LIMIT = 50
 
+// Backend sends short codes; show a readable label instead.
+function reasonLabel(event: DashboardEvent): string {
+  switch (event.reason) {
+    case 'PII':
+      return 'PII detected'
+    case 'GUARDRAIL':
+      return 'Guardrail check failed'
+    case 'RULE':
+      return event.blocked ? 'Blocked by rule' : 'No findings'
+  }
+}
+
 export default function Events() {
   const [events, setEvents] = useState<DashboardEvent[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
@@ -92,7 +104,7 @@ export default function Events() {
                       inactiveLabel="Blocked"
                     />
                   </td>
-                  <td data-label="Reason">{event.reason}</td>
+                  <td data-label="Reason">{reasonLabel(event)}</td>
                 </tr>
               ))}
             </tbody>

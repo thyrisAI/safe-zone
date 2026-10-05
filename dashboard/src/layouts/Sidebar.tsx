@@ -1,13 +1,21 @@
 import { NavLink } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import './Layout.css'
 
-const navItems = [
+interface NavItem {
+  label: string
+  path: string
+  adminOnly?: boolean
+}
+
+const navItems: NavItem[] = [
   { label: 'Overview', path: '/' },
   { label: 'Patterns', path: '/patterns' },
   { label: 'Guardrails', path: '/guardrails' },
   { label: 'Events', path: '/events' },
   { label: 'Lists', path: '/lists' },
   { label: 'Configuration', path: '/configuration' },
+  { label: 'Users', path: '/users', adminOnly: true },
 ]
 
 interface SidebarProps {
@@ -16,13 +24,16 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isOpen = false, onNavigate }: SidebarProps) {
+  const { user } = useAuth()
+  const visibleItems = navItems.filter((item) => !item.adminOnly || user?.role === 'admin')
+
   return (
     <nav
       className={`sidebar${isOpen ? ' sidebar-open' : ''}`}
       aria-label="Main navigation"
     >
       <ul className="sidebar-list">
-        {navItems.map((item) => (
+        {visibleItems.map((item) => (
           <li key={item.path}>
             <NavLink
               to={item.path}

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminRoute from './components/AdminRoute'
 import AppLayout from './layouts/AppLayout'
 import Login from './pages/Login'
 import Overview from './pages/Overview'
@@ -9,6 +10,7 @@ import Guardrails from './pages/Guardrails'
 import Events from './pages/Events'
 import Configuration from './pages/Configuration'
 import Lists from './pages/Lists'
+import Users from './pages/Users'
 
 export default function App() {
   return (
@@ -24,6 +26,9 @@ export default function App() {
               <Route path="/events" element={<Events />} />
               <Route path="/lists" element={<Lists />} />
               <Route path="/configuration" element={<Configuration />} />
+              <Route element={<AdminRoute />}>
+                <Route path="/users" element={<Users />} />
+              </Route>
             </Route>
           </Route>
         </Routes>

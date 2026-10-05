@@ -3,6 +3,8 @@ import { getPatterns, setPatternActive } from '../api/patterns'
 import { ApiError } from '../api/client'
 import type { Pattern } from '../types/pattern'
 import ConfirmDialog from '../components/ConfirmDialog'
+import StatusPill from '../components/StatusPill'
+import { useAuth } from '../context/AuthContext'
 
 type LoadState = 'loading' | 'success' | 'empty' | 'error' | 'unauthorized'
 
@@ -11,6 +13,9 @@ function sortById(items: Pattern[]): Pattern[] {
 }
 
 export default function Patterns() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
+
   const [patterns, setPatterns] = useState<Pattern[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [pendingToggle, setPendingToggle] = useState<Pattern | null>(null)
@@ -105,24 +110,28 @@ export default function Patterns() {
                 <td data-label="Category">{pattern.Category}</td>
                 <td data-label="Description">{pattern.Description}</td>
                 <td data-label="Status">
-                  <div className="toggle-cell">
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={pattern.IsActive}
-                      aria-label={`${pattern.IsActive ? 'Disable' : 'Enable'} ${pattern.Name}`}
-                      className={`toggle-switch${pattern.IsActive ? ' toggle-switch-on' : ''}`}
-                      onClick={() => {
-                        setPendingToggle(pattern)
-                        setToggleError(null)
-                      }}
-                    >
-                      <span className="toggle-switch-knob" />
-                    </button>
-                    <span className={pattern.IsActive ? 'toggle-label-on' : 'toggle-label-off'}>
-                      {pattern.IsActive ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </div>
+                  {isAdmin ? (
+                    <div className="toggle-cell">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={pattern.IsActive}
+                        aria-label={`${pattern.IsActive ? 'Disable' : 'Enable'} ${pattern.Name}`}
+                        className={`toggle-switch${pattern.IsActive ? ' toggle-switch-on' : ''}`}
+                        onClick={() => {
+                          setPendingToggle(pattern)
+                          setToggleError(null)
+                        }}
+                      >
+                        <span className="toggle-switch-knob" />
+                      </button>
+                      <span className={pattern.IsActive ? 'toggle-label-on' : 'toggle-label-off'}>
+                        {pattern.IsActive ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </div>
+                  ) : (
+                    <StatusPill active={pattern.IsActive} />
+                  )}
                 </td>
               </tr>
             ))}

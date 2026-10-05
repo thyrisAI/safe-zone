@@ -11,10 +11,14 @@ import { ApiError } from '../api/client'
 import type { ListItem, ListKind } from '../types/list'
 import AddEntryModal from '../components/AddEntryModal'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { useAuth } from '../context/AuthContext'
 
 type LoadState = 'loading' | 'success' | 'empty' | 'error' | 'unauthorized'
 
 export default function Lists() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
+
   const [activeTab, setActiveTab] = useState<ListKind>('allowlist')
   const [items, setItems] = useState<ListItem[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
@@ -93,7 +97,9 @@ export default function Lists() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Lists</h1>
-        <p className="page-subtitle">Manage allowlist and blacklist entries</p>
+        <p className="page-subtitle">
+          {isAdmin ? 'Manage allowlist and blacklist entries' : 'View allowlist and blacklist entries'}
+        </p>
       </div>
 
       <div role="tablist" aria-label="List type" className="tab-row">
@@ -117,11 +123,13 @@ export default function Lists() {
         </button>
       </div>
 
-      <div className="list-toolbar">
-        <button type="button" className="button-primary" onClick={() => setIsAddModalOpen(true)}>
-          + Add Entry
-        </button>
-      </div>
+      {isAdmin && (
+        <div className="list-toolbar">
+          <button type="button" className="button-primary" onClick={() => setIsAddModalOpen(true)}>
+            + Add Entry
+          </button>
+        </div>
+      )}
 
       {loadState === 'loading' && <p className="info-message">Loading {listLabel.toLowerCase()} entries...</p>}
 
@@ -146,7 +154,7 @@ export default function Lists() {
               <th scope="col">Value</th>
               <th scope="col">Description</th>
               <th scope="col">Created</th>
-              <th scope="col">Actions</th>
+              {isAdmin && <th scope="col">Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -155,18 +163,20 @@ export default function Lists() {
                 <td data-label="Value">{item.value}</td>
                 <td data-label="Description">{item.description || '—'}</td>
                 <td data-label="Created">{new Date(item.CreatedAt).toLocaleDateString()}</td>
-                                <td data-label="Actions" className="actions-cell">
-                  <button
-                    type="button"
-                    className="button-danger-text"
-                    onClick={() => {
-                      setPendingDelete(item)
-                      setDeleteError(null)
-                    }}
-                  >
-                    Delete
-                  </button>
-                </td>
+                {isAdmin && (
+                  <td data-label="Actions" className="actions-cell">
+                    <button
+                      type="button"
+                      className="button-danger-text"
+                      onClick={() => {
+                        setPendingDelete(item)
+                        setDeleteError(null)
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

@@ -3,23 +3,12 @@ import { getDashboardEvents } from '../api/dashboard'
 import { ApiError } from '../api/client'
 import type { DashboardEvent } from '../types/dashboard'
 import StatusPill from '../components/StatusPill'
+import { reasonLabel } from '../utils/eventReason'
 
 type LoadState = 'loading' | 'success' | 'empty' | 'error' | 'unauthorized'
 
 const DEFAULT_LIMIT = 20
 const EXPANDED_LIMIT = 50
-
-// Backend sends short codes; show a readable label instead.
-function reasonLabel(event: DashboardEvent): string {
-  switch (event.reason) {
-    case 'PII':
-      return 'PII detected'
-    case 'GUARDRAIL':
-      return 'Guardrail check failed'
-    case 'RULE':
-      return event.blocked ? 'Blocked by rule' : 'No findings'
-  }
-}
 
 export default function Events() {
   const [events, setEvents] = useState<DashboardEvent[]>([])

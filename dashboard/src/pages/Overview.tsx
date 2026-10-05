@@ -4,6 +4,7 @@ import { getDashboardEvents } from '../api/dashboard'
 import { ApiError } from '../api/client'
 import type { DashboardSummary, DashboardEvent } from '../types/dashboard'
 import StatusPill from '../components/StatusPill'
+import { reasonLabel } from '../utils/eventReason'
 
 type LoadState = 'loading' | 'success' | 'empty' | 'error' | 'unauthorized'
 
@@ -118,7 +119,7 @@ export default function Overview() {
                         inactiveLabel="Blocked"
                       />
                     </td>
-                    <td data-label="Reason">{event.reason}</td>
+                    <td data-label="Reason">{reasonLabel(event)}</td>
                   </tr>
                 ))}
               </tbody>

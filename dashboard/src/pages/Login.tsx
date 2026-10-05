@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Alert, AlertDescription, Button, Field, FieldGroup, FieldLabel, Input } from '@thyris/ui'
 import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../api/client'
 
@@ -33,29 +34,39 @@ export default function Login() {
     <div className="login-page">
       <form className="login-form" onSubmit={handleSubmit}>
         <h1 className="page-title">Safe Zone Dashboard</h1>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoFocus
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </label>
-        {error && <p className="info-message">{error}</p>}
-        <button type="submit" className="button-primary" disabled={isSubmitting}>
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="login-email">Email</FieldLabel>
+            <Input
+              id="login-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+              autoFocus
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="login-password">Password</FieldLabel>
+            <Input
+              id="login-password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </Field>
+        </FieldGroup>
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        <Button type="submit" className="w-full" disabled={isSubmitting}>
           {isSubmitting ? 'Signing in...' : 'Sign in'}
-        </button>
+        </Button>
       </form>
     </div>
   )

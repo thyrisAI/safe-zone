@@ -1,4 +1,17 @@
 import { useEffect, useState } from 'react'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@thyris/ui'
 import { getDashboardSummary } from '../api/dashboard'
 import { getDashboardEvents } from '../api/dashboard'
 import { ApiError } from '../api/client'
@@ -66,29 +79,45 @@ export default function Overview() {
       )}
 
       {(loadState === 'success' || loadState === 'empty') && summary && (
-        <div className="stat-grid">
-          <div className="stat-card">
-            <span className="stat-label">Total Requests</span>
-            <span className="stat-value">{summary.total_requests}</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Allowed</span>
-            <span className="stat-value">{summary.allowed}</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Blocked</span>
-            <span className="stat-value">{summary.blocked}</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">PII Detections</span>
-            <span className="stat-value">{summary.pii_detections}</span>
-          </div>
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Total Requests</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CardTitle className="font-mono text-3xl">{summary.total_requests}</CardTitle>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Allowed</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CardTitle className="font-mono text-3xl">{summary.allowed}</CardTitle>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Blocked</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CardTitle className="font-mono text-3xl">{summary.blocked}</CardTitle>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>PII Detections</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CardTitle className="font-mono text-3xl">{summary.pii_detections}</CardTitle>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {(loadState === 'success' || loadState === 'empty') && (
         <>
-          <h2 className="section-title">Recent Activity</h2>
+          <h2 className="mb-4 text-lg font-semibold">Recent Activity</h2>
 
           {loadState === 'empty' && (
             <p className="info-message">
@@ -97,32 +126,32 @@ export default function Overview() {
           )}
 
           {loadState === 'success' && (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th scope="col">Timestamp</th>
-                  <th scope="col">Request ID</th>
-                  <th scope="col">Result</th>
-                  <th scope="col">Reason</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="data-table">
+              <TableHeader>
+                <TableRow>
+                  <TableHead scope="col">Timestamp</TableHead>
+                  <TableHead scope="col">Request ID</TableHead>
+                  <TableHead scope="col">Result</TableHead>
+                  <TableHead scope="col">Reason</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {events.map((event) => (
-                  <tr key={`${event.request_id}-${event.timestamp}`}>
-                    <td data-label="Timestamp">{new Date(event.timestamp).toLocaleString()}</td>
-                    <td data-label="Request ID">{event.request_id || '—'}</td>
-                    <td data-label="Result">
+                  <TableRow key={`${event.request_id}-${event.timestamp}`}>
+                    <TableCell data-label="Timestamp">{new Date(event.timestamp).toLocaleString()}</TableCell>
+                    <TableCell data-label="Request ID">{event.request_id || '—'}</TableCell>
+                    <TableCell data-label="Result">
                       <StatusPill
                         active={!event.blocked}
                         activeLabel="Allowed"
                         inactiveLabel="Blocked"
                       />
-                    </td>
-                    <td data-label="Reason">{event.reason}</td>
-                  </tr>
+                    </TableCell>
+                    <TableCell data-label="Reason">{event.reason}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           )}
         </>
       )}

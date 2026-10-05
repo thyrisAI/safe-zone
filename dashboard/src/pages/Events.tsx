@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@thyris/ui'
 import { getDashboardEvents } from '../api/dashboard'
 import { ApiError } from '../api/client'
 import type { DashboardEvent } from '../types/dashboard'
@@ -71,44 +72,45 @@ export default function Events() {
 
       {loadState === 'success' && (
         <>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th scope="col">Timestamp</th>
-                <th scope="col">Request ID</th>
-                <th scope="col">Result</th>
-                <th scope="col">Reason</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="data-table">
+            <TableHeader>
+              <TableRow>
+                <TableHead scope="col">Timestamp</TableHead>
+                <TableHead scope="col">Request ID</TableHead>
+                <TableHead scope="col">Result</TableHead>
+                <TableHead scope="col">Reason</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {events.map((event) => (
-                <tr key={`${event.request_id}-${event.timestamp}`}>
-                  <td data-label="Timestamp">{new Date(event.timestamp).toLocaleString()}</td>
-                  <td data-label="Request ID">{event.request_id || '—'}</td>
-                  <td data-label="Result">
+                <TableRow key={`${event.request_id}-${event.timestamp}`}>
+                  <TableCell data-label="Timestamp">{new Date(event.timestamp).toLocaleString()}</TableCell>
+                  <TableCell data-label="Request ID">{event.request_id || '—'}</TableCell>
+                  <TableCell data-label="Result">
                     <StatusPill
                       active={!event.blocked}
                       activeLabel="Allowed"
                       inactiveLabel="Blocked"
                     />
-                  </td>
-                  <td data-label="Reason">{event.reason}</td>
-                </tr>
+                  </TableCell>
+                  <TableCell data-label="Reason">{event.reason}</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
 
           {/* The backend does not support real pagination (only "most
               recent N events"), so we use a simple "load more" button
               instead of page-numbered pagination. */}
           {events.length === limit && limit < EXPANDED_LIMIT && (
-            <button
+            <Button
               type="button"
-              className="load-more-button"
+              variant="outline"
+              className="mt-4"
               onClick={() => setLimit(EXPANDED_LIMIT)}
             >
               Show more events
-            </button>
+            </Button>
           )}
         </>
       )}

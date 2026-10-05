@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
+import { Button, SidebarProvider, SidebarTrigger, useSidebar } from '@thyris/ui'
 import Sidebar from './Sidebar'
 import StatusBadge from '../components/StatusBadge'
 import { getSystemStatus, type SystemStatus } from '../api/health'
@@ -9,9 +10,17 @@ import './Layout.css'
 const REFRESH_INTERVAL_MS = 30000
 
 export default function AppLayout() {
+  return (
+    <SidebarProvider>
+      <AppShell />
+    </SidebarProvider>
+  )
+}
+
+function AppShell() {
   const { logout } = useAuth()
+  const { isCollapsed, isMobile, setCollapsed } = useSidebar()
   const [status, setStatus] = useState<SystemStatus | 'loading'>('loading')
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -36,32 +45,29 @@ export default function AppLayout() {
     <div className="app-shell">
       <header className="app-header">
         <div className="app-header-left">
-          {/* Hamburger button, visible on mobile only (via CSS). */}
-          <button
-            type="button"
+          <SidebarTrigger
             className="hamburger-button"
-            aria-label={isSidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
-            aria-expanded={isSidebarOpen}
-            onClick={() => setIsSidebarOpen((open) => !open)}
+            aria-label={isCollapsed ? 'Open navigation menu' : 'Close navigation menu'}
+            aria-expanded={!isCollapsed}
           >
             ☰
-          </button>
+          </SidebarTrigger>
           <span className="app-header-title">Safe Zone</span>
         </div>
         <div className="app-header-right">
           <StatusBadge status={status} />
-          <button type="button" className="button-secondary button-small" onClick={() => logout()}>
+          <Button type="button" variant="outline" size="sm" onClick={() => logout()}>
             Log out
-          </button>
+          </Button>
         </div>
       </header>
       <div className="app-body">
-        <Sidebar isOpen={isSidebarOpen} onNavigate={() => setIsSidebarOpen(false)} />
+        <Sidebar onNavigate={() => isMobile && setCollapsed(true)} />
         {/* Overlay to close the sidebar on outside click (mobile only). */}
-        {isSidebarOpen && (
+        {isMobile && !isCollapsed && (
           <div
             className="sidebar-overlay"
-            onClick={() => setIsSidebarOpen(false)}
+            onClick={() => setCollapsed(true)}
             aria-hidden="true"
           />
         )}

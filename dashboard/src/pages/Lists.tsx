@@ -1,5 +1,18 @@
 import { useEffect, useState } from 'react'
 import {
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@thyris/ui'
+import {
   getAllowlist,
   getBlacklist,
   createAllowlistItem,
@@ -89,6 +102,70 @@ export default function Lists() {
 
   const listLabel = activeTab === 'allowlist' ? 'Allowlist' : 'Blacklist'
 
+  function renderListContent() {
+    return (
+      <>
+        <div className="my-4 flex justify-end">
+          <Button type="button" onClick={() => setIsAddModalOpen(true)}>
+            + Add Entry
+          </Button>
+        </div>
+
+        {loadState === 'loading' && <p className="info-message">Loading {listLabel.toLowerCase()} entries...</p>}
+
+        {loadState === 'unauthorized' && (
+          <p className="info-message">
+            You don't have permission to view this data. Contact your administrator if you believe this is an error.
+          </p>
+        )}
+
+        {loadState === 'error' && (
+          <p className="info-message">
+            Unable to load {listLabel.toLowerCase()}. Please check your connection and try again.
+          </p>
+        )}
+
+        {loadState === 'empty' && <p className="info-message">No {listLabel.toLowerCase()} entries yet.</p>}
+
+        {loadState === 'success' && (
+          <Table className="data-table">
+            <TableHeader>
+              <TableRow>
+                <TableHead scope="col">Value</TableHead>
+                <TableHead scope="col">Description</TableHead>
+                <TableHead scope="col">Created</TableHead>
+                <TableHead scope="col">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => (
+                <TableRow key={item.ID}>
+                  <TableCell data-label="Value">{item.value}</TableCell>
+                  <TableCell data-label="Description">{item.description || '—'}</TableCell>
+                  <TableCell data-label="Created">{new Date(item.CreatedAt).toLocaleDateString()}</TableCell>
+                  <TableCell data-label="Actions" className="actions-cell">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => {
+                        setPendingDelete(item)
+                        setDeleteError(null)
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </>
+    )
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -96,82 +173,18 @@ export default function Lists() {
         <p className="page-subtitle">Manage allowlist and blacklist entries</p>
       </div>
 
-      <div role="tablist" aria-label="List type" className="tab-row">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'allowlist'}
-          className={`tab-button${activeTab === 'allowlist' ? ' tab-button-active' : ''}`}
-          onClick={() => setActiveTab('allowlist')}
-        >
-          Allowlist
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'blacklist'}
-          className={`tab-button${activeTab === 'blacklist' ? ' tab-button-active' : ''}`}
-          onClick={() => setActiveTab('blacklist')}
-        >
-          Blacklist
-        </button>
-      </div>
-
-      <div className="list-toolbar">
-        <button type="button" className="button-primary" onClick={() => setIsAddModalOpen(true)}>
-          + Add Entry
-        </button>
-      </div>
-
-      {loadState === 'loading' && <p className="info-message">Loading {listLabel.toLowerCase()} entries...</p>}
-
-      {loadState === 'unauthorized' && (
-        <p className="info-message">
-          You don't have permission to view this data. Contact your administrator if you believe this is an error.
-        </p>
-      )}
-
-      {loadState === 'error' && (
-        <p className="info-message">
-          Unable to load {listLabel.toLowerCase()}. Please check your connection and try again.
-        </p>
-      )}
-
-      {loadState === 'empty' && <p className="info-message">No {listLabel.toLowerCase()} entries yet.</p>}
-
-      {loadState === 'success' && (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th scope="col">Value</th>
-              <th scope="col">Description</th>
-              <th scope="col">Created</th>
-              <th scope="col">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr key={item.ID}>
-                <td data-label="Value">{item.value}</td>
-                <td data-label="Description">{item.description || '—'}</td>
-                <td data-label="Created">{new Date(item.CreatedAt).toLocaleDateString()}</td>
-                                <td data-label="Actions" className="actions-cell">
-                  <button
-                    type="button"
-                    className="button-danger-text"
-                    onClick={() => {
-                      setPendingDelete(item)
-                      setDeleteError(null)
-                    }}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ListKind)}>
+        <TabsList aria-label="List type">
+          <TabsTrigger value="allowlist">Allowlist</TabsTrigger>
+          <TabsTrigger value="blacklist">Blacklist</TabsTrigger>
+        </TabsList>
+        <TabsContent value="allowlist">
+          {activeTab === 'allowlist' && renderListContent()}
+        </TabsContent>
+        <TabsContent value="blacklist">
+          {activeTab === 'blacklist' && renderListContent()}
+        </TabsContent>
+      </Tabs>
 
       {isAddModalOpen && (
         <AddEntryModal

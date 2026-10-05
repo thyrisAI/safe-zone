@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@thyris/ui'
 import { getValidators } from '../api/validators'
 import { ApiError } from '../api/client'
 import type { Validator } from '../types/validator'
@@ -61,24 +62,24 @@ export default function Guardrails() {
       {loadState === 'empty' && <p className="info-message">No guardrails configured yet.</p>}
 
       {loadState === 'success' && (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Type</th>
-              <th scope="col">Description</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table className="data-table">
+          <TableHeader>
+            <TableRow>
+              <TableHead scope="col">Name</TableHead>
+              <TableHead scope="col">Type</TableHead>
+              <TableHead scope="col">Description</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {validators.map((validator) => (
-              <tr key={validator.ID}>
-                <td data-label="Name">{validator.name}</td>
-                <td data-label="Type">{validator.type}</td>
-                <td data-label="Description">{validator.description}</td>
-              </tr>
+              <TableRow key={validator.ID}>
+                <TableCell data-label="Name">{validator.name}</TableCell>
+                <TableCell data-label="Type">{validator.type}</TableCell>
+                <TableCell data-label="Description">{validator.description}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
     </div>
   )

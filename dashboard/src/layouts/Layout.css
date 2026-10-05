@@ -47,47 +47,14 @@
   /* ============================================
      SIDEBAR
      ============================================ */
-  .sidebar {
-    width: var(--sidebar-width);
+  .app-sidebar {
+    position: static !important;
+    z-index: auto !important;
+    width: var(--sidebar-width) !important;
+    max-width: var(--sidebar-width) !important;
+    height: auto !important;
     flex-shrink: 0;
-    border-right: 1px solid var(--color-border);
-    background: var(--color-bg);
     padding: var(--space-3) 0;
-  }
-  
-  .sidebar-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-  }
-  
-  .sidebar-link {
-    display: block;
-    padding: var(--space-2) var(--space-4);
-    color: var(--color-text-muted);
-    text-decoration: none;
-    font-size: 14px;
-    font-weight: 500;
-    border-left: 3px solid transparent;
-  }
-  
-  .sidebar-link:hover {
-    background: var(--color-bg-subtle);
-    color: var(--color-text);
-  }
-  
-  .sidebar-link-active {
-    color: var(--color-accent);
-    background: var(--color-accent-bg);
-    border-left-color: var(--color-accent);
-  }
-  
-  .sidebar-link:focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: -2px;
   }
   
   /* ============================================
@@ -125,26 +92,26 @@
   }
   
   /* ============================================
-     RESPONSIVE - below 768px (mobile/tablet)
+     RESPONSIVE - below 1024px (mobile/tablet)
      ============================================ */
-  @media (max-width: 768px) {
+  @media (max-width: 1023px) {
     .hamburger-button {
       display: block;
     }
   
-    .sidebar {
-      position: fixed;
+    .app-sidebar {
+      position: fixed !important;
       top: 56px;
       left: 0;
       bottom: 0;
-      z-index: 20;
-      transform: translateX(-100%);
+      z-index: 20 !important;
+      height: calc(100dvh - 56px) !important;
       transition: transform 0.2s ease;
       box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
     }
   
-    .sidebar-open {
-      transform: translateX(0);
+    .app-sidebar[data-collapsible="true"] {
+      transform: translateX(-100%);
     }
   
     .sidebar-overlay {
@@ -157,7 +124,9 @@
       background: rgba(0, 0, 0, 0.3);
       z-index: 10;
     }
-  
+  }
+
+  @media (max-width: 768px) {
     .app-main {
       padding: var(--space-3);
     }

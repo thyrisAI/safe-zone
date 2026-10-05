@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Switch, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@thyris/ui'
 import { getPatterns, setPatternActive } from '../api/patterns'
 import { ApiError } from '../api/client'
 import type { Pattern } from '../types/pattern'
@@ -89,45 +90,40 @@ export default function Patterns() {
       {loadState === 'empty' && <p className="info-message">No patterns configured yet.</p>}
 
       {loadState === 'success' && (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Category</th>
-              <th scope="col">Description</th>
-              <th scope="col">Status</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table className="data-table">
+          <TableHeader>
+            <TableRow>
+              <TableHead scope="col">Name</TableHead>
+              <TableHead scope="col">Category</TableHead>
+              <TableHead scope="col">Description</TableHead>
+              <TableHead scope="col">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {patterns.map((pattern) => (
-              <tr key={pattern.ID}>
-                <td data-label="Name">{pattern.Name}</td>
-                <td data-label="Category">{pattern.Category}</td>
-                <td data-label="Description">{pattern.Description}</td>
-                <td data-label="Status">
-                  <div className="toggle-cell">
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={pattern.IsActive}
+              <TableRow key={pattern.ID}>
+                <TableCell data-label="Name">{pattern.Name}</TableCell>
+                <TableCell data-label="Category">{pattern.Category}</TableCell>
+                <TableCell data-label="Description">{pattern.Description}</TableCell>
+                <TableCell data-label="Status">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={pattern.IsActive}
                       aria-label={`${pattern.IsActive ? 'Disable' : 'Enable'} ${pattern.Name}`}
-                      className={`toggle-switch${pattern.IsActive ? ' toggle-switch-on' : ''}`}
-                      onClick={() => {
+                      onCheckedChange={() => {
                         setPendingToggle(pattern)
                         setToggleError(null)
                       }}
-                    >
-                      <span className="toggle-switch-knob" />
-                    </button>
-                    <span className={pattern.IsActive ? 'toggle-label-on' : 'toggle-label-off'}>
+                    />
+                    <span className={pattern.IsActive ? 'text-sm font-medium text-green-700' : 'text-sm text-muted-foreground'}>
                       {pattern.IsActive ? 'Enabled' : 'Disabled'}
                     </span>
                   </div>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
 
       {pendingToggle && (

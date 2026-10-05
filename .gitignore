@@ -62,6 +62,7 @@ web/coverage/
 
 # Helm and local deployment overrides
 *.tgz
+!dashboard/vendor/thyris-ui-*.tgz
 deployment/helm/**/charts/
 deployment/docker/docker-compose.override.yml
 deployment/docker/docker-compose.override.yaml

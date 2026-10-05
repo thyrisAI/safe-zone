@@ -1,3 +1,15 @@
+import {
+  Alert,
+  AlertDescription,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@thyris/ui'
+
 interface ConfirmDialogProps {
   title: string
   message: string
@@ -24,35 +36,42 @@ export default function ConfirmDialog({
   onConfirm,
 }: ConfirmDialogProps) {
   return (
-    <div role="dialog" aria-modal="true" aria-label={title} className="modal-overlay">
-      <div className="modal">
-        <div className="modal-header">
-          <h2 className="modal-title">{title}</h2>
-          <button type="button" className="modal-close" aria-label="Close" onClick={onCancel}>
-            ×
-          </button>
-        </div>
+    <Dialog open onOpenChange={(open) => !open && !isConfirming && onCancel()}>
+      <DialogContent
+        onEscapeKeyDown={(event) => isConfirming && event.preventDefault()}
+        onInteractOutside={(event) => isConfirming && event.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{message}</DialogDescription>
+        </DialogHeader>
 
-        <p>{message}</p>
+        {itemLabel && (
+          <p className="rounded-md bg-muted px-3 py-2 font-mono text-sm font-semibold break-all">
+            {itemLabel}
+          </p>
+        )}
 
-        {itemLabel && <p className="confirm-item-label">{itemLabel}</p>}
+        {confirmError && (
+          <Alert variant="destructive">
+            <AlertDescription>{confirmError}</AlertDescription>
+          </Alert>
+        )}
 
-        {confirmError && <p className="field-error">{confirmError}</p>}
-
-        <div className="modal-footer">
-          <button type="button" className="button-secondary" onClick={onCancel} disabled={isConfirming}>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isConfirming}>
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className={`button-${confirmVariant}`}
+            variant={confirmVariant === 'danger' ? 'destructive' : 'default'}
             onClick={onConfirm}
             disabled={isConfirming}
           >
             {isConfirming ? confirmingLabel : confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

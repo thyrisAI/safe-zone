@@ -1,4 +1,5 @@
 import type { SystemStatus } from '../api/health'
+import { Badge } from '@thyris/ui'
 import './StatusBadge.css'
 
 interface StatusBadgeProps {
@@ -16,9 +17,9 @@ export default function StatusBadge({ status }: StatusBadgeProps) {
   const config = statusConfig[status]
 
   return (
-    <span className={config.className}>
+    <Badge variant="outline" className={config.className}>
       <span className="status-badge-dot" aria-hidden="true" />
       {config.label}
-    </span>
+    </Badge>
   )
 }

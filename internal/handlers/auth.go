@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"strings"
 
+	"thyris-sz/internal/audit"
 	"thyris-sz/internal/auth"
 	"thyris-sz/internal/config"
+	"thyris-sz/internal/models"
 	"thyris-sz/internal/repository"
 )
 
@@ -42,6 +44,15 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 	}
 
+	// failed records the attempt in the audit log, then answers with the
+	// same generic error. userID is nil when the email matches no user.
+	failed := func(userID *uint) {
+		audit.Record(r, userID, req.Email, models.AuditActionLogin, models.AuditStatusFailure)
+		unauthorized()
+	}
+
+	// Empty credentials carry no identity, so they are rejected without an
+	// audit row (otherwise anyone could fill the table with empty requests).
 	if req.Email == "" || req.Password == "" {
 		unauthorized()
 		return
@@ -49,17 +60,19 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 	user, err := repository.GetUserByEmail(req.Email)
 	if err != nil {
-		unauthorized()
+		failed(nil)
 		return
 	}
 
+	userID := user.ID
+
 	if !user.IsActive {
-		unauthorized()
+		failed(&userID)
 		return
 	}
 
 	if !auth.VerifyPassword(req.Password, user.PasswordHash) {
-		unauthorized()
+		failed(&userID)
 		return
 	}
 
@@ -74,6 +87,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	setSessionCookie(w, sessionID)
+	audit.Record(r, &userID, user.Email, models.AuditActionLogin, models.AuditStatusSuccess)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(userResponse{Email: user.Email, Role: user.Role})
@@ -87,7 +101,15 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if cookie, err := r.Cookie(auth.SessionCookieName); err == nil {
+		// Read the session first: once it is deleted we can no longer tell
+		// who was logging out.
+		session, sessionErr := auth.GetSession(r.Context(), cookie.Value)
 		_ = auth.DeleteSession(r.Context(), cookie.Value)
+
+		if sessionErr == nil {
+			userID := session.UserID
+			audit.Record(r, &userID, session.Email, models.AuditActionLogout, models.AuditStatusSuccess)
+		}
 	}
 
 	clearSessionCookie(w)

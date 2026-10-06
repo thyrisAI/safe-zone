@@ -37,6 +37,7 @@ func InitDB() {
 		&models.BlacklistItem{},
 		&models.FormatValidator{},
 		&models.User{},
+		&models.AuditLog{},
 	)
 	if err != nil {
 		// Log error but don't crash. This can happen during constraint updates.

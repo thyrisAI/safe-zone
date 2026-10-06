@@ -239,6 +239,7 @@ func main() {
 	mux.HandleFunc("GET /auth/me", handlers.Me)
 	mux.Handle("POST /users", middleware.RequireAdminSession(http.HandlerFunc(handlers.CreateUser)))
 	mux.Handle("GET /users", middleware.RequireAdminSession(http.HandlerFunc(handlers.ListUsers)))
+	mux.Handle("GET /audit/logs", middleware.RequireAdminSession(http.HandlerFunc(handlers.ListAuditLogs)))
 
 	// ===== MILESTONE 1: MIDDLEWARE WRAPPING =====
 	// Wrap mux with middleware (applied in reverse order: last middleware is outermost)

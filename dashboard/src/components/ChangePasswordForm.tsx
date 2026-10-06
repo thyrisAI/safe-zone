@@ -1,18 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { changePassword } from '../api/auth'
 import { ApiError } from '../api/client'
-
-// Mirrors the backend policy (internal/auth/password_policy.go). The
-// backend stays the authority; this only gives feedback before sending.
-const MIN_LENGTH = 8
-const MAX_LENGTH = 128
+import {
+  MAX_PASSWORD_LENGTH as MAX_LENGTH,
+  MIN_PASSWORD_LENGTH as MIN_LENGTH,
+  passwordLength,
+} from '../utils/passwordPolicy'
 
 interface ChangePasswordFormProps {
   onChanged: () => void
-}
-
-function charCount(value: string): number {
-  return Array.from(value).length
 }
 
 export default function ChangePasswordForm({ onChanged }: ChangePasswordFormProps) {
@@ -26,7 +22,7 @@ export default function ChangePasswordForm({ onChanged }: ChangePasswordFormProp
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [wasUpdated, setWasUpdated] = useState(false)
 
-  const newLength = charCount(newPassword)
+  const newLength = passwordLength(newPassword)
   const longEnough = newLength >= MIN_LENGTH
 
   function reset() {

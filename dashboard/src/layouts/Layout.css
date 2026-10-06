@@ -64,6 +64,22 @@
     gap: var(--space-1);
   }
   
+  .sidebar-group + .sidebar-group {
+    margin-top: var(--space-5);
+  }
+
+  .sidebar-heading {
+    margin: 0 0 var(--space-2);
+    /* Same left edge as the link text: link padding plus its 3px border. */
+    padding: 0 var(--space-4) 0 calc(var(--space-4) + 3px);
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.8;
+  }
+
   .sidebar-link {
     display: block;
     padding: var(--space-2) var(--space-4);

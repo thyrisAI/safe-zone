@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
+	"thyris-sz/internal/audit"
 	"thyris-sz/internal/auth"
+	"thyris-sz/internal/middleware"
 	"thyris-sz/internal/models"
 	"thyris-sz/internal/repository"
 )
@@ -44,6 +47,11 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := auth.ValidatePassword(req.Password); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	if _, err := repository.GetUserByEmail(req.Email); err == nil {
 		http.Error(w, "a user with this email already exists", http.StatusConflict)
 		return
@@ -65,6 +73,15 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	if err := repository.CreateUser(user); err != nil {
 		http.Error(w, "Failed to create user", http.StatusInternalServerError)
 		return
+	}
+
+	// Record which admin created which account. The actor comes from the
+	// session RequireAdminSession verified, never from the request.
+	if actor, ok := middleware.SessionFromContext(r.Context()); ok {
+		actorID := actor.UserID
+		audit.RecordWithDetails(r, &actorID, actor.Email,
+			models.AuditActionUserCreated, models.AuditStatusSuccess,
+			fmt.Sprintf("%s (%s)", user.Email, user.Role))
 	}
 
 	w.Header().Set("Content-Type", "application/json")

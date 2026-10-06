@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import type { CreateUserInput, UserRole } from '../types/users'
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, passwordLength } from '../utils/passwordPolicy'
 
 interface AddUserModalProps {
   onCancel: () => void
@@ -17,6 +18,13 @@ export default function AddUserModal({ onCancel, onSubmit }: AddUserModalProps) 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
+
+    const length = passwordLength(password)
+    if (length < MIN_PASSWORD_LENGTH || length > MAX_PASSWORD_LENGTH) {
+      setError(`Password must be ${MIN_PASSWORD_LENGTH}-${MAX_PASSWORD_LENGTH} characters.`)
+      return
+    }
+
     setIsSubmitting(true)
     try {
       await onSubmit({ email: email.trim(), password, role })
@@ -73,6 +81,16 @@ export default function AddUserModal({ onCancel, onSubmit }: AddUserModalProps) 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+            <p
+              className={
+                passwordLength(password) >= MIN_PASSWORD_LENGTH
+                  ? 'requirement requirement-met'
+                  : 'requirement'
+              }
+            >
+              {passwordLength(password) >= MIN_PASSWORD_LENGTH ? '\u2713 ' : ''}At least{' '}
+              {MIN_PASSWORD_LENGTH} characters
+            </p>
           </div>
 
           <div className="form-field">

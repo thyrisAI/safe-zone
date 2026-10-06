@@ -8,6 +8,7 @@ const (
 	AuditActionLogin          = "login"
 	AuditActionLogout         = "logout"
 	AuditActionPasswordChange = "password_change"
+	AuditActionUserCreated    = "user_created"
 
 	AuditStatusSuccess = "success"
 	AuditStatusFailure = "failure"
@@ -23,5 +24,8 @@ type AuditLog struct {
 	Action     string    `gorm:"size:50;not null" json:"action"`
 	Status     string    `gorm:"size:20;not null" json:"status"`
 	IPAddress  string    `gorm:"size:45" json:"ip_address"` // 45 = longest IPv6 text form
+	// Details names what the action was done to, e.g. the account an admin
+	// created. Short free text; never a password or request body.
+	Details    string    `gorm:"size:255" json:"details,omitempty"`
 	CreatedAt  time.Time `gorm:"index;not null" json:"created_at"`
 }

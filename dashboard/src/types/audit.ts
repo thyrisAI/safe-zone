@@ -1,4 +1,4 @@
-export type AuditAction = 'login' | 'logout' | 'password_change'
+export type AuditAction = 'login' | 'logout' | 'password_change' | 'user_created'
 export type AuditStatus = 'success' | 'failure'
 
 export interface AuditLogEntry {
@@ -8,6 +8,7 @@ export interface AuditLogEntry {
   action: AuditAction
   status: AuditStatus
   ip_address: string
+  details?: string // what the action was done to, e.g. a created account
   created_at: string // ISO 8601
 }
 

@@ -83,6 +83,7 @@ export default function Profile() {
                     <span className={entry.status === 'failure' ? 'toggle-label-off' : undefined}>
                       {activityLabel(entry)}
                     </span>
+                    {entry.details && <div className="activity-details">{entry.details}</div>}
                   </td>
                   <td data-label="IP address">{entry.ip_address || '—'}</td>
                 </tr>

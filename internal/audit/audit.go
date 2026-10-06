@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	maxEmailLength = 254 // matches the actor_email column size
-	maxIPLength    = 45  // longest textual IPv6 address
+	maxEmailLength   = 254 // matches the actor_email column size
+	maxIPLength      = 45  // longest textual IPv6 address
+	maxDetailsLength = 255 // matches the details column size
 )
 
 // Truncate shortens s to at most max characters (not bytes), so a
@@ -41,17 +42,24 @@ func ClientIP(r *http.Request) string {
 // the error is logged and swallowed, so an audit problem can never block
 // a login or logout. userID is nil when the email matches no user.
 func Record(r *http.Request, userID *uint, email, action, status string) {
+	RecordWithDetails(r, userID, email, action, status, "")
+}
+
+// RecordWithDetails is Record plus a short note about what the action was
+// done to (for example the account an admin created).
+func RecordWithDetails(r *http.Request, userID *uint, email, action, status, details string) {
 	entry := &models.AuditLog{
 		UserID:     userID,
 		ActorEmail: Truncate(email, maxEmailLength),
 		Action:     action,
 		Status:     status,
 		IPAddress:  ClientIP(r),
+		Details:    Truncate(details, maxDetailsLength),
 	}
 
 	if err := repository.CreateAuditLog(entry); err != nil {
-		// Log only action/status/error, never the email: it is user
-		// input and could be used to inject fake lines into the log.
+		// Log only action/status/error, never the email or details: they
+		// are user input and could be used to inject fake lines into the log.
 		log.Printf("audit: failed to record %s/%s: %v", action, status, err)
 	}
 }

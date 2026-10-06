@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 
 	"thyris-sz/internal/auth"
@@ -100,6 +101,9 @@ func RequireAdminSession(next http.Handler) http.Handler {
 			return
 		}
 
-		next.ServeHTTP(w, r)
+		// Handlers behind this middleware (user management) need to know
+		// which admin is acting, e.g. for the audit log.
+		ctx := context.WithValue(r.Context(), currentSessionKey, session)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

@@ -827,3 +827,10 @@ a.button-secondary {
 .data-table tr.row-self td {
   background: color-mix(in srgb, var(--color-accent) 7%, transparent);
 }
+
+/* Second line under an activity: what it was done to */
+.activity-details {
+  margin-top: 2px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}

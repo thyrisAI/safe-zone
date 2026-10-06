@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"thyris-sz/internal/middleware"
 	"thyris-sz/internal/models"
 	"thyris-sz/internal/repository"
 )
@@ -60,6 +61,42 @@ func ListAuditLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Always answer with a JSON array: "null" would break the frontend.
+	if logs == nil {
+		logs = []models.AuditLog{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(logs)
+}
+
+// myActivityLimit is how many of their own records a user sees on the
+// profile page.
+const myActivityLimit = 20
+
+// MyActivity returns the signed-in user's own recent audit records, newest
+// first. Any role may call it (route middleware: RequireSession).
+//
+// The user is taken from the session, never from the request, so one user
+// cannot ask for another user's records.
+func MyActivity(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	session, ok := middleware.SessionFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	userID := session.UserID
+	logs, err := repository.ListAuditLogs(repository.AuditLogFilter{UserID: &userID}, myActivityLimit)
+	if err != nil {
+		http.Error(w, "Failed to list activity", http.StatusInternalServerError)
+		return
+	}
+
 	if logs == nil {
 		logs = []models.AuditLog{}
 	}

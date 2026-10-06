@@ -40,3 +40,25 @@ func TestListAuditLogs_RejectsInvalidFilters(t *testing.T) {
 		})
 	}
 }
+
+func TestMyActivity_RejectsWrongMethod(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/auth/me/activity", nil)
+	rr := httptest.NewRecorder()
+	handlers.MyActivity(rr, req)
+
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405 for POST /auth/me/activity, got %d", rr.Code)
+	}
+}
+
+// Without a session in the request context the handler must refuse
+// before touching the database.
+func TestMyActivity_RequiresSession(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/auth/me/activity", nil)
+	rr := httptest.NewRecorder()
+	handlers.MyActivity(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 without a session, got %d", rr.Code)
+	}
+}

@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { listAuditLogs } from '../api/audit'
 import { listUsers } from '../api/users'
 import { ApiError } from '../api/client'
 import type { AuditFilter, AuditLogEntry, AuditStatus } from '../types/audit'
 import type { DashboardUser } from '../types/users'
+import { useAuth } from '../context/AuthContext'
+import { activityLabel } from '../utils/activityLabel'
 
 type LoadState = 'loading' | 'success' | 'empty' | 'error' | 'unauthorized'
 
@@ -11,16 +14,6 @@ type LoadState = 'loading' | 'success' | 'empty' | 'error' | 'unauthorized'
 // otherwise a user id as a string.
 type UserFilterValue = 'all' | 'none' | string
 type StatusFilterValue = 'all' | AuditStatus
-
-function activityLabel(entry: AuditLogEntry): string {
-  if (entry.action === 'login') {
-    return entry.status === 'success' ? 'Signed in' : 'Failed sign-in'
-  }
-  if (entry.action === 'logout') {
-    return entry.status === 'success' ? 'Signed out' : 'Failed sign-out'
-  }
-  return `${String(entry.action)} (${entry.status})`
-}
 
 function toFilter(userFilter: UserFilterValue, statusFilter: StatusFilterValue): AuditFilter {
   const filter: AuditFilter = {}
@@ -30,11 +23,21 @@ function toFilter(userFilter: UserFilterValue, statusFilter: StatusFilterValue):
   return filter
 }
 
+// Reads the optional ?user= link parameter (used by the Users page).
+// Only a plain number or 'none' is accepted; anything else is ignored.
+function initialUserFilter(param: string | null): UserFilterValue {
+  if (param === 'none') return 'none'
+  if (param !== null && /^\d+$/.test(param)) return param
+  return 'all'
+}
+
 export default function Activity() {
+  const { user: currentUser } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [entries, setEntries] = useState<AuditLogEntry[]>([])
   const [users, setUsers] = useState<DashboardUser[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
-  const [userFilter, setUserFilter] = useState<UserFilterValue>('all')
+  const [userFilter, setUserFilter] = useState<UserFilterValue>(() => initialUserFilter(searchParams.get('user')))
   const [statusFilter, setStatusFilter] = useState<StatusFilterValue>('all')
   const [refreshCount, setRefreshCount] = useState(0)
 
@@ -95,9 +98,16 @@ export default function Activity() {
     return text
   }
 
+  // Only a record tied to a registered user can be "mine"; an unregistered
+  // email that happens to equal mine must not be marked.
+  function isOwnEntry(entry: AuditLogEntry): boolean {
+    return entry.user_id !== undefined && entry.actor_email === currentUser?.email
+  }
+
   function clearFilters() {
     setUserFilter('all')
     setStatusFilter('all')
+    if (searchParams.has('user')) setSearchParams({}, { replace: true })
   }
 
   return (
@@ -186,7 +196,7 @@ export default function Activity() {
           </thead>
           <tbody>
             {entries.map((entry) => (
-              <tr key={entry.id}>
+              <tr key={entry.id} className={isOwnEntry(entry) ? 'row-self' : undefined}>
                 <td data-label="Time">{new Date(entry.created_at).toLocaleString()}</td>
                 <td data-label="User">
                   {entry.user_id !== undefined ? (
@@ -203,6 +213,7 @@ export default function Activity() {
                       {entry.actor_email} <span className="tag-muted">Not a registered user</span>
                     </>
                   )}
+                  {isOwnEntry(entry) && <span className="tag-you">You</span>}
                 </td>
                 <td data-label="Activity">
                   <span className={entry.status === 'failure' ? 'toggle-label-off' : undefined}>

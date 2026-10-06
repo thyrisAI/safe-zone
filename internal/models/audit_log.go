@@ -5,8 +5,9 @@ import "time"
 // Audit actions and statuses. Kept as constants so a typo can never
 // create an inconsistent value in the table.
 const (
-	AuditActionLogin  = "login"
-	AuditActionLogout = "logout"
+	AuditActionLogin          = "login"
+	AuditActionLogout         = "logout"
+	AuditActionPasswordChange = "password_change"
 
 	AuditStatusSuccess = "success"
 	AuditStatusFailure = "failure"

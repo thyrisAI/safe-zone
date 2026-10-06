@@ -10,3 +10,8 @@ export async function listAuditLogs(filter: AuditFilter = {}): Promise<AuditLogE
   const query = params.toString()
   return request<AuditLogEntry[]>(`/audit/logs${query ? `?${query}` : ''}`)
 }
+
+/** The signed-in user's own recent records (any role), newest first. */
+export async function getMyActivity(): Promise<AuditLogEntry[]> {
+  return request<AuditLogEntry[]>('/auth/me/activity')
+}

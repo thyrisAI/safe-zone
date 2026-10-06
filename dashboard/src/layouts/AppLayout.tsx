@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Link, Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import StatusBadge from '../components/StatusBadge'
 import { getSystemStatus, type SystemStatus } from '../api/health'
@@ -50,6 +50,9 @@ export default function AppLayout() {
         </div>
         <div className="app-header-right">
           <StatusBadge status={status} />
+          <Link to="/profile" className="button-secondary button-small">
+            Profile
+          </Link>
           <button type="button" className="button-secondary button-small" onClick={() => logout()}>
             Log out
           </button>

@@ -8,6 +8,7 @@ import (
 	"thyris-sz/internal/audit"
 	"thyris-sz/internal/auth"
 	"thyris-sz/internal/config"
+	"thyris-sz/internal/middleware"
 	"thyris-sz/internal/models"
 	"thyris-sz/internal/repository"
 )
@@ -138,6 +139,87 @@ func Me(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(userResponse{Email: session.Email, Role: session.Role})
+}
+
+type changePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+// ChangePassword lets the signed-in user replace their own password. The
+// user comes from the session, never from the request body. Any role may
+// call it (route middleware: RequireSession).
+//
+// Responses: 204 on success, 400 policy violation or bad body, 401 no
+// valid session, 403 wrong current password, 429 too many wrong guesses.
+func ChangePassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	session, ok := middleware.SessionFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	var req changePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+		return
+	}
+
+	if req.CurrentPassword == "" {
+		http.Error(w, "Current password is required", http.StatusBadRequest)
+		return
+	}
+	if err := auth.ValidateNewPassword(req.CurrentPassword, req.NewPassword); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	user, err := repository.GetUserByID(session.UserID)
+	if err != nil || !user.IsActive {
+		// The account was removed or disabled after this session started.
+		http.Error(w, "Not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	userID := user.ID
+
+	blocked, err := auth.PasswordAttemptsExceeded(r.Context(), userID)
+	if err != nil {
+		http.Error(w, "Failed to change password", http.StatusInternalServerError)
+		return
+	}
+	if blocked {
+		http.Error(w, "Too many incorrect attempts. Try again later.", http.StatusTooManyRequests)
+		return
+	}
+
+	if !auth.VerifyPassword(req.CurrentPassword, user.PasswordHash) {
+		// Both writes are best-effort bookkeeping; the answer is the same.
+		_ = auth.RecordPasswordFailure(r.Context(), userID)
+		audit.Record(r, &userID, user.Email, models.AuditActionPasswordChange, models.AuditStatusFailure)
+		http.Error(w, "Current password is incorrect", http.StatusForbidden)
+		return
+	}
+
+	hash, err := auth.HashPassword(req.NewPassword)
+	if err != nil {
+		http.Error(w, "Failed to change password", http.StatusInternalServerError)
+		return
+	}
+
+	if err := repository.UpdateUserPasswordHash(userID, hash); err != nil {
+		http.Error(w, "Failed to change password", http.StatusInternalServerError)
+		return
+	}
+
+	_ = auth.ClearPasswordFailures(r.Context(), userID)
+	audit.Record(r, &userID, user.Email, models.AuditActionPasswordChange, models.AuditStatusSuccess)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func setSessionCookie(w http.ResponseWriter, sessionID string) {

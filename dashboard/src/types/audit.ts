@@ -1,4 +1,4 @@
-export type AuditAction = 'login' | 'logout'
+export type AuditAction = 'login' | 'logout' | 'password_change'
 export type AuditStatus = 'success' | 'failure'
 
 export interface AuditLogEntry {

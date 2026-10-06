@@ -733,3 +733,97 @@
   color: var(--color-text-muted);
   font-size: 12px;
 }
+
+/* Users page: marks the signed-in account */
+.tag-you {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius);
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Profile page */
+.profile-section {
+  margin-bottom: var(--space-5);
+}
+
+.profile-section-title {
+  margin: 0 0 var(--space-3);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.profile-details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  align-items: baseline;
+  gap: var(--space-3) var(--space-4);
+  margin: 0 0 var(--space-3);
+}
+
+.profile-details dt {
+  color: var(--color-text-muted);
+}
+
+.profile-details dd {
+  margin: 0;
+}
+
+.profile-note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+/* Buttons rendered as links (e.g. Profile in the header) */
+a.button-secondary {
+  display: inline-block;
+  text-decoration: none;
+}
+
+/* Profile page: change password */
+.password-collapsed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.password-form {
+  max-width: 420px;
+}
+
+.password-input-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.password-input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.requirement {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.requirement-met {
+  color: var(--color-success, #1a7f37);
+}
+
+.password-form-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  margin-top: var(--space-3);
+}
+
+/* Row that belongs to the signed-in user (Users and Activity tables) */
+.data-table tr.row-self td {
+  background: color-mix(in srgb, var(--color-accent) 7%, transparent);
+}

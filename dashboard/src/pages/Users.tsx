@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { listUsers, createUser } from '../api/users'
 import { ApiError } from '../api/client'
 import type { CreateUserInput, DashboardUser } from '../types/users'
 import AddUserModal from '../components/AddUserModal'
+import { useAuth } from '../context/AuthContext'
 
 type LoadState = 'loading' | 'success' | 'empty' | 'error' | 'unauthorized'
 
 export default function Users() {
+  const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<DashboardUser[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -87,12 +90,16 @@ export default function Users() {
               <th scope="col">Role</th>
               <th scope="col">Status</th>
               <th scope="col">Created</th>
+              <th scope="col">Activity</th>
             </tr>
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr key={user.ID}>
-                <td data-label="Email">{user.email}</td>
+              <tr key={user.ID} className={currentUser?.email === user.email ? 'row-self' : undefined}>
+                <td data-label="Email">
+                  {user.email}
+                  {currentUser?.email === user.email && <span className="tag-you">You</span>}
+                </td>
                 <td data-label="Role">{user.role === 'admin' ? 'Admin' : 'Viewer'}</td>
                 <td data-label="Status">
                   <span className={user.is_active ? 'toggle-label-on' : 'toggle-label-off'}>
@@ -100,6 +107,11 @@ export default function Users() {
                   </span>
                 </td>
                 <td data-label="Created">{new Date(user.CreatedAt).toLocaleDateString()}</td>
+                <td data-label="Activity">
+                  <Link to={`/activity?user=${user.ID}`} className="link-button">
+                    View activity
+                  </Link>
+                </td>
               </tr>
             ))}
           </tbody>

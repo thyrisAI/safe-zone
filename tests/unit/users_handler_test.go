@@ -76,3 +76,15 @@ func TestRequireAdminSession_RejectsNoCookie(t *testing.T) {
 		t.Fatalf("expected 401 with no session cookie, got %d", rr.Code)
 	}
 }
+// The password policy is checked before the database is touched, so a
+// short password is refused without any DB.
+func TestCreateUser_RejectsShortPassword(t *testing.T) {
+	body := `{"email":"nobody@example.com","password":"short","role":"viewer"}`
+	req := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(body))
+	rr := httptest.NewRecorder()
+	handlers.CreateUser(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for a short password, got %d", rr.Code)
+	}
+}

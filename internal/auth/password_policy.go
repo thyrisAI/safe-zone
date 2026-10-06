@@ -15,21 +15,32 @@ const (
 )
 
 var (
-	ErrPasswordTooShort  = errors.New("New password must be at least 8 characters")
-	ErrPasswordTooLong   = errors.New("New password must be at most 128 characters")
+	ErrPasswordTooShort  = errors.New("Password must be at least 8 characters")
+	ErrPasswordTooLong   = errors.New("Password must be at most 128 characters")
 	ErrPasswordUnchanged = errors.New("New password must be different from the current password")
 )
 
-// ValidateNewPassword checks a replacement password against the policy.
+// ValidatePassword checks a password against the length policy. Used when
+// an account is created and, through ValidateNewPassword, when it changes.
 // It needs no database, so it is cheap to run before any lookup.
-func ValidateNewPassword(current, next string) error {
-	n := utf8.RuneCountInString(next)
+func ValidatePassword(password string) error {
+	n := utf8.RuneCountInString(password)
 	switch {
 	case n < MinPasswordLength:
 		return ErrPasswordTooShort
 	case n > MaxPasswordLength:
 		return ErrPasswordTooLong
-	case next == current:
+	}
+	return nil
+}
+
+// ValidateNewPassword checks a replacement password: the length policy,
+// plus it must differ from the current one.
+func ValidateNewPassword(current, next string) error {
+	if err := ValidatePassword(next); err != nil {
+		return err
+	}
+	if next == current {
 		return ErrPasswordUnchanged
 	}
 	return nil

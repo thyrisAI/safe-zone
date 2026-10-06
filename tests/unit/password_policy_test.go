@@ -39,6 +39,27 @@ func TestValidateNewPassword(t *testing.T) {
 	}
 }
 
+func TestValidatePassword(t *testing.T) {
+	cases := []struct {
+		name     string
+		password string
+		want     error
+	}{
+		{"valid", "test1234", nil},
+		{"too short", "1234567", auth.ErrPasswordTooShort},
+		{"empty", "", auth.ErrPasswordTooShort},
+		{"too long", strings.Repeat("a", auth.MaxPasswordLength+1), auth.ErrPasswordTooLong},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := auth.ValidatePassword(tc.password); !errors.Is(got, tc.want) {
+				t.Fatalf("expected %v, got %v", tc.want, got)
+			}
+		})
+	}
+}
+
 func TestChangePassword_RejectsWrongMethod(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/auth/me/password", nil)
 	rr := httptest.NewRecorder()

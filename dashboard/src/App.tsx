@@ -11,6 +11,7 @@ import Events from './pages/Events'
 import Configuration from './pages/Configuration'
 import Lists from './pages/Lists'
 import Users from './pages/Users'
+import Activity from './pages/Activity'
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
               <Route path="/configuration" element={<Configuration />} />
               <Route element={<AdminRoute />}>
                 <Route path="/users" element={<Users />} />
+                <Route path="/activity" element={<Activity />} />
               </Route>
             </Route>
           </Route>

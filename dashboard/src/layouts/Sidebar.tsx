@@ -16,6 +16,7 @@ const navItems: NavItem[] = [
   { label: 'Lists', path: '/lists' },
   { label: 'Configuration', path: '/configuration' },
   { label: 'Users', path: '/users', adminOnly: true },
+  { label: 'Activity', path: '/activity', adminOnly: true },
 ]
 
 interface SidebarProps {

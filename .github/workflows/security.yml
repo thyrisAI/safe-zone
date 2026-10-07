@@ -1,0 +1,324 @@
+name: Security Scanning
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+  queue: max
+
+permissions:
+  contents: read
+
+env:
+  ENFORCE_CONTAINER_SCAN: "true"
+  DC_VERSION: "12.1.0"
+  DC_ZIP_SHA256: "0e5ba6ae58e753d5841048c6c8e495dbc4c7a4ea921a2b14daeac65195700532"
+
+jobs:
+  govulncheck:
+    name: Go Vulnerability Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Run govulncheck
+        continue-on-error: false
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+
+      - name: Generate govulncheck SARIF report
+        if: always()
+        continue-on-error: true
+        run: |
+          go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 \
+            -format sarif ./... > govulncheck-report.sarif || true
+
+      - name: Upload govulncheck SARIF to Security tab
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: govulncheck-report.sarif
+          category: govulncheck
+
+      - name: Upload govulncheck report
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: govulncheck-report
+          path: govulncheck-report.sarif
+          retention-days: 30
+
+  gosec:
+    name: Run gosec
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Run gosec
+        continue-on-error: false
+        run: |
+          go run github.com/securego/gosec/v2/cmd/gosec@v2.29.0 \
+            -fmt=json -out=gosec-report.json \
+            -fmt=sarif -out=gosec-report.sarif \
+            ./...
+
+      - name: Upload gosec SARIF to Security tab
+        continue-on-error: true
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: gosec-report.sarif
+          category: gosec
+
+      - name: Upload gosec report
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: gosec-report
+          path: gosec-report.sarif
+          retention-days: 30
+
+  owasp-dependency-check:
+    name: OWASP Dependency-Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      security-events: write
+    concurrency:
+      group: owasp-dependency-check-nvd
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install web dependencies for scanning
+        working-directory: web
+        run: npm ci
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Debug NVD key presence
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          if [ -z "${NVD_API_KEY:-}" ]; then
+            echo "::error::NVD_API_KEY is EMPTY"
+          else
+            echo "NVD_API_KEY length: ${#NVD_API_KEY}"
+          fi
+
+      - name: Get cache period
+        id: cache-period
+        run: |
+          PERIOD=$(date +'%Y-W%V')
+          echo "period=$PERIOD" >> "$GITHUB_OUTPUT"
+          echo "Computed cache period: $PERIOD"
+
+      - name: Restore OWASP Dependency-Check cache
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.owasp-dc-data
+          key: owasp-dc-data-${{ steps.cache-period.outputs.period }}
+          restore-keys: |
+            owasp-dc-data-
+
+      - name: Download OWASP Dependency-Check
+        run: |
+          set -euo pipefail
+          ASSET_NAME="dependency-check-${DC_VERSION}-release.zip"
+          DOWNLOAD_URL="https://github.com/jeremylong/DependencyCheck/releases/download/v${DC_VERSION}/${ASSET_NAME}"
+
+          mkdir -p "${RUNNER_TEMP}/dependency-check-cli"
+          curl -sSfL -o "${RUNNER_TEMP}/dc.zip" "$DOWNLOAD_URL"
+
+          if [ -z "${DC_ZIP_SHA256:-}" ]; then
+            echo "::error::DC_ZIP_SHA256 is not set for DC_VERSION=${DC_VERSION}"
+            exit 1
+          fi
+
+          ACTUAL_DIGEST="$(sha256sum "${RUNNER_TEMP}/dc.zip" | cut -d' ' -f1)"
+          if [ "${DC_ZIP_SHA256}" != "${ACTUAL_DIGEST}" ]; then
+            echo "::error::Checksum mismatch for ${ASSET_NAME}: expected ${DC_ZIP_SHA256}, got ${ACTUAL_DIGEST}"
+            exit 1
+          fi
+          echo "Checksum verified: ${ACTUAL_DIGEST}"
+
+          unzip -q "${RUNNER_TEMP}/dc.zip" -d "${RUNNER_TEMP}/dependency-check-cli"
+
+      # Only refresh the NVD database on main pushes and the weekly schedule.
+      # PR/feature-branch runs reuse the cached data as-is (--noupdate),
+      # unless the cache came back essentially empty, in which case we force
+      # a real update so the scan is never run against a dataset with no data.
+      - name: Determine NVD update mode
+        id: update-mode
+        run: |
+          CACHE_SIZE=$(du -sb ~/.owasp-dc-data 2>/dev/null | cut -f1 || echo 0)
+          echo "Cache size before scan: ${CACHE_SIZE} bytes"
+
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            REASON="scheduled/main run"
+            FLAG=""
+          elif [ "$CACHE_SIZE" -lt 50000000 ]; then
+            REASON="cache empty/too small ($CACHE_SIZE bytes)"
+            FLAG=""
+          else
+            REASON="PR/branch run with warm cache"
+            FLAG="--noupdate"
+          fi
+
+          echo "Update mode reason: ${REASON}"
+          echo "flag=${FLAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Run OWASP Dependency-Check
+        id: dc-scan
+        continue-on-error: false
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+          NVD_UPDATE_FLAG: ${{ steps.update-mode.outputs.flag }}
+        run: |
+          mkdir -p reports ~/.owasp-dc-data
+          set +e
+          for attempt in 1 2 3; do
+            echo "=== Dependency-Check attempt ${attempt}/3 (update flag: '${NVD_UPDATE_FLAG:-<update>}') ==="
+            "${RUNNER_TEMP}/dependency-check-cli/dependency-check/bin/dependency-check.sh" \
+              --enableExperimental \
+              --disableOssIndex \
+              --exclude "**/.git/**" \
+              --scan . \
+              --format ALL \
+              --nvdApiDelay 2000 \
+              ${NVD_UPDATE_FLAG} \
+              --project "go-security-test" \
+              --out reports \
+              --data ~/.owasp-dc-data \
+              --failOnCVSS 7 \
+              ${NVD_API_KEY:+--nvdApiKey "$NVD_API_KEY"} 2>&1 | tee dc-output.log
+            STATUS=${PIPESTATUS[0]}
+
+            if [ $STATUS -eq 0 ]; then
+              exit 0
+            fi
+            if grep -q "vulnerabilities that have a CVSS score greater than or equal to" dc-output.log; then
+              echo "::error::Genuine CVSS threshold breach - not retrying"
+              exit $STATUS
+            fi
+            echo "::warning::Attempt ${attempt} failed with exit code ${STATUS}"
+            if [ $attempt -lt 3 ]; then
+              echo "Retrying in 30s..."
+              sleep 30
+            fi
+          done
+          exit $STATUS
+
+      - name: Check OWASP data was actually populated
+        id: dc-data-check
+        if: always()
+        continue-on-error: true
+        run: |
+          SIZE=$(du -sb ~/.owasp-dc-data 2>/dev/null | cut -f1 || echo 0)
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+          echo "OWASP data dir size: ${SIZE} bytes"
+
+      - name: Save OWASP Dependency-Check cache
+        if: >-
+          always() &&
+          steps.dc-data-check.outputs.size > 50000000
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.owasp-dc-data
+          key: owasp-dc-data-${{ steps.cache-period.outputs.period }}
+
+      - name: Upload Dependency-Check SARIF to Security tab
+        continue-on-error: true
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: reports/dependency-check-report.sarif
+          category: owasp-dependency-check
+
+      - name: Upload Dependency-Check report
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: owasp-dependency-check-report
+          path: reports/
+          retention-days: 30
+
+  trivy:
+    name: Container Scan (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build image for scanning
+        run: docker build -t thyris-sz:scan -f deployment/docker/Dockerfile .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: thyris-sz:scan
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: table
+          output: trivy-report.txt
+          exit-code: ${{ env.ENFORCE_CONTAINER_SCAN == 'true' && '1' || '0' }}
+
+      - name: Upload Trivy report
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-report
+          path: trivy-report.txt
+          retention-days: 30

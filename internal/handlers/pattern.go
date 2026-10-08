@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"thyris-sz/internal/cache"
@@ -28,6 +29,8 @@ func CreatePattern(w http.ResponseWriter, r *http.Request) {
 
 	// Invalidate cache
 	cache.ClearCache(cache.KeyPatterns)
+
+	recordManagement(r, models.AuditActionPatternCreated, fmt.Sprintf("%s (#%d)", pattern.Name, pattern.ID))
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(pattern)
@@ -62,7 +65,16 @@ func DeletePattern(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if result := database.DB.Delete(&models.Pattern{}, id); result.Error != nil {
+	// Read the name first so the audit row says which pattern was removed.
+	// A pattern name is chosen by an admin and is not personal data.
+	details := fmt.Sprintf("#%d", id)
+	var existing models.Pattern
+	if database.DB.First(&existing, id).Error == nil {
+		details = fmt.Sprintf("%s (#%d)", existing.Name, id)
+	}
+
+	result := database.DB.Delete(&models.Pattern{}, id)
+	if result.Error != nil {
 		http.Error(w, result.Error.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -70,9 +82,13 @@ func DeletePattern(w http.ResponseWriter, r *http.Request) {
 	// Invalidate cache
 	cache.ClearCache(cache.KeyPatterns)
 
+	// Deleting an id that does not exist changes nothing, so it is not logged.
+	if result.RowsAffected > 0 {
+		recordManagement(r, models.AuditActionPatternDeleted, details)
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
-
 
 // UpdatePatternActive toggles only the IsActive flag of a pattern.
 // PATCH /patterns/{id}  body: {"is_active": true|false}
@@ -114,6 +130,12 @@ func UpdatePatternActive(w http.ResponseWriter, r *http.Request) {
 
 	// Invalidate cache so the change takes effect immediately
 	cache.ClearCache(cache.KeyPatterns)
+
+	toggleAction := models.AuditActionPatternDisabled
+	if *req.IsActive {
+		toggleAction = models.AuditActionPatternEnabled
+	}
+	recordManagement(r, toggleAction, fmt.Sprintf("%s (#%d)", pattern.Name, pattern.ID))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(pattern)

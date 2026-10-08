@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"thyris-sz/internal/audit"
 	"thyris-sz/internal/auth"
 )
 
@@ -59,11 +60,16 @@ func RequireWriteAccess(tokenPermission string) func(http.Handler) http.Handler 
 			}
 
 			if session.Role != "admin" {
+				audit.RecordAccessDenied(r, session.UserID, session.Email)
 				http.Error(w, "Forbidden", http.StatusForbidden)
 				return
 			}
 
-			next.ServeHTTP(w, r)
+			// Handlers record management actions in the audit log and need
+			// to know which admin acted. A token call has no session in
+			// the context, which is how a handler tells the two apart.
+			ctx := context.WithValue(r.Context(), currentSessionKey, session)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
@@ -97,6 +103,7 @@ func RequireAdminSession(next http.Handler) http.Handler {
 		}
 
 		if session.Role != "admin" {
+			audit.RecordAccessDenied(r, session.UserID, session.Email)
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}

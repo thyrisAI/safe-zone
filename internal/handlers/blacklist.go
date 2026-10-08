@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"thyris-sz/internal/cache"
@@ -25,6 +26,9 @@ func CreateBlacklistItem(w http.ResponseWriter, r *http.Request) {
 	// Invalidate cache
 	cache.ClearCache(cache.KeyBlocklist)
 
+	// Only the entry number is logged: the value itself may be personal data.
+	recordManagement(r, models.AuditActionBlacklistAdded, fmt.Sprintf("blacklist entry #%d", item.ID))
+
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(item)
 }
@@ -47,13 +51,19 @@ func DeleteBlacklistItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if result := database.DB.Delete(&models.BlacklistItem{}, id); result.Error != nil {
+	result := database.DB.Delete(&models.BlacklistItem{}, id)
+	if result.Error != nil {
 		http.Error(w, result.Error.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Invalidate cache
 	cache.ClearCache(cache.KeyBlocklist)
+
+	// Deleting an id that does not exist changes nothing, so it is not logged.
+	if result.RowsAffected > 0 {
+		recordManagement(r, models.AuditActionBlacklistRemoved, fmt.Sprintf("blacklist entry #%d", id))
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }

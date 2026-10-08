@@ -6,7 +6,7 @@ import { ApiError } from '../api/client'
 import type { AuditFilter, AuditLogEntry, AuditStatus } from '../types/audit'
 import type { DashboardUser } from '../types/users'
 import { useAuth } from '../context/AuthContext'
-import { activityLabel } from '../utils/activityLabel'
+import { activityLabel, API_TOKEN_ACTOR } from '../utils/activityLabel'
 
 type LoadState = 'loading' | 'success' | 'empty' | 'error' | 'unauthorized'
 
@@ -114,7 +114,7 @@ export default function Activity() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Activity</h1>
-        <p className="page-subtitle">Sign-in and sign-out activity (most recent 100 records)</p>
+        <p className="page-subtitle">Sign-ins, account changes and rule changes (most recent 100 records)</p>
       </div>
 
       <div className="filter-bar">
@@ -208,6 +208,10 @@ export default function Activity() {
                     >
                       {entry.actor_email}
                     </button>
+                  ) : entry.actor_email === API_TOKEN_ACTOR ? (
+                    <>
+                      {entry.actor_email} <span className="tag-muted">API token</span>
+                    </>
                   ) : (
                     <>
                       {entry.actor_email} <span className="tag-muted">Not a registered user</span>

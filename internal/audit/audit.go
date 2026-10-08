@@ -3,9 +3,11 @@
 package audit
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"time"
 
 	"thyris-sz/internal/models"
 	"thyris-sz/internal/repository"
@@ -62,4 +64,23 @@ func RecordWithDetails(r *http.Request, userID *uint, email, action, status, det
 		// are user input and could be used to inject fake lines into the log.
 		log.Printf("audit: failed to record %s/%s: %v", action, status, err)
 	}
+}
+
+// deniedThrottle keeps one forbidden URL from filling the audit table:
+// the same user hitting the same method and path is recorded once a minute.
+var deniedThrottle = NewThrottle(time.Minute, 1000)
+
+// RecordAccessDenied records that a signed-in user was refused (HTTP 403)
+// because of their role. Only the method and path are stored, never the
+// query string or body.
+func RecordAccessDenied(r *http.Request, userID uint, email string) {
+	details := r.Method + " " + r.URL.Path
+
+	key := fmt.Sprintf("%d|%s", userID, details)
+	if !deniedThrottle.Allow(key, time.Now()) {
+		return
+	}
+
+	id := userID
+	RecordWithDetails(r, &id, email, models.AuditActionAccessDenied, models.AuditStatusFailure, details)
 }

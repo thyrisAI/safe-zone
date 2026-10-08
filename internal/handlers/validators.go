@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"thyris-sz/internal/models"
@@ -20,6 +21,8 @@ func CreateValidator(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to create validator: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	recordManagement(r, models.AuditActionGuardrailCreated, fmt.Sprintf("%s (#%d)", validator.Name, validator.ID))
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -51,6 +54,8 @@ func DeleteValidator(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to delete validator", http.StatusInternalServerError)
 		return
 	}
+
+	recordManagement(r, models.AuditActionGuardrailDeleted, fmt.Sprintf("#%d", id))
 
 	w.WriteHeader(http.StatusNoContent)
 }

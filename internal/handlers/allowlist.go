@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"thyris-sz/internal/cache"
@@ -28,6 +29,9 @@ func CreateAllowlistItem(w http.ResponseWriter, r *http.Request) {
 
 	// Invalidate cache
 	cache.ClearCache(cache.KeyAllowlist)
+
+	// Only the entry number is logged: the value itself may be personal data.
+	recordManagement(r, models.AuditActionAllowlistAdded, fmt.Sprintf("allowlist entry #%d", item.ID))
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(item)
@@ -62,13 +66,19 @@ func DeleteAllowlistItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if result := database.DB.Delete(&models.AllowlistItem{}, id); result.Error != nil {
+	result := database.DB.Delete(&models.AllowlistItem{}, id)
+	if result.Error != nil {
 		http.Error(w, result.Error.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Invalidate cache
 	cache.ClearCache(cache.KeyAllowlist)
+
+	// Deleting an id that does not exist changes nothing, so it is not logged.
+	if result.RowsAffected > 0 {
+		recordManagement(r, models.AuditActionAllowlistRemoved, fmt.Sprintf("allowlist entry #%d", id))
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }

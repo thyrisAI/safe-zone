@@ -1,4 +1,19 @@
-export type AuditAction = 'login' | 'logout' | 'password_change' | 'user_created'
+export type AuditAction =
+  | 'login'
+  | 'logout'
+  | 'password_change'
+  | 'user_created'
+  | 'pattern_created'
+  | 'pattern_deleted'
+  | 'pattern_enabled'
+  | 'pattern_disabled'
+  | 'allowlist_added'
+  | 'allowlist_removed'
+  | 'blacklist_added'
+  | 'blacklist_removed'
+  | 'guardrail_created'
+  | 'guardrail_deleted'
+  | 'access_denied'
 export type AuditStatus = 'success' | 'failure'
 
 export interface AuditLogEntry {

@@ -13,6 +13,8 @@ export type AuditAction =
   | 'blacklist_removed'
   | 'guardrail_created'
   | 'guardrail_deleted'
+  | 'guardrail_enabled'
+  | 'guardrail_disabled'
   | 'access_denied'
 export type AuditStatus = 'success' | 'failure'
 

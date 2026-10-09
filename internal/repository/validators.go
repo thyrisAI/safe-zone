@@ -31,3 +31,17 @@ func ListFormatValidators() ([]models.FormatValidator, error) {
 func DeleteFormatValidator(id uint) error {
 	return database.DB.Delete(&models.FormatValidator{}, id).Error
 }
+
+// SetFormatValidatorActive switches a validator on or off and returns the
+// updated row. It returns gorm.ErrRecordNotFound when the id does not exist.
+func SetFormatValidatorActive(id uint, active bool) (*models.FormatValidator, error) {
+	var validator models.FormatValidator
+	if err := database.DB.First(&validator, id).Error; err != nil {
+		return nil, err
+	}
+
+	if err := database.DB.Model(&validator).Update("is_active", active).Error; err != nil {
+		return nil, err
+	}
+	return &validator, nil
+}

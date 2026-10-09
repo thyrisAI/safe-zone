@@ -22,6 +22,10 @@ const (
 	AuditActionGuardrailCreated = "guardrail_created"
 	AuditActionGuardrailDeleted = "guardrail_deleted"
 
+	// A guardrail switched off or on without being deleted.
+	AuditActionGuardrailEnabled  = "guardrail_enabled"
+	AuditActionGuardrailDisabled = "guardrail_disabled"
+
 	// AuditActionAccessDenied records a signed-in user trying something
 	// their role does not allow (HTTP 403).
 	AuditActionAccessDenied = "access_denied"

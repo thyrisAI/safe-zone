@@ -14,6 +14,8 @@ const MANAGEMENT_LABELS: Record<string, [string, string]> = {
   blacklist_removed: ['Removed blocklist entry', 'Failed to remove blocklist entry'],
   guardrail_created: ['Created guardrail', 'Failed to create guardrail'],
   guardrail_deleted: ['Deleted guardrail', 'Failed to delete guardrail'],
+  guardrail_enabled: ['Enabled guardrail', 'Failed to enable guardrail'],
+  guardrail_disabled: ['Disabled guardrail', 'Failed to disable guardrail'],
 }
 
 /** Plain-language text for one audit record. */

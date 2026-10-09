@@ -64,6 +64,9 @@ type FormatValidator struct {
 	Rule             string `json:"rule"`                 // Regex, Prompt text, or JSON Schema
 	Description      string `json:"description"`
 	ExpectedResponse string `json:"expected_response"` // Dynamic expectation (e.g. "YES", "SAFE", "1")
+	// IsActive lets an admin switch a guardrail off without deleting it.
+	// Existing rows become active when the column is added.
+	IsActive bool `gorm:"default:true" json:"is_active"`
 }
 
 // GuardrailTemplate represents a portable collection of rules

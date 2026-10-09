@@ -20,4 +20,5 @@ export interface Validator {
     type: 'BUILTIN' | 'REGEX' | 'SCHEMA' | 'AI_PROMPT'
     description: string
     expected_response: string
+    is_active: boolean
   }

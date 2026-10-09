@@ -5,6 +5,28 @@ released versions follow the GitHub release publication date. Component-only
 SDK and CLI tags are mentioned under the Safe Zone release that introduced
 them, rather than being treated as product releases.
 
+## Unreleased
+
+### Dashboard authentication, roles and audit
+
+- Added dashboard sign-in with Redis-backed sessions (`sz_session` cookie,
+  `HttpOnly`, `SameSite=Lax`, `Secure` in `APP_MODE=PROD`) and argon2id
+  password hashes. The first admin comes from `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+- Added `admin` and `viewer` roles. Viewers are read-only; denied writes
+  return `403` and are audited.
+- Added `POST /users`, `GET /users`, `POST /auth/me/password`,
+  `GET /auth/me/activity` and `GET /audit/logs`.
+- Added brute-force protection: failed sign-ins are limited per email (5) and
+  per IP (20) per 15 minutes, and password changes to 5 wrong attempts per
+  15 minutes (`429` with `Retry-After`).
+- Added an audit log for sign-in, account and management actions. Secrets,
+  request bodies and allowlist/blocklist values are never stored.
+- Added `PATCH /validators/{id}` and a dashboard switch to enable or disable a
+  guardrail without deleting it. Disabled guardrails are skipped by `/detect`
+  and the skip is logged. Existing guardrails stay active.
+- `AUTH_PUBLIC_PATHS` now defaults to
+  `/healthz,/ready,/auth/login,/auth/logout,/auth/me`.
+
 ## 2.1.0 - 2026-09-07
 
 ### Bring Your Gateway

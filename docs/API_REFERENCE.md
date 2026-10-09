@@ -42,12 +42,13 @@ Authentication behavior is controlled via:
 AUTH_ENABLED=false
 AUTH_REQUIRE_BEARER_TOKEN=true
 AUTH_TOKEN_PERMISSIONS=token_detect=detect:read,token_admin=*
-AUTH_PUBLIC_PATHS=/healthz,/ready
+AUTH_PUBLIC_PATHS=/healthz,/ready,/auth/login,/auth/logout,/auth/me
 ```
 
 - `AUTH_ENABLED=false` (default): open endpoints (recommended only for trusted internal networks).
 - `AUTH_ENABLED=true`: all non-public endpoints require a valid token with matching permissions.
-- Public endpoints are `/healthz` and `/ready` by default.
+- Public endpoints are `/healthz`, `/ready` and the dashboard sign-in endpoints `/auth/login`, `/auth/logout` and `/auth/me` by default. The sign-in endpoints are public only so a browser can obtain a session; the account endpoints listed in section 12 still require a valid session.
+- Management endpoints (`/patterns`, `/allowlist`, `/blacklist`, `/validators`) accept either a bearer token / `X-ADMIN-KEY` or a dashboard session cookie. See section 12 for roles.
 - Legacy `X-ADMIN-KEY` compatibility remains available for admin handlers.
 
 Permissions:
@@ -1234,8 +1235,11 @@ type FormatValidator struct {
     Rule             string `json:"rule"` // Regex, prompt text, or JSON Schema
     Description      string `json:"description"`
     ExpectedResponse string `json:"expected_response"` // e.g. "YES", "SAFE", "1"
+    IsActive         bool   `json:"is_active"`         // default true; false = skipped by /detect
 }
 ```
+
+A validator with `is_active: false` is **skipped** during `/detect`: a request that names it in `guardrails` is processed as if the validator were not requested, and a log line `guardrail "<name>" is disabled, skipped` is written. The response contains no `validator_results` entry for it. Newly created validators and validators that existed before this field was added are active.
 
 ### 7.2 Create Validator
 
@@ -1280,7 +1284,8 @@ GET /validators
     "type": "AI_PROMPT",
     "rule": "Is this text toxic or abusive? Answer YES or NO.",
     "description": "Blocks abusive language",
-    "expected_response": "NO"
+    "expected_response": "NO",
+    "is_active": true
   }
 ]
 ```
@@ -1302,6 +1307,37 @@ Path parameters:
 - `204 No Content` on success.
 - `400 Bad Request` if `id` is invalid.
 - `500 Internal Server Error` on delete failure.
+
+### 7.5 Enable or Disable a Validator
+
+Switches a guardrail on or off without deleting it. The configuration (including `rule`) is kept, so it can be switched back on at any time.
+
+**Endpoint**
+
+```http
+PATCH /validators/{id}
+```
+
+**Request Body**
+
+```json
+{ "is_active": false }
+```
+
+`is_active` is required and must be a JSON boolean.
+
+**Responses**
+
+- `200 OK` with the updated validator (including `rule`).
+- `400 Bad Request` if `id` is not a positive integer, the body is not valid JSON, or `is_active` is missing.
+- `403 Forbidden` for a dashboard `viewer` session.
+- `404 Not Found` if the validator does not exist.
+- `405 Method Not Allowed` for any method other than `PATCH`.
+- `500 Internal Server Error` on persistence error.
+
+Every successful change is written to the audit log as `guardrail_enabled` or `guardrail_disabled` with the guardrail name and id.
+
+Template import (`POST /templates/import`) never changes `is_active` of a validator that already exists, so an administrator's choice is not undone by re-importing a template.
 
 ---
 
@@ -1579,3 +1615,78 @@ Example structure as exposed by the current implementation:
   - Consider enabling request/response logging only in controlled environments, as logs may contain redacted but still sensitive patterns.
 
 For additional architecture and product‑level details, see `ARCHITECTURE_SECURITY.md` and `../PRODUCT_OVERVIEW.md`.
+
+---
+
+## 12. Dashboard Authentication, Users & Audit API
+
+These endpoints back the Safe Zone dashboard. They use **server-side sessions** instead of API tokens. Sessions are stored in Redis, so Redis must be available for sign-in.
+
+### 12.1 Sessions and roles
+
+- Sign-in sets the cookie `sz_session` (`HttpOnly`, `SameSite=Lax`, `Path=/`, lifetime 24 hours). The `Secure` flag is added when `APP_MODE=PROD`. The cookie holds only a random session id; no user data or password material.
+- Passwords are stored as argon2id hashes. Length policy: 8 to 128 characters.
+- Roles:
+
+| Role | Can do |
+|------|--------|
+| `admin` | Everything: manage patterns, allowlist, blocklist, guardrails (including enable/disable), users, and read the full audit log. |
+| `viewer` | Read-only: view data, and their own recent activity. Any write is refused with `403` and recorded as `access_denied`. |
+
+- An API token or `X-ADMIN-KEY` (when `AUTH_ENABLED=true`) is treated as an administrator for management endpoints. Its actions are recorded in the audit log with the actor `api-token`; the token value is never stored.
+- The first administrator is created at startup from `ADMIN_EMAIL` and `ADMIN_PASSWORD` if no user exists. Change the password after the first sign-in and do not keep the default from `.env.example`.
+
+### 12.2 Endpoints
+
+| Method and path | Access | Purpose |
+|-----------------|--------|---------|
+| `POST /auth/login` | public | Sign in with `{ "email", "password" }`. Returns `{ "email", "role" }` and sets the session cookie. |
+| `POST /auth/logout` | public | Ends the session. `204 No Content`. |
+| `GET /auth/me` | public | Returns `{ "email", "role" }` for the current session, or `401`. |
+| `GET /auth/me/activity` | any session | The signed-in user's own 20 most recent audit records, newest first. The user comes from the session, never from the request. |
+| `POST /auth/me/password` | any session | Change own password with `{ "current_password", "new_password" }`. `204` on success. |
+| `POST /users` | admin session | Create an account with `{ "email", "password", "role" }` (`role` is `admin` or `viewer`). `201` with `{ "email", "role" }`. |
+| `GET /users` | admin session | List accounts. Password hashes are never returned. |
+| `GET /audit/logs` | admin session | Latest 100 audit records, newest first. |
+
+`GET /audit/logs` query parameters (all optional):
+
+- `user_id=<number>`: only that registered user's records.
+- `user_id=none`: only records whose email matched no registered user.
+- `status=success|failure`.
+
+An invalid `user_id` or `status` returns `400`.
+
+Common error responses: `400` invalid body or password policy, `401` not signed in (or wrong credentials; the message is always `Invalid email or password`), `403` role not allowed or wrong current password, `409` email already exists, `429` too many attempts.
+
+### 12.3 Brute-force protection
+
+| Action | Limit | Window | On limit |
+|--------|-------|--------|----------|
+| Failed sign-ins per email | 5 | 15 minutes | `429` with `Retry-After` |
+| Failed sign-ins per client IP | 20 | 15 minutes | `429` with `Retry-After` |
+| Wrong current password on `POST /auth/me/password` | 5 per user | 15 minutes | `429` |
+
+Notes:
+
+- Every email is counted the same way, whether or not an account exists, so the response never reveals which accounts exist.
+- A successful sign-in resets only the email counter. The IP counter is kept so one success does not erase failures made against other accounts from the same address.
+- Counters live in Redis and expire on their own.
+
+### 12.4 Audit log
+
+Records are stored in the `audit_logs` table and have these fields: `id`, `user_id` (absent when the email matched no user), `actor_email`, `action`, `status` (`success` or `failure`), `ip_address`, `details` (short text naming what the action was done to), `created_at`.
+
+Recorded actions:
+
+| Group | Actions |
+|-------|---------|
+| Account | `login`, `logout`, `password_change`, `user_created` |
+| Patterns | `pattern_created`, `pattern_deleted`, `pattern_enabled`, `pattern_disabled` |
+| Allowlist / blocklist | `allowlist_added`, `allowlist_removed`, `blacklist_added`, `blacklist_removed` |
+| Guardrails | `guardrail_created`, `guardrail_deleted`, `guardrail_enabled`, `guardrail_disabled` |
+| Security | `access_denied` (a signed-in user tried something their role does not allow), blocked sign-in attempts |
+
+What is **never** written to the audit log: passwords, request bodies, tokens, session ids, and allowlist or blocklist values. `details` carries names and ids only. Repeated identical failures are throttled so an attacker cannot flood the table.
+
+Audit records are kept without an expiry in this version. Define a retention period that fits your KVKK / GDPR obligations before running in production.

@@ -84,3 +84,31 @@ func RecordAccessDenied(r *http.Request, userID uint, email string) {
 	id := userID
 	RecordWithDetails(r, &id, email, models.AuditActionAccessDenied, models.AuditStatusFailure, details)
 }
+
+// loginBlockedThrottle keeps a blocked client that keeps retrying from
+// filling the audit table: one row per IP and email per minute.
+var loginBlockedThrottle = NewThrottle(time.Minute, 1000)
+
+// RecordLoginBlocked records a sign-in refused because of too many recent
+// failures. It is written as a failed login with a short note.
+//
+// The account is looked up only here, after the throttle has allowed the
+// row, so at most one lookup per minute per IP and email happens. The
+// lookup only decides which user the audit row belongs to; the answer sent
+// to the client is the same whether or not the email exists.
+func RecordLoginBlocked(r *http.Request, email string) {
+	email = Truncate(email, maxEmailLength)
+
+	key := ClientIP(r) + "|" + email
+	if !loginBlockedThrottle.Allow(key, time.Now()) {
+		return
+	}
+
+	var userID *uint
+	if user, err := repository.GetUserByEmail(email); err == nil {
+		id := user.ID
+		userID = &id
+	}
+
+	RecordWithDetails(r, userID, email, models.AuditActionLogin, models.AuditStatusFailure, "blocked: too many attempts")
+}

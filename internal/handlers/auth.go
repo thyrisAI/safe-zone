@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"thyris-sz/internal/audit"
@@ -45,9 +47,17 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 	}
 
-	// failed records the attempt in the audit log, then answers with the
-	// same generic error. userID is nil when the email matches no user.
+	clientIP := audit.ClientIP(r)
+
+	// failed counts the failure, records it in the audit log, then answers
+	// with the same generic error. userID is nil when the email matches no
+	// user.
 	failed := func(userID *uint) {
+		// Counting is best effort: a Redis problem must not turn a normal
+		// "wrong password" answer into an error.
+		if err := auth.RecordLoginFailure(r.Context(), req.Email, clientIP); err != nil {
+			log.Printf("login rate limit: could not record failure: %v", err)
+		}
 		audit.Record(r, userID, req.Email, models.AuditActionLogin, models.AuditStatusFailure)
 		unauthorized()
 	}
@@ -56,6 +66,20 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	// audit row (otherwise anyone could fill the table with empty requests).
 	if req.Email == "" || req.Password == "" {
 		unauthorized()
+		return
+	}
+
+	// Refuse before touching the database or checking the password, so a
+	// blocked client learns nothing about whether the account exists.
+	// If Redis is down the check is skipped (fail open): signing in must
+	// keep working even when the counter cannot.
+	blocked, retryAfter, err := auth.LoginBlocked(r.Context(), req.Email, clientIP)
+	if err != nil {
+		log.Printf("login rate limit: check skipped: %v", err)
+	} else if blocked {
+		audit.RecordLoginBlocked(r, req.Email)
+		w.Header().Set("Retry-After", strconv.Itoa(auth.RetryAfterSeconds(retryAfter)))
+		http.Error(w, "Too many attempts. Try again later.", http.StatusTooManyRequests)
 		return
 	}
 
@@ -88,6 +112,9 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	setSessionCookie(w, sessionID)
+	if err := auth.ClearLoginFailures(r.Context(), req.Email); err != nil {
+		log.Printf("login rate limit: could not reset counter: %v", err)
+	}
 	audit.Record(r, &userID, user.Email, models.AuditActionLogin, models.AuditStatusSuccess)
 
 	w.Header().Set("Content-Type", "application/json")

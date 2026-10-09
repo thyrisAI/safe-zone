@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Switch, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@thyris/ui'
 import { getValidators, setValidatorActive } from '../api/validators'
 import { ApiError } from '../api/client'
 import type { Validator } from '../types/validator'
@@ -94,49 +95,44 @@ export default function Guardrails() {
       {loadState === 'empty' && <p className="info-message">No guardrails configured yet.</p>}
 
       {loadState === 'success' && (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Type</th>
-              <th scope="col">Description</th>
-              <th scope="col">Status</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table className="data-table">
+          <TableHeader>
+            <TableRow>
+              <TableHead scope="col">Name</TableHead>
+              <TableHead scope="col">Type</TableHead>
+              <TableHead scope="col">Description</TableHead>
+              <TableHead scope="col">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {validators.map((validator) => (
-              <tr key={validator.ID}>
-                <td data-label="Name">{validator.name}</td>
-                <td data-label="Type">{validator.type}</td>
-                <td data-label="Description">{validator.description}</td>
-                <td data-label="Status">
+              <TableRow key={validator.ID}>
+                <TableCell data-label="Name">{validator.name}</TableCell>
+                <TableCell data-label="Type">{validator.type}</TableCell>
+                <TableCell data-label="Description">{validator.description}</TableCell>
+                <TableCell data-label="Status">
                   {isAdmin ? (
-                    <div className="toggle-cell">
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={validator.is_active}
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={validator.is_active}
                         aria-label={`${validator.is_active ? 'Disable' : 'Enable'} ${validator.name}`}
-                        className={`toggle-switch${validator.is_active ? ' toggle-switch-on' : ''}`}
-                        onClick={() => {
+                        onCheckedChange={() => {
                           setPendingToggle(validator)
                           setToggleError(null)
                         }}
-                      >
-                        <span className="toggle-switch-knob" />
-                      </button>
-                      <span className={validator.is_active ? 'toggle-label-on' : 'toggle-label-off'}>
+                      />
+                      <span className={validator.is_active ? 'text-sm font-medium text-green-700' : 'text-sm text-muted-foreground'}>
                         {validator.is_active ? 'Enabled' : 'Disabled'}
                       </span>
                     </div>
                   ) : (
                     <StatusPill active={validator.is_active} />
                   )}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
       {pendingToggle && (
         <ConfirmDialog

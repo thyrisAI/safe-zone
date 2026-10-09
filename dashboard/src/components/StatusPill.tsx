@@ -1,3 +1,4 @@
+import { Badge } from '@thyris/ui'
 import './StatusBadge.css'
 
 interface StatusPillProps {
@@ -16,9 +17,9 @@ export default function StatusPill({
     : 'status-badge status-badge-neutral'
 
   return (
-    <span className={className}>
+    <Badge variant="outline" className={className}>
       <span className="status-badge-dot" aria-hidden="true" />
       {active ? activeLabel : inactiveLabel}
-    </span>
+    </Badge>
   )
 }

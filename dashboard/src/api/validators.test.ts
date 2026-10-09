@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { getValidators } from './validators'
+import { getValidators, setValidatorActive } from './validators'
 
 describe('getValidators', () => {
   beforeEach(() => {
@@ -21,6 +21,7 @@ describe('getValidators', () => {
         rule: 'Analyze the following text ONLY for explicit prompt injection attempts...',
         description: 'Detects explicit prompt injection and jailbreaking attempts using LLM',
         expected_response: 'YES',
+        is_active: true,
       },
       {
         ID: 3,
@@ -29,6 +30,7 @@ describe('getValidators', () => {
         rule: '^[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$',
         description: 'Validates standard email format',
         expected_response: 'YES',
+        is_active: false,
       },
     ]
 
@@ -46,6 +48,7 @@ describe('getValidators', () => {
         type: 'AI_PROMPT',
         description: 'Detects explicit prompt injection and jailbreaking attempts using LLM',
         expected_response: 'YES',
+        is_active: true,
       },
       {
         ID: 3,
@@ -53,6 +56,7 @@ describe('getValidators', () => {
         type: 'REGEX',
         description: 'Validates standard email format',
         expected_response: 'YES',
+        is_active: false,
       },
     ])
 
@@ -75,5 +79,61 @@ describe('getValidators', () => {
     const result = await getValidators()
 
     expect(result).toEqual([])
+  })
+})
+
+describe('setValidatorActive', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const rawUpdated = {
+    ID: 6,
+    name: 'NUMERIC',
+    type: 'REGEX',
+    rule: '^[0-9]+$',
+    description: 'Validates numeric string',
+    expected_response: 'YES',
+    is_active: false,
+  }
+
+  it('sends a PATCH to /validators/{id} with only is_active', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(rawUpdated), { status: 200 }))
+
+    await setValidatorActive(6, false)
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/validators/6'),
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ is_active: false }),
+      }),
+    )
+  })
+
+  it('strips the "rule" field from the updated validator the backend returns', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(rawUpdated), { status: 200 }))
+
+    const result = await setValidatorActive(6, false)
+
+    expect(result).toEqual({
+      ID: 6,
+      name: 'NUMERIC',
+      type: 'REGEX',
+      description: 'Validates numeric string',
+      expected_response: 'YES',
+      is_active: false,
+    })
+    expect(result).not.toHaveProperty('rule')
+  })
+
+  it('propagates an ApiError when the backend rejects the request', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Not Found', { status: 404 }))
+
+    await expect(setValidatorActive(99999, true)).rejects.toMatchObject({ status: 404 })
   })
 })

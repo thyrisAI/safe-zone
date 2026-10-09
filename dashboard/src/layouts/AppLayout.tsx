@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Link, Outlet } from 'react-router-dom'
 import { Button, SidebarProvider, SidebarTrigger, useSidebar } from '@thyris/ui'
 import Sidebar from './Sidebar'
 import StatusBadge from '../components/StatusBadge'
@@ -56,6 +56,9 @@ function AppShell() {
         </div>
         <div className="app-header-right">
           <StatusBadge status={status} />
+          <Button asChild variant="outline" size="sm">
+            <Link to="/profile">Profile</Link>
+          </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => logout()}>
             Log out
           </Button>

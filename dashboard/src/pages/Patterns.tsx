@@ -4,6 +4,8 @@ import { getPatterns, setPatternActive } from '../api/patterns'
 import { ApiError } from '../api/client'
 import type { Pattern } from '../types/pattern'
 import ConfirmDialog from '../components/ConfirmDialog'
+import StatusPill from '../components/StatusPill'
+import { useAuth } from '../context/AuthContext'
 
 type LoadState = 'loading' | 'success' | 'empty' | 'error' | 'unauthorized'
 
@@ -12,6 +14,9 @@ function sortById(items: Pattern[]): Pattern[] {
 }
 
 export default function Patterns() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
+
   const [patterns, setPatterns] = useState<Pattern[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [pendingToggle, setPendingToggle] = useState<Pattern | null>(null)
@@ -106,19 +111,23 @@ export default function Patterns() {
                 <TableCell data-label="Category">{pattern.Category}</TableCell>
                 <TableCell data-label="Description">{pattern.Description}</TableCell>
                 <TableCell data-label="Status">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={pattern.IsActive}
-                      aria-label={`${pattern.IsActive ? 'Disable' : 'Enable'} ${pattern.Name}`}
-                      onCheckedChange={() => {
-                        setPendingToggle(pattern)
-                        setToggleError(null)
-                      }}
-                    />
-                    <span className={pattern.IsActive ? 'text-sm font-medium text-green-700' : 'text-sm text-muted-foreground'}>
-                      {pattern.IsActive ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </div>
+                  {isAdmin ? (
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={pattern.IsActive}
+                        aria-label={`${pattern.IsActive ? 'Disable' : 'Enable'} ${pattern.Name}`}
+                        onCheckedChange={() => {
+                          setPendingToggle(pattern)
+                          setToggleError(null)
+                        }}
+                      />
+                      <span className={pattern.IsActive ? 'text-sm font-medium text-green-700' : 'text-sm text-muted-foreground'}>
+                        {pattern.IsActive ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </div>
+                  ) : (
+                    <StatusPill active={pattern.IsActive} />
+                  )}
                 </TableCell>
               </TableRow>
             ))}

@@ -24,10 +24,14 @@ import { ApiError } from '../api/client'
 import type { ListItem, ListKind } from '../types/list'
 import AddEntryModal from '../components/AddEntryModal'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { useAuth } from '../context/AuthContext'
 
 type LoadState = 'loading' | 'success' | 'empty' | 'error' | 'unauthorized'
 
 export default function Lists() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
+
   const [activeTab, setActiveTab] = useState<ListKind>('allowlist')
   const [items, setItems] = useState<ListItem[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
@@ -105,11 +109,13 @@ export default function Lists() {
   function renderListContent() {
     return (
       <>
-        <div className="my-4 flex justify-end">
-          <Button type="button" onClick={() => setIsAddModalOpen(true)}>
-            + Add Entry
-          </Button>
-        </div>
+        {isAdmin && (
+          <div className="my-4 flex justify-end">
+            <Button type="button" onClick={() => setIsAddModalOpen(true)}>
+              + Add Entry
+            </Button>
+          </div>
+        )}
 
         {loadState === 'loading' && <p className="info-message">Loading {listLabel.toLowerCase()} entries...</p>}
 
@@ -134,7 +140,7 @@ export default function Lists() {
                 <TableHead scope="col">Value</TableHead>
                 <TableHead scope="col">Description</TableHead>
                 <TableHead scope="col">Created</TableHead>
-                <TableHead scope="col">Actions</TableHead>
+                {isAdmin && <TableHead scope="col">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -143,20 +149,22 @@ export default function Lists() {
                   <TableCell data-label="Value">{item.value}</TableCell>
                   <TableCell data-label="Description">{item.description || '—'}</TableCell>
                   <TableCell data-label="Created">{new Date(item.CreatedAt).toLocaleDateString()}</TableCell>
-                  <TableCell data-label="Actions" className="actions-cell">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => {
-                        setPendingDelete(item)
-                        setDeleteError(null)
-                      }}
-                    >
-                      Delete
-                    </Button>
-                  </TableCell>
+                  {isAdmin && (
+                    <TableCell data-label="Actions" className="actions-cell">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          setPendingDelete(item)
+                          setDeleteError(null)
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -170,7 +178,9 @@ export default function Lists() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Lists</h1>
-        <p className="page-subtitle">Manage allowlist and blacklist entries</p>
+        <p className="page-subtitle">
+          {isAdmin ? 'Manage allowlist and blacklist entries' : 'View allowlist and blacklist entries'}
+        </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ListKind)}>

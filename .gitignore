@@ -98,3 +98,4 @@ examples/bring-your-gateway/19-mtls-and-network-policy/certs/
 ._*
 Thumbs.db
 cookies.txt
+*cookies*.txt

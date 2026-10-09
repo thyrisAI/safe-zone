@@ -218,6 +218,8 @@ func main() {
 	mux.Handle("POST /validators", middleware.RequireWriteAccess("validators:admin")(http.HandlerFunc(handlers.CreateValidator)))
 	mux.Handle("GET /validators", middleware.RequireReadAccess("validators:admin")(http.HandlerFunc(handlers.ListValidators)))
 	mux.Handle("DELETE /validators/{id}", middleware.RequireWriteAccess("validators:admin")(http.HandlerFunc(handlers.DeleteValidator)))
+	// Switch a guardrail on or off without deleting it.
+	mux.Handle("PATCH /validators/{id}", middleware.RequireWriteAccess("validators:admin")(http.HandlerFunc(handlers.UpdateValidatorActive)))
 
 	// Template Endpoints
 	mux.Handle("POST /templates/import", auth.RequirePermission("templates:admin")(http.HandlerFunc(handlers.ImportTemplateHandler)))
@@ -237,6 +239,11 @@ func main() {
 	mux.HandleFunc("POST /auth/login", handlers.Login)
 	mux.HandleFunc("POST /auth/logout", handlers.Logout)
 	mux.HandleFunc("GET /auth/me", handlers.Me)
+	mux.Handle("POST /users", middleware.RequireAdminSession(http.HandlerFunc(handlers.CreateUser)))
+	mux.Handle("GET /users", middleware.RequireAdminSession(http.HandlerFunc(handlers.ListUsers)))
+	mux.Handle("GET /audit/logs", middleware.RequireAdminSession(http.HandlerFunc(handlers.ListAuditLogs)))
+	mux.Handle("GET /auth/me/activity", middleware.RequireSession(http.HandlerFunc(handlers.MyActivity)))
+	mux.Handle("POST /auth/me/password", middleware.RequireSession(http.HandlerFunc(handlers.ChangePassword)))
 
 	// ===== MILESTONE 1: MIDDLEWARE WRAPPING =====
 	// Wrap mux with middleware (applied in reverse order: last middleware is outermost)

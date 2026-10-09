@@ -22,6 +22,8 @@ export default function Login() {
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         setError('Invalid email or password.')
+      } else if (err instanceof ApiError && err.status === 429) {
+        setError('Too many attempts. Please try again in a few minutes.')
       } else {
         setError('Something went wrong. Please try again.')
       }

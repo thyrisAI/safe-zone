@@ -75,6 +75,15 @@ func (d *Detector) Detect(req models.DetectRequest) models.DetectResponse {
 	var validatorResults []models.ValidatorResult
 	for vName := range validatorsToRun {
 		validator, _ := repository.GetValidatorByName(vName)
+
+		// A guardrail an admin switched off is treated as if it were not
+		// requested: it is not run and not reported. The caller is not
+		// told, so the log is the only trace of why it did not apply.
+		if validator != nil && !validator.IsActive {
+			log.Printf("[Guardrails] guardrail %q is disabled, skipped", truncateForLog(vName))
+			continue
+		}
+
 		valid, err := ValidateFormat(req.Text, vName)
 		confidence := 0.5
 
@@ -394,4 +403,16 @@ func (d *Detector) Detect(req models.DetectRequest) models.DetectResponse {
 		OverallConfidence: models.Confidence(roundConfidence(overall)),
 		Message:           finalMessage,
 	}
+}
+
+// maxLoggedNameLength bounds client-supplied guardrail names in log lines.
+const maxLoggedNameLength = 100
+
+// truncateForLog shortens a client-supplied name before it is logged, so a
+// request cannot write an arbitrarily long line.
+func truncateForLog(name string) string {
+	if len(name) > maxLoggedNameLength {
+		return name[:maxLoggedNameLength]
+	}
+	return name
 }

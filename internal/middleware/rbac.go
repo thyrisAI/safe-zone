@@ -1,8 +1,10 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 
+	"thyris-sz/internal/audit"
 	"thyris-sz/internal/auth"
 )
 
@@ -37,6 +39,12 @@ func RequireReadAccess(tokenPermission string) func(http.Handler) http.Handler {
 // RequireWriteAccess protects a write (POST/PATCH/DELETE) route the same
 // way as RequireReadAccess, except a dashboard session must additionally
 // have the "admin" role -- a "viewer" session is not enough to write.
+//
+// Status codes are chosen to match what each case actually means:
+//   - no valid token and no valid session at all -> 401 Unauthorized
+//     (we don't know who this is)
+//   - a valid session, but its role isn't "admin" -> 403 Forbidden
+//     (we know who this is, they just lack the permission)
 func RequireWriteAccess(tokenPermission string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -45,12 +53,23 @@ func RequireWriteAccess(tokenPermission string) func(http.Handler) http.Handler 
 				return
 			}
 
-			if session, ok := sessionFromRequest(r); ok && session.Role == "admin" {
-				next.ServeHTTP(w, r)
+			session, ok := sessionFromRequest(r)
+			if !ok {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
 
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			if session.Role != "admin" {
+				audit.RecordAccessDenied(r, session.UserID, session.Email)
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+
+			// Handlers record management actions in the audit log and need
+			// to know which admin acted. A token call has no session in
+			// the context, which is how a handler tells the two apart.
+			ctx := context.WithValue(r.Context(), currentSessionKey, session)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
@@ -69,4 +88,29 @@ func sessionFromRequest(r *http.Request) (*auth.Session, bool) {
 	}
 
 	return session, true
+}
+
+// RequireAdminSession protects a route so that only a dashboard session
+// with the "admin" role may proceed. Unlike RequireReadAccess/
+// RequireWriteAccess, it has no token-based path -- user management has
+// no CLI/SDK equivalent, so only a logged-in admin may call it.
+func RequireAdminSession(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, ok := sessionFromRequest(r)
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		if session.Role != "admin" {
+			audit.RecordAccessDenied(r, session.UserID, session.Email)
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		// Handlers behind this middleware (user management) need to know
+		// which admin is acting, e.g. for the audit log.
+		ctx := context.WithValue(r.Context(), currentSessionKey, session)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

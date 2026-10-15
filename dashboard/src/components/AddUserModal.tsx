@@ -1,4 +1,24 @@
 import { useState, type FormEvent } from 'react'
+import {
+  Alert,
+  AlertDescription,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Field,
+  FieldGroup,
+  FieldLabel,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@thyris/ui'
 import { ApiError } from '../api/client'
 import type { CreateUserInput, UserRole } from '../types/users'
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, passwordLength } from '../utils/passwordPolicy'
@@ -14,6 +34,8 @@ export default function AddUserModal({ onCancel, onSubmit }: AddUserModalProps) 
   const [role, setRole] = useState<UserRole>('viewer')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const longEnough = passwordLength(password) >= MIN_PASSWORD_LENGTH
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -43,84 +65,87 @@ export default function AddUserModal({ onCancel, onSubmit }: AddUserModalProps) 
   }
 
   return (
-    <div className="modal-overlay" role="presentation">
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="add-user-title">
-        <div className="modal-header">
-          <h2 className="modal-title" id="add-user-title">
-            Add User
-          </h2>
-          <button type="button" className="modal-close" aria-label="Close" onClick={onCancel}>
-            ×
-          </button>
-        </div>
+    <Dialog open onOpenChange={(open) => !open && !isSubmitting && onCancel()}>
+      <DialogContent
+        onEscapeKeyDown={(event) => isSubmitting && event.preventDefault()}
+        onInteractOutside={(event) => isSubmitting && event.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle>Add User</DialogTitle>
+          <DialogDescription>
+            Create a dashboard account. Viewers are read-only, admins have full access.
+          </DialogDescription>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit}>
-          <div className="form-field">
-            <label htmlFor="user-email">
-              Email <span className="required-mark">*</span>
-            </label>
-            <input
-              id="user-email"
-              type="email"
-              required
-              autoComplete="off"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="user-email">
+                Email <span className="text-destructive">*</span>
+              </FieldLabel>
+              <Input
+                id="user-email"
+                type="email"
+                required
+                autoFocus
+                autoComplete="off"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@example.com"
+              />
+            </Field>
 
-          <div className="form-field">
-            <label htmlFor="user-password">
-              Password <span className="required-mark">*</span>
-            </label>
-            <input
-              id="user-password"
-              type="password"
-              required
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <p
-              className={
-                passwordLength(password) >= MIN_PASSWORD_LENGTH
-                  ? 'requirement requirement-met'
-                  : 'requirement'
-              }
-            >
-              {passwordLength(password) >= MIN_PASSWORD_LENGTH ? '\u2713 ' : ''}At least{' '}
-              {MIN_PASSWORD_LENGTH} characters
-            </p>
-          </div>
+            <Field>
+              <FieldLabel htmlFor="user-password">
+                Password <span className="text-destructive">*</span>
+              </FieldLabel>
+              <Input
+                id="user-password"
+                type="password"
+                required
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                aria-describedby="user-password-hint"
+              />
+              <p
+                id="user-password-hint"
+                className={longEnough ? 'text-sm text-[var(--color-success)]' : 'text-sm text-muted-foreground'}
+              >
+                {longEnough ? '✓ ' : ''}At least {MIN_PASSWORD_LENGTH} characters
+              </p>
+            </Field>
 
-          <div className="form-field">
-            <label htmlFor="user-role">Role</label>
-            <select
-              id="user-role"
-              value={role}
-              onChange={(e) => setRole(e.target.value as UserRole)}
-            >
-              <option value="viewer">Viewer (read-only)</option>
-              <option value="admin">Admin (full access)</option>
-            </select>
-          </div>
+            <Field>
+              <FieldLabel htmlFor="user-role">Role</FieldLabel>
+              <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
+                <SelectTrigger id="user-role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="viewer">Viewer (read-only)</SelectItem>
+                  <SelectItem value="admin">Admin (full access)</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
 
-          {error && (
-            <p className="field-error" role="alert">
-              {error}
-            </p>
-          )}
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+          </FieldGroup>
 
-          <div className="modal-footer">
-            <button type="button" className="button-secondary" onClick={onCancel} disabled={isSubmitting}>
+          <DialogFooter className="mt-6">
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
               Cancel
-            </button>
-            <button type="submit" className="button-primary" disabled={isSubmitting}>
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Creating...' : 'Create User'}
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

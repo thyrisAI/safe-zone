@@ -244,6 +244,7 @@ func main() {
 	mux.HandleFunc("GET /auth/me", handlers.Me)
 	mux.Handle("POST /users", middleware.RequireAdminSession(http.HandlerFunc(handlers.CreateUser)))
 	mux.Handle("GET /users", middleware.RequireAdminSession(http.HandlerFunc(handlers.ListUsers)))
+	mux.Handle("DELETE /users/{id}", middleware.RequireAdminSession(http.HandlerFunc(handlers.DeleteUser)))
 	mux.Handle("GET /audit/logs", middleware.RequireAdminSession(http.HandlerFunc(handlers.ListAuditLogs)))
 	mux.Handle("GET /auth/me/activity", middleware.RequireSession(http.HandlerFunc(handlers.MyActivity)))
 	mux.Handle("POST /auth/me/password", middleware.RequireSession(http.HandlerFunc(handlers.ChangePassword)))

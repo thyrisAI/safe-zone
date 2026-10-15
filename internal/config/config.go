@@ -69,7 +69,7 @@ type Config struct {
 	// Authentication & Authorization
 	AuthEnabled            bool
 	AuthTokenPermissions   string // CSV: token=perm1|perm2|perm3
-	AuthPublicPaths        string // CSV: /healthz,/ready
+	AuthPublicPaths        string // CSV: paths the outer token check skips; routes under them still enforce their own session or token check
 	AuthRequireBearerToken bool
 
 	// Rate limiting
@@ -147,7 +147,7 @@ func LoadConfig() {
 		// Authentication & Authorization
 		AuthEnabled:            getEnvAsBool("AUTH_ENABLED", false),
 		AuthTokenPermissions:   getEnv("AUTH_TOKEN_PERMISSIONS", ""),
-		AuthPublicPaths:        getEnv("AUTH_PUBLIC_PATHS", "/healthz,/ready,/auth/login,/auth/logout,/auth/me"),
+		AuthPublicPaths:        getEnv("AUTH_PUBLIC_PATHS", "/healthz,/ready,/auth/login,/auth/logout,/auth/me,/patterns,/allowlist,/blacklist,/validators,/users,/dashboard,/audit"),
 		AuthRequireBearerToken: getEnvAsBool("AUTH_REQUIRE_BEARER_TOKEN", true),
 
 		// Rate limiting

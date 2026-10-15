@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { Badge, Button } from '@thyris/ui'
 import { listAuditLogs } from '../api/audit'
 import { listUsers } from '../api/users'
 import { ApiError } from '../api/client'
@@ -148,21 +149,22 @@ export default function Activity() {
           </select>
         </div>
 
-        <button
+        <Button
           type="button"
-          className="button-primary filter-bar-end"
+          variant="outline"
+          className="filter-bar-end"
           onClick={() => setRefreshCount((n) => n + 1)}
         >
           Refresh
-        </button>
+        </Button>
       </div>
 
       {filtersActive && (loadState === 'success' || loadState === 'empty') && (
         <div className="filter-summary">
           <span>{summaryText()}</span>
-          <button type="button" className="link-button" onClick={clearFilters}>
+          <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={clearFilters}>
             Clear filters
-          </button>
+          </Button>
         </div>
       )}
 
@@ -200,24 +202,26 @@ export default function Activity() {
                 <td data-label="Time">{new Date(entry.created_at).toLocaleString()}</td>
                 <td data-label="User">
                   {entry.user_id !== undefined ? (
-                    <button
+                    <Button
                       type="button"
-                      className="link-button"
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0"
                       title="Show only this user's activity"
                       onClick={() => setUserFilter(String(entry.user_id))}
                     >
                       {entry.actor_email}
-                    </button>
+                    </Button>
                   ) : entry.actor_email === API_TOKEN_ACTOR ? (
                     <>
-                      {entry.actor_email} <span className="tag-muted">API token</span>
+                      {entry.actor_email} <Badge variant="secondary" className="ml-1">API token</Badge>
                     </>
                   ) : (
                     <>
-                      {entry.actor_email} <span className="tag-muted">Not a registered user</span>
+                      {entry.actor_email} <Badge variant="secondary" className="ml-1">Not a registered user</Badge>
                     </>
                   )}
-                  {isOwnEntry(entry) && <span className="tag-you">You</span>}
+                  {isOwnEntry(entry) && <Badge className="ml-2">You</Badge>}
                 </td>
                 <td data-label="Activity">
                   <span className={entry.status === 'failure' ? 'toggle-label-off' : undefined}>

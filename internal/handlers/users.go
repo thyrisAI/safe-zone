@@ -3,7 +3,9 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"thyris-sz/internal/audit"
@@ -105,4 +107,68 @@ func ListUsers(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(users)
+}
+
+// DeleteUser lets an admin delete a dashboard account for good.
+// Protected by middleware.RequireAdminSession.
+//
+// Two rules keep the dashboard manageable: an admin cannot delete their own
+// account, and the last active admin cannot be deleted. The deleted user's
+// open sessions are closed, and the action is written to the audit log with
+// the account's email (audit rows are never deleted).
+func DeleteUser(w http.ResponseWriter, r *http.Request) {
+	actor, ok := middleware.SessionFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	id64, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
+	if err != nil || id64 == 0 {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+	id := uint(id64)
+
+	if id == actor.UserID {
+		http.Error(w, "you cannot delete your own account", http.StatusBadRequest)
+		return
+	}
+
+	user, err := repository.GetUserByID(id)
+	if err != nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	if user.Role == "admin" && user.IsActive {
+		admins, err := repository.CountActiveAdmins()
+		if err != nil {
+			http.Error(w, "Failed to delete user", http.StatusInternalServerError)
+			return
+		}
+		if admins <= 1 {
+			http.Error(w, "the last active admin cannot be deleted", http.StatusConflict)
+			return
+		}
+	}
+
+	if err := repository.DeleteUser(id); err != nil {
+		http.Error(w, "Failed to delete user", http.StatusInternalServerError)
+		return
+	}
+
+	// The account is already gone, so a Redis problem must not turn this
+	// into an error. Log it; the sessions expire on their own.
+	closed, err := auth.RevokeAllSessions(r.Context(), id)
+	if err != nil {
+		log.Printf("deleted user %d but could not close their sessions: %v", id, err)
+	}
+
+	actorID := actor.UserID
+	audit.RecordWithDetails(r, &actorID, actor.Email,
+		models.AuditActionUserDeleted, models.AuditStatusSuccess,
+		fmt.Sprintf("%s (%s), %d sessions closed", user.Email, user.Role, closed))
+
+	w.WriteHeader(http.StatusNoContent)
 }

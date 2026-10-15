@@ -3,6 +3,7 @@ export type AuditAction =
   | 'logout'
   | 'password_change'
   | 'user_created'
+  | 'user_deleted'
   | 'pattern_created'
   | 'pattern_deleted'
   | 'pattern_enabled'

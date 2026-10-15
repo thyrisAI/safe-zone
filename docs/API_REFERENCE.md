@@ -42,12 +42,12 @@ Authentication behavior is controlled via:
 AUTH_ENABLED=false
 AUTH_REQUIRE_BEARER_TOKEN=true
 AUTH_TOKEN_PERMISSIONS=token_detect=detect:read,token_admin=*
-AUTH_PUBLIC_PATHS=/healthz,/ready,/auth/login,/auth/logout,/auth/me
+AUTH_PUBLIC_PATHS=/healthz,/ready,/auth/login,/auth/logout,/auth/me,/patterns,/allowlist,/blacklist,/validators,/users,/dashboard,/audit
 ```
 
 - `AUTH_ENABLED=false` (default): open endpoints (recommended only for trusted internal networks).
 - `AUTH_ENABLED=true`: all non-public endpoints require a valid token with matching permissions.
-- Public endpoints are `/healthz`, `/ready` and the dashboard sign-in endpoints `/auth/login`, `/auth/logout` and `/auth/me` by default. The sign-in endpoints are public only so a browser can obtain a session; the account endpoints listed in section 12 still require a valid session.
+- `AUTH_PUBLIC_PATHS` lists the paths the outer token check skips. It does not make them open to everyone: the routes under `/patterns`, `/allowlist`, `/blacklist`, `/validators`, `/users`, `/dashboard` and `/audit` still check a dashboard session or an API token themselves. They are listed so a signed-in dashboard user does not also need an API token. `/healthz`, `/ready`, `/auth/login`, `/auth/logout` and `/auth/me` are the paths a browser reaches before it has a session. The account endpoints listed in section 12 still require a valid session. A new route added under one of these paths must have its own session or token check.
 - Management endpoints (`/patterns`, `/allowlist`, `/blacklist`, `/validators`) accept either a bearer token / `X-ADMIN-KEY` or a dashboard session cookie. See section 12 for roles.
 - Legacy `X-ADMIN-KEY` compatibility remains available for admin handlers.
 
@@ -1625,6 +1625,10 @@ These endpoints back the Safe Zone dashboard. They use **server-side sessions** 
 ### 12.1 Sessions and roles
 
 - Sign-in sets the cookie `sz_session` (`HttpOnly`, `SameSite=Lax`, `Path=/`, lifetime 24 hours). The `Secure` flag is added when `APP_MODE=PROD`. The cookie holds only a random session id; no user data or password material.
+- Each user's live session ids are also listed in Redis under `user_sessions:<user id>` (a set that expires with the newest session). It is only used to close sessions together and holds ids, never passwords.
+- **Changing the password closes the user's other sessions** (other browsers and devices, or anyone who signed in with the old password). The session that changed the password stays signed in. The audit record of the change says how many sessions were closed, for example `2 other sessions closed`. If closing fails, the password is still changed and the audit note says `other sessions could not be closed`.
+- Sessions opened before this behaviour existed are not in the list, so a password change does not close them. They end on their own within 24 hours.
+- **Deleting a user closes all of that user's sessions** at once. If closing fails, the account is still deleted and the sessions end on their own within 24 hours.
 - Passwords are stored as argon2id hashes. Length policy: 8 to 128 characters.
 - Roles:
 
@@ -1644,9 +1648,10 @@ These endpoints back the Safe Zone dashboard. They use **server-side sessions** 
 | `POST /auth/logout` | public | Ends the session. `204 No Content`. |
 | `GET /auth/me` | public | Returns `{ "email", "role" }` for the current session, or `401`. |
 | `GET /auth/me/activity` | any session | The signed-in user's own 20 most recent audit records, newest first. The user comes from the session, never from the request. |
-| `POST /auth/me/password` | any session | Change own password with `{ "current_password", "new_password" }`. `204` on success. |
+| `POST /auth/me/password` | any session | Change own password with `{ "current_password", "new_password" }`. `204` on success. Every other session of the same user is closed; the session that made the request stays open (see 12.1). |
 | `POST /users` | admin session | Create an account with `{ "email", "password", "role" }` (`role` is `admin` or `viewer`). `201` with `{ "email", "role" }`. |
 | `GET /users` | admin session | List accounts. Password hashes are never returned. |
+| `DELETE /users/{id}` | admin session | Delete an account for good (the row is removed, so the email can be used again). `204 No Content`. An admin cannot delete their own account (`400`) and the last active admin cannot be deleted (`409`). An unknown id returns `404`. The deleted user's sessions are closed and the action is audited as `user_deleted`. |
 | `GET /audit/logs` | admin session | Latest 100 audit records, newest first. |
 
 `GET /audit/logs` query parameters (all optional):
@@ -1657,7 +1662,7 @@ These endpoints back the Safe Zone dashboard. They use **server-side sessions** 
 
 An invalid `user_id` or `status` returns `400`.
 
-Common error responses: `400` invalid body or password policy, `401` not signed in (or wrong credentials; the message is always `Invalid email or password`), `403` role not allowed or wrong current password, `409` email already exists, `429` too many attempts.
+Common error responses: `400` invalid body or password policy, `401` not signed in (or wrong credentials; the message is always `Invalid email or password`), `403` role not allowed or wrong current password, `404` user not found, `409` email already exists or the last active admin cannot be deleted, `429` too many attempts.
 
 ### 12.3 Brute-force protection
 
@@ -1681,11 +1686,13 @@ Recorded actions:
 
 | Group | Actions |
 |-------|---------|
-| Account | `login`, `logout`, `password_change`, `user_created` |
+| Account | `login`, `logout`, `password_change`, `user_created`, `user_deleted` |
 | Patterns | `pattern_created`, `pattern_deleted`, `pattern_enabled`, `pattern_disabled` |
 | Allowlist / blocklist | `allowlist_added`, `allowlist_removed`, `blacklist_added`, `blacklist_removed` |
 | Guardrails | `guardrail_created`, `guardrail_deleted`, `guardrail_enabled`, `guardrail_disabled` |
 | Security | `access_denied` (a signed-in user tried something their role does not allow), blocked sign-in attempts |
+
+Audit records are never deleted with the account they refer to. After `DELETE /users/{id}`, the older records of that user keep their email in `actor_email`, and the `user_deleted` record's `details` names the deleted account, its role and how many sessions were closed, for example `sema@example.com (viewer), 1 sessions closed`.
 
 What is **never** written to the audit log: passwords, request bodies, tokens, session ids, and allowlist or blocklist values. `details` carries names and ids only. Repeated identical failures are throttled so an attacker cannot flood the table.
 

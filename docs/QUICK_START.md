@@ -86,7 +86,7 @@ HANDLER_TIMEOUT_CHAT_SECONDS=300
 AUTH_ENABLED=false
 AUTH_REQUIRE_BEARER_TOKEN=true
 AUTH_TOKEN_PERMISSIONS=token_detect=detect:read,token_admin=*
-AUTH_PUBLIC_PATHS=/healthz,/ready
+AUTH_PUBLIC_PATHS=/healthz,/ready,/auth/login,/auth/logout,/auth/me,/patterns,/allowlist,/blacklist,/validators,/users,/dashboard,/audit
 
 # AI Provider Configuration
 # Options: OPENAI_COMPATIBLE (default) or BEDROCK

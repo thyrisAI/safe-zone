@@ -32,6 +32,9 @@ export function activityLabel(entry: AuditLogEntry): string {
   if (entry.action === 'user_created') {
     return entry.status === 'success' ? 'Created user' : 'Failed to create user'
   }
+  if (entry.action === 'user_deleted') {
+    return entry.status === 'success' ? 'Deleted user' : 'Failed to delete user'
+  }
   if (entry.action === 'access_denied') {
     return 'Blocked: not allowed for this role'
   }

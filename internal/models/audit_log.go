@@ -9,6 +9,7 @@ const (
 	AuditActionLogout         = "logout"
 	AuditActionPasswordChange = "password_change"
 	AuditActionUserCreated    = "user_created"
+	AuditActionUserDeleted    = "user_deleted"
 
 	// Management actions on the protection rules.
 	AuditActionPatternCreated   = "pattern_created"

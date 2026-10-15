@@ -25,7 +25,12 @@ them, rather than being treated as product releases.
   guardrail without deleting it. Disabled guardrails are skipped by `/detect`
   and the skip is logged. Existing guardrails stay active.
 - `AUTH_PUBLIC_PATHS` now defaults to
-  `/healthz,/ready,/auth/login,/auth/logout,/auth/me`.
+  `/healthz,/ready,/auth/login,/auth/logout,/auth/me,/patterns,/allowlist,/blacklist,/validators,/users,/dashboard,/audit`
+  (code default, `.env.example`, Helm chart and docs now agree). With only
+  the first five paths and `AUTH_ENABLED=true`, a signed-in dashboard user got
+  `401` on `/users`, `/audit/logs` and `/dashboard/*` unless an API token was
+  also sent. The routes under these paths still check a session or token
+  themselves.
 
 ### Dashboard analytics
 
@@ -37,6 +42,25 @@ them, rather than being treated as product releases.
   Only counts and category or guardrail names are stored, never request
   content, request ids or IP addresses.
 - Added `recharts` as an explicit dashboard dependency.
+
+### Dashboard sessions
+
+- Changing the password now closes the user's other dashboard sessions. The
+  session that made the change stays open. The audit record says how many
+  sessions were closed.
+- Sessions are listed per user in Redis (`user_sessions:<id>`) so they can be
+  closed together. Sessions opened before this change are not listed and end
+  on their own within 24 hours.
+
+### Dashboard user management
+
+- Added `DELETE /users/{id}` and a Delete button with a confirmation dialog on
+  the Users page. The account is removed for good, so the email can be used
+  again, and all of the user's sessions are closed.
+- An admin cannot delete their own account (`400`) and the last active admin
+  cannot be deleted (`409`).
+- The deletion is recorded in the audit log as `user_deleted`. The user's
+  earlier audit records stay and keep their email.
 
 ## 2.1.0 - 2026-09-07
 

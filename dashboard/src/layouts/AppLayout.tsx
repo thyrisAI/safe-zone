@@ -56,7 +56,7 @@ function AppShell() {
         </div>
         <div className="app-header-right">
           <StatusBadge status={status} />
-          <Button asChild variant="outline" size="sm">
+          <Button asChild variant="outline" size="sm" className="text-foreground">
             <Link to="/profile">Profile</Link>
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => logout()}>

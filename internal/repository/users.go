@@ -44,3 +44,18 @@ func ListUsers() ([]models.User, error) {
 	}
 	return users, nil
 }
+
+// CountActiveAdmins returns how many active accounts have the admin role.
+func CountActiveAdmins() (int64, error) {
+	var count int64
+	err := database.DB.Model(&models.User{}).
+		Where("role = ? AND is_active = ?", "admin", true).
+		Count(&count).Error
+	return count, err
+}
+
+// DeleteUser removes a user row for good (not a soft delete), so the email
+// can be used again. Audit rows keep the email, so the history stays.
+func DeleteUser(id uint) error {
+	return database.DB.Unscoped().Delete(&models.User{}, id).Error
+}

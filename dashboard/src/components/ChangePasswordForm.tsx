@@ -1,4 +1,19 @@
 import { useState, type FormEvent } from 'react'
+import {
+  Alert,
+  AlertDescription,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Field,
+  FieldGroup,
+  FieldLabel,
+  Input,
+} from '@thyris/ui'
 import { changePassword } from '../api/auth'
 import { ApiError } from '../api/client'
 import {
@@ -40,6 +55,7 @@ export default function ChangePasswordForm({ onChanged }: ChangePasswordFormProp
   }
 
   function cancel() {
+    if (isSubmitting) return
     reset()
     setIsOpen(false)
   }
@@ -83,92 +99,111 @@ export default function ChangePasswordForm({ onChanged }: ChangePasswordFormProp
     }
   }
 
-  if (!isOpen) {
-    return (
+  return (
+    <>
       <div className="password-collapsed">
-        <button type="button" className="button-secondary" onClick={open}>
+        <Button type="button" variant="outline" size="sm" onClick={open}>
           Change password
-        </button>
+        </Button>
         {wasUpdated && (
           <span className="toggle-label-on" role="status">
-            Password updated
+            Password updated. Your other sessions were signed out.
           </span>
         )}
       </div>
-    )
-  }
 
-  return (
-    <form className="password-form" onSubmit={handleSubmit}>
-      <div className="form-field">
-        <label htmlFor="current-password">Current password</label>
-        <input
-          id="current-password"
-          type="password"
-          required
-          autoFocus
-          autoComplete="current-password"
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
-          aria-invalid={currentError !== null}
-          aria-describedby={currentError ? 'current-password-error' : undefined}
-        />
-        {currentError && (
-          <p className="field-error" id="current-password-error" role="alert">
-            {currentError}
-          </p>
-        )}
-      </div>
-
-      <div className="form-field">
-        <label htmlFor="new-password">New password</label>
-        <div className="password-input-row">
-          <input
-            id="new-password"
-            type={showNew ? 'text' : 'password'}
-            required
-            autoComplete="new-password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            aria-invalid={newError !== null}
-            aria-describedby="new-password-hint"
-          />
-          <button
-            type="button"
-            className="button-secondary"
-            aria-pressed={showNew}
-            onClick={() => setShowNew((v) => !v)}
+      {isOpen && (
+        <Dialog open onOpenChange={(next) => !next && cancel()}>
+          <DialogContent
+            onEscapeKeyDown={(event) => isSubmitting && event.preventDefault()}
+            onInteractOutside={(event) => isSubmitting && event.preventDefault()}
           >
-            {showNew ? 'Hide' : 'Show'}
-          </button>
-        </div>
-        <p
-          id="new-password-hint"
-          className={longEnough ? 'requirement requirement-met' : 'requirement'}
-        >
-          {longEnough ? '\u2713 ' : ''}At least {MIN_LENGTH} characters
-        </p>
-        {newError && (
-          <p className="field-error" role="alert">
-            {newError}
-          </p>
-        )}
-      </div>
+            <DialogHeader>
+              <DialogTitle>Change password</DialogTitle>
+              <DialogDescription>
+                Choose a new password. Your other sessions on other browsers and devices will be
+                signed out.
+              </DialogDescription>
+            </DialogHeader>
 
-      {formError && (
-        <p className="field-error" role="alert">
-          {formError}
-        </p>
+            <form onSubmit={handleSubmit}>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="current-password">Current password</FieldLabel>
+                  <Input
+                    id="current-password"
+                    type="password"
+                    required
+                    autoFocus
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    aria-invalid={currentError !== null}
+                    aria-describedby={currentError ? 'current-password-error' : undefined}
+                  />
+                  {currentError && (
+                    <p id="current-password-error" className="text-sm text-destructive" role="alert">
+                      {currentError}
+                    </p>
+                  )}
+                </Field>
+
+                <Field>
+                  <FieldLabel htmlFor="new-password">New password</FieldLabel>
+                  <div className="flex gap-2">
+                    <Input
+                      id="new-password"
+                      type={showNew ? 'text' : 'password'}
+                      required
+                      autoComplete="new-password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      aria-invalid={newError !== null}
+                      aria-describedby="new-password-hint"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      aria-pressed={showNew}
+                      onClick={() => setShowNew((v) => !v)}
+                    >
+                      {showNew ? 'Hide' : 'Show'}
+                    </Button>
+                  </div>
+                  <p
+                    id="new-password-hint"
+                    className={
+                      longEnough ? 'text-sm text-[var(--color-success)]' : 'text-sm text-muted-foreground'
+                    }
+                  >
+                    {longEnough ? '✓ ' : ''}At least {MIN_LENGTH} characters
+                  </p>
+                  {newError && (
+                    <p className="text-sm text-destructive" role="alert">
+                      {newError}
+                    </p>
+                  )}
+                </Field>
+
+                {formError && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{formError}</AlertDescription>
+                  </Alert>
+                )}
+              </FieldGroup>
+
+              <DialogFooter className="mt-6">
+                <Button type="button" variant="outline" onClick={cancel} disabled={isSubmitting}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'Saving...' : 'Update password'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       )}
-
-      <div className="password-form-actions">
-        <button type="button" className="button-secondary" onClick={cancel} disabled={isSubmitting}>
-          Cancel
-        </button>
-        <button type="submit" className="button-primary" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : 'Update password'}
-        </button>
-      </div>
-    </form>
+    </>
   )
 }

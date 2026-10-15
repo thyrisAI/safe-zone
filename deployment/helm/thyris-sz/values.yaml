@@ -89,7 +89,7 @@ config:
   validateContentType: "true"
   authEnabled: "false"
   authRequireBearerToken: "true"
-  authPublicPaths: /healthz,/ready
+  authPublicPaths: /healthz,/ready,/auth/login,/auth/logout,/auth/me,/patterns,/allowlist,/blacklist,/validators,/users,/dashboard,/audit
   authTokenPermissions: token_detect=detect:read,token_gateway=gateway:use,token_admin=*
   rateLimitEnabled: "true"
   rateLimitRequestsPerSecond: "100"

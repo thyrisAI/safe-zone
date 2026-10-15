@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { listUsers, createUser } from '../api/users'
+import { Badge, Button } from '@thyris/ui'
+import { listUsers, createUser, deleteUser } from '../api/users'
 import { ApiError } from '../api/client'
 import type { CreateUserInput, DashboardUser } from '../types/users'
 import AddUserModal from '../components/AddUserModal'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { useAuth } from '../context/AuthContext'
 
 type LoadState = 'loading' | 'success' | 'empty' | 'error' | 'unauthorized'
@@ -13,6 +15,9 @@ export default function Users() {
   const [users, setUsers] = useState<DashboardUser[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<DashboardUser | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -55,6 +60,39 @@ export default function Users() {
     }
   }
 
+  async function handleConfirmDelete() {
+    if (!pendingDelete) return
+
+    setIsDeleting(true)
+    setDeleteError(null)
+    try {
+      await deleteUser(pendingDelete.ID)
+    } catch (err) {
+      // 404: someone else already deleted this account, so just refresh.
+      if (!(err instanceof ApiError && err.status === 404)) {
+        if (err instanceof ApiError && err.status === 409) {
+          setDeleteError('The last active admin cannot be deleted.')
+        } else if (err instanceof ApiError && err.status === 400) {
+          setDeleteError('You cannot delete your own account.')
+        } else {
+          setDeleteError('Unable to delete this user. Please try again.')
+        }
+        setIsDeleting(false)
+        return
+      }
+    }
+
+    setPendingDelete(null)
+    setIsDeleting(false)
+    try {
+      const data = await listUsers()
+      setUsers(data)
+      setLoadState(data.length === 0 ? 'empty' : 'success')
+    } catch {
+      setLoadState('error')
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -62,10 +100,10 @@ export default function Users() {
         <p className="page-subtitle">Manage dashboard accounts and roles</p>
       </div>
 
-      <div className="list-toolbar">
-        <button type="button" className="button-primary" onClick={() => setIsAddModalOpen(true)}>
+      <div className="my-4 flex justify-end">
+        <Button type="button" onClick={() => setIsAddModalOpen(true)}>
           + Add User
-        </button>
+        </Button>
       </div>
 
       {loadState === 'loading' && <p className="info-message">Loading users...</p>}
@@ -91,6 +129,7 @@ export default function Users() {
               <th scope="col">Status</th>
               <th scope="col">Created</th>
               <th scope="col">Activity</th>
+              <th scope="col">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -98,19 +137,35 @@ export default function Users() {
               <tr key={user.ID} className={currentUser?.email === user.email ? 'row-self' : undefined}>
                 <td data-label="Email">
                   {user.email}
-                  {currentUser?.email === user.email && <span className="tag-you">You</span>}
+                  {currentUser?.email === user.email && <Badge className="ml-2">You</Badge>}
                 </td>
                 <td data-label="Role">{user.role === 'admin' ? 'Admin' : 'Viewer'}</td>
                 <td data-label="Status">
-                  <span className={user.is_active ? 'toggle-label-on' : 'toggle-label-off'}>
+                  <span className={user.is_active ? 'text-sm font-medium text-green-700' : 'text-sm text-muted-foreground'}>
                     {user.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
                 <td data-label="Created">{new Date(user.CreatedAt).toLocaleDateString()}</td>
                 <td data-label="Activity">
-                  <Link to={`/activity?user=${user.ID}`} className="link-button">
-                    View activity
-                  </Link>
+                  <Button asChild variant="link" size="sm" className="h-auto p-0">
+                    <Link to={`/activity?user=${user.ID}`}>View activity</Link>
+                  </Button>
+                </td>
+                <td data-label="Actions">
+                  {currentUser?.email !== user.email && (
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0 text-destructive"
+                      onClick={() => {
+                        setDeleteError(null)
+                        setPendingDelete(user)
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -119,6 +174,18 @@ export default function Users() {
       )}
 
       {isAddModalOpen && <AddUserModal onCancel={() => setIsAddModalOpen(false)} onSubmit={handleAddUser} />}
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Delete user?"
+          message="Are you sure you want to delete this user? They will be signed out immediately and cannot sign in again. This cannot be undone."
+          itemLabel={pendingDelete.email}
+          isConfirming={isDeleting}
+          confirmError={deleteError}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={handleConfirmDelete}
+        />
+      )}
     </div>
   )
 }

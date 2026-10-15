@@ -13,3 +13,8 @@ export async function createUser(input: CreateUserInput): Promise<{ email: strin
     body: JSON.stringify(input),
   })
 }
+
+/** Admin-only: delete a dashboard account for good. */
+export async function deleteUser(id: number): Promise<void> {
+  return request<void>(`/users/${id}`, { method: 'DELETE' })
+}

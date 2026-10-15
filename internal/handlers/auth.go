@@ -245,7 +245,23 @@ func ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = auth.ClearPasswordFailures(r.Context(), userID)
-	audit.Record(r, &userID, user.Email, models.AuditActionPasswordChange, models.AuditStatusSuccess)
+
+	// Close the user's other sessions (other browsers and devices, or
+	// whoever signed in with the old password). The session that made this
+	// request stays open. The new password is already stored, so a failure
+	// here is logged and does not undo the change.
+	details := "0 other sessions closed"
+	if cookie, cookieErr := r.Cookie(auth.SessionCookieName); cookieErr == nil {
+		closed, revokeErr := auth.RevokeOtherSessions(r.Context(), userID, cookie.Value)
+		if revokeErr != nil {
+			log.Printf("auth: could not close other sessions after a password change: %v", revokeErr)
+			details = "other sessions could not be closed"
+		} else {
+			details = strconv.Itoa(closed) + " other sessions closed"
+		}
+	}
+
+	audit.RecordWithDetails(r, &userID, user.Email, models.AuditActionPasswordChange, models.AuditStatusSuccess, details)
 	w.WriteHeader(http.StatusNoContent)
 }
 

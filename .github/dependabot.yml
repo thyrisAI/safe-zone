@@ -1,0 +1,85 @@
+version: 2
+updates:
+  # Internal Go modules (root app: api, tsz-ext-proc, tsz-controller, tsz-policy,
+  # mocks; plus the CLI and the SDK usage example). Merged into one entry so
+  # compatible version bumps land in a single PR instead of separate ones per
+  # directory.
+  - package-ecosystem: "gomod"
+    directories:
+      - "/"
+      - "/pkg/tsz-cli"
+      - "/examples/go-sdk-demo"
+    schedule:
+      interval: "weekly"
+    groups:
+      patch-and-minor:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Go SDK module (published, used by external consumers). Kept separate from
+  # the internal modules above so its version bumps stay independently
+  # trackable/releasable and aren't mixed into internal app changes.
+  - package-ecosystem: "gomod"
+    directory: "/pkg/tszclient-go"
+    schedule:
+      interval: "weekly"
+    groups:
+      patch-and-minor:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Python packages (root pyproject.toml + red-team/example tooling). Merged
+  # into one entry for the same reason as the Go modules above.
+  - package-ecosystem: "pip"
+    directories:
+      - "/"
+      - "/examples/llm-data-exfiltration-redteam-python"
+    schedule:
+      interval: "weekly"
+    groups:
+      patch-and-minor:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Web frontend (npm) — previously missing; this is where react-router/nanoid
+  # findings came from during OWASP Dependency-Check runs.
+  - package-ecosystem: "npm"
+    directory: "/web"
+    schedule:
+      interval: "weekly"
+    groups:
+      patch-and-minor:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+
+  # CI/CD workflow actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      patch-and-minor:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Container base images
+  - package-ecosystem: "docker"
+    directory: "/deployment/docker"
+    schedule:
+      interval: "weekly"
+    groups:
+      patch-and-minor:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
